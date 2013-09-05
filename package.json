@@ -1,0 +1,39 @@
+{
+	"name": "nodeclam",
+	"version": "0.0.1",
+	"author": {
+		"name": "Kyle Farris",
+		"company": "Info Tech, Inc.",
+		"email": "kyle.farris@infotechfl.com"
+	},
+	"description": "Scan files on your server with ClamAV. Especially useful for scanning uploaded files provided by untrusted sources.",
+	"main": "index.js",
+	"contributors": [
+		
+	],
+	"scripts": {
+		"test": "echo 'Error: no test specified' && exit 1"
+	},
+	"repository": {
+		"type": "git",
+		"url": "http://stash1.prod.int.hs.lan/projects/IS/repos/app_corp_fileshare/"
+	},
+	"dependencies": {
+		"express": "3.3.x",
+		"connect-flash": "0.1.x",
+        "markdown": "0.5.x",
+		"jade" : "0.34.x",
+		"mysql-activerecord" : "0.8.x",
+		"sqlite3" : "2.1.x",
+        "connect-redis": "1.4.x",
+		"underscore": "1.5.x",
+        "nodemailer": "0.5.x",
+        "winston": "0.6.x",
+		"phpjs": "*",
+		"passport-google": "0.3.x"
+	},
+	"license": "Copyright &copy; 2013",
+	"engines": {
+		"node": ">=0.10.13"
+	}
+}
