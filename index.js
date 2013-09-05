@@ -26,27 +26,80 @@ module.exports = function(options){
 	function NodeClam(options) {
 		// Configuration Settings
 		this.settings = {};
-		this.settings.max_forks = 5;
 		this.settings.clam_path = '/usr/bin/clamscan';
+		this.settings.max_forks = 2;
+		this.settings.remove_infected = false;
+		this.settings.quarantine_infected = false;
+		this.settings.scan_archives = true;
+		this.settings.scan_recursively = true;
+		this.settings.scan_log = null;
+		this.settings.db = null;
+		this.settings.debug_mode = false;
 		
 		// Override settings by user configs
 		this.settings = __.extend(this.settings,options);
 		
+		// Verify specified paths exists
+		this.clam_path_exists = false;
+		
+		// REQUIRED: Make sure clamscan exists at specified location
+		if(fs.existsSync(this.settings.clam_path)) {
+			this.clam_path_exists = true;
+		} else {
+			if(this.settings.debug_mode)
+				console.log("node-clam: ClamAV could not be found at " + this.clam_path + "!");
+		}
+		
+		// Make sure quarantine path exists at specified location
+		if(!__.isEmpty(this.settings.quarantine_path) && fs.existsSync(this.settings.quarantine_path)) {
+			this.quarantine_path = null;
+			this.quarantine_infected = false;
+			if(this.settings.debug_mode)
+				console.log("node-clam: Quarantine path (" + this.clam_path + ") is invalid.");
+		}
+		
+		// Make sure scan_log exists at specified location
+		if(!__.isEmpty(this.settings.scan_log) && fs.existsSync(this.settings.scan_log)) {
+			this.scan_log = null;
+			if(this.settings.debug_mode)
+				console.log("node-clam: Scan Log path (" + this.scan_log + ") is invalid.");
+		}
+		
+		// Make sure definition db exists at specified location
+		if(!__.isEmpty(this.settings.db) && fs.existsSync(this.settings.db)) {
+			this.db = null;
+			if(this.settings.debug_mode)
+				console.log("node-clam: Definitions DB path (" + this.db + ") is invalid.");
+		}
+		
 		// Prevent dividing by 0 or NaN and force a positive Integer
-		if(this.settings.max_forks !== +this.settings.max_forks || this.settings.max_forks !== (this.settings.max_forks|0))
+		if(this.settings.max_forks !== +this.settings.max_forks || this.settings.max_forks !== (this.settings.max_forks|0)) {
 			this.settings.max_forks = 1;
+			if(this.settings.debug_mode)
+				console.log("node-clam: Max forks value is invalid and was reset to 1.");
+		}
+		
+		// Build clam flags
+		this.clam_flags = build_clam_flags(this.settings);
 		
 		// Non-overrideable stuff
 		this.bad_files = [];
 		this.good_files = [];
 		this.completed_files = 0;
 		
+		// *****************************************************************************
 		// Scan Files function
+		// -----
+		// @param	Array		all_files	List of files (with paths) to be scanned
+		// @param	Function	callback	What to do when all files have been scanned
+		// *****************************************************************************
 		this.do_multiscan = function(all_files,callback) {
 			var chunks = [];
 			var chunk = 0;
+			var self = this;
+			
 			for(var i=0; i<=all_files.length-1; i++) {
-				if(i % self.settings.max_forks == 0) chunk = i / self.settings.max_forks;
+				if(i % this.settings.max_forks == 0) chunk = i / this.settings.max_forks;
 				if(!__.isArray(chunks[chunk])) {
 					chunks[chunk] = [];
 				}
@@ -56,19 +109,21 @@ module.exports = function(options){
 				var files = chunks.shift();
 				var file;
 				for(key in files) {
-					file = path + files[key];
-					self.is_infected(file, function(file, infected) {
-						completed_files++;
-						if(infected) self.bad_files.push(file);
+					file = files[key];
+					self.is_infected(file, function(err, file, infected) {
+						self.completed_files++;
+						if(infected || err) self.bad_files.push(file);
 						if(!infected) self.good_files.push(file);
 						if(self.completed_files % self.settings.max_forks == 0 || self.completed_files == all_files.length) {
 							// Fires when all files have been scanned
 							if(self.completed_files == all_files.length) {
-								//console.log("All Done!");
-								//console.log("Bad Files: ");
-								//console.dir(bad_files);
-								//console.log("Good Files: ");
-								//console.dir(good_files);
+								if(self.settings.debug_mode) {
+									console.log('node-clam: Scan Complete!');
+									console.log("node-clam: Bad Files: ");
+									console.dir(self.bad_files);
+									console.log("node-clam: Good Files: ");
+									console.dir(self.good_files);
+								}
 								if(__.isFunction(callback)) callback(null,self.good_files,self.bad_files);
 								self.reset();
 							} 
@@ -82,6 +137,56 @@ module.exports = function(options){
 				}
 			})();
 		}
+	}
+	
+	// ****************************************************************************
+	// Checks if a particular file is infected.
+	// -----
+	// @param	String		file		Path to the file to check
+	// @param	Function	callback	What to do after the scan
+	// ****************************************************************************
+	NodeClam.prototype.is_infected = function(file,callback) {
+		if(this.settings.debug_mode)
+			console.log("node-clam: Scanning " + file);
+		
+		var command = this.settings.clam_path + this.clam_flags + file;
+		
+		if(this.settings.debug_mode === true)
+			console.log('node-clam: Configured clam command: ' + command);
+		
+		var self = this;
+		
+		// Execute the clam binary with the proper flags
+		exec(command, function(err, stdout, stderr) { 
+			if(err || stderr) {
+				if(self.settings.debug_mode)
+					console.log(err);
+				callback(err, file, null);
+			} else {
+				var result = stdout.trim();
+				
+				if(result.match(/OK$/)) {
+					if(self.settings.debug_mode)
+						console.log(file + ' is OK!');
+					callback(null, file, false);
+				} else {
+					if(self.settings.debug_mode)
+						console.log(file + ' is INFECTED!');
+					callback(null, file, true);
+				}
+			}
+		});
+	}
+	
+	// ****************************************************************************
+	// Scans an array of files. You should provide the full paths of the files. If
+	// The file is not found, the default 
+	// -----
+	// @param	Array	files	A list of files (full paths) to be scanned.
+	// @param	Function	callback	What to do after the scan
+	// ****************************************************************************
+	NodeClam.prototype.scan_files = function(files,callback) {
+		this.do_multiscan(files,callback);
 	}
 
 	// ****************************************************************************
@@ -101,44 +206,10 @@ module.exports = function(options){
 			}
 		});
 	}
-
+	
 	// ****************************************************************************
-	// Scans an array of files. You should provide the full paths of the files. If
-	// The file is not found, the default 
-	// -----
-	// @param	Array	files	A list of files (full paths) to be scanned.
-	// @param	Function	callback	What to do after the scan
-	// ****************************************************************************
-	NodeClam.prototype.scan_files = function(files,callback) {
-		this.do_multiscan(files,callback);
-	}
-
-	// ****************************************************************************
-	// Checks if a particular file is infected.
-	// -----
-	// @param	String		file		Path to the file to check
-	// @param	Function	callback	What to do after the scan
-	// ****************************************************************************
-	NodeClam.prototype.is_infected = function(file,callback) {
-		//console.log("Scanning " + file);
-		exec(this.settings.clam_path + ' --stdout --no-summary ' + file, function(error, stdout, stderr) { 
-			var result = stdout.trim();
-			//console.log(result);
-			if(result.match(/OK$/)) {
-				//console.log("File is good!");
-				callback(file, false);
-			} else {
-				//console.log("File is bad!");
-				callback(file, true);
-			}
-		});
-	}
-
-	// ****************************************************************************
-	// Basic Description
-	// -----
-	// @param
-	// @return
+	// Cleans up the list of good, bad, and completed filed. Not sure if it will be
+	// necessary but it really doesn't hurt to do it.
 	// ****************************************************************************
 	NodeClam.prototype.reset = function() {
 		this.good_files = [];
@@ -148,3 +219,45 @@ module.exports = function(options){
 	
 	return new NodeClam(options);
 };
+
+// *****************************************************************************
+// Builds out the flags based on the configuration the user provided
+// -----
+// @param	Object	settings	The settings used to build the flags
+// @return	String				The concatenated clamav flags
+// @api		Private
+// *****************************************************************************
+function build_clam_flags(settings) {
+	var flags_array = ['--stdout','--no-summary'];
+	
+	// Collect the proper flags
+	if(settings.remove_infected === true) {
+		flags_array.push('--remove=yes');
+	} else {
+		flags_array.push('--remove=no');
+		if(!__.isEmpty(settings.quarantine_path) && settings.quarantine_infected === true) 
+			flags_array.push('--move=' + settings.quarantine_path);
+	}
+	
+	if(settings.scan_archives === true) {
+		flags_array.push('--scan-archive=yes');
+	} else {
+		flags_array.push('--scan-archive=no');
+	}
+	
+	if(settings.scan_recursively === true) {
+		flags_array.push('-r');
+	} else {
+		flags_array.push('--recursive=no');
+	}
+	
+	if(!__.isEmpty(settings.scan_log))
+		flags_array.push('--log=' + settings.scan_log);
+		
+	if(!__.isEmpty(settings.db))
+		flags_array.push('--database=' + settings.db);
+	
+	// Build the String
+	return ' ' + flags_array.join(' ') + ' ';
+	
+}
