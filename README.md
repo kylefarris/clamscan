@@ -1,7 +1,10 @@
 # node-clam
-========
 
 Scan files on your server with ClamAV. Especially useful for scanning uploaded files provided by un-trusted sources.
+
+** NOTE **
+
+This is not production ready! Please do not use this until this message has been removed!
 
 ## Examples
 
