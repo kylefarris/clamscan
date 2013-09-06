@@ -10,7 +10,7 @@ This module has the ability to scan many files at once if you set the max_forks 
 
 All of the values listed in the example below represent the default values for their respective configuration item.
 
-    var clam = require('node-clam')({
+    var clam = require('clamscan')({
 	    max_forks: 2, 					// Num of files to scan at once (should be no more than # of CPU cores)
 	    clam_path: '/usr/bin/clamscan',	// Path to clamscan binary on your server
 		remove_infected: false,			// If true, removes infected files
@@ -24,7 +24,7 @@ All of the values listed in the example below represent the default values for t
 	
 Here is a non-default values example (to help you get an idea of what the proper-looking values should be):
 
-    var clam = require('node-clam')({
+    var clam = require('clamscan')({
 	    max_forks: 1, 					// Do this if you only have one CPU core (12 for a monster machine)
 	    clam_path: '/usr/bin/clam',		// I dunno, maybe your clamscan is just call "clam"
 		remove_infected: true,			// Removes files if they are infected
