@@ -1,6 +1,6 @@
 {
-	"name": "node-clam",
-	"version": "0.0.1",
+	"name": "clamav",
+	"version": "0.1.0",
 	"author": {
 		"name": "Kyle Farris",
 		"company": "Info Tech, Inc.",
@@ -16,7 +16,7 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "git@github.com:kylefarris/nodeclam.git"
+		"url": "git@github.com:kylefarris/clamscan.git"
 	},
 	"dependencies": {
 		"underscore": "1.5.x"
@@ -28,7 +28,8 @@
 		"upload",
 		"virus scanning",
 		"clam",
-		"clamd"
+		"clamd",
+		"security"
 	],
 	"license": "MIT",
 	"engines": {

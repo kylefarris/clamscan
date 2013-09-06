@@ -1,12 +1,8 @@
-# node-clam
+# NodeJS Clamscan Virus Scanning Utility
 
-Scan files on your server with ClamAV. Especially useful for scanning uploaded files provided by un-trusted sources. 
+Use Node JS to scan files on your server with ClamAV's clamscan binary. This is especially useful for scanning uploaded files provided by un-trusted sources. 
 
-This module has the ability to scan many files at once if you set the max_forks greater than 1. By default it is set to scan 5 at a time. Using this technique may not prove to be more efficient depending on your setup.
-
-** NOTE **
-
-This is not production ready! Please do not use this until this message has been removed!
+This module has the ability to scan many files at once if you set the max_forks greater than 1. By default it is set to scan 2 at a time. Using this technique may not prove to be more efficient depending on your setup. Scans are called via `child_process.exec` and, so, each execution (scan) is a new child process. The more CPU cores you have, the higher you can make this number. If you have 8 cores, I wouldn't go higher than 7. If you have 4, set this number to 3. If you have a 2-core machine, you can safely set this to 2, per my testing.
 
 ## Examples
 
