@@ -1,38 +1,36 @@
 {
-	"name": "clamscan",
-	"version": "0.1.0",
-	"author": {
-		"name": "Kyle Farris",
-		"company": "Info Tech, Inc.",
-		"email": "kyle.farris@infotechfl.com"
-	},
-	"description": "Scan files on your server with ClamAV. Especially useful for scanning uploaded files provided by un-trusted sources.",
-	"main": "index.js",
-	"contributors": [
-		
-	],
-	"scripts": {
-		"test": "echo 'Error: no test specified' && exit 1"
-	},
-	"repository": {
-		"type": "git",
-		"url": "git@github.com:kylefarris/clamscan.git"
-	},
-	"dependencies": {
-		"underscore": "1.5.x"
-	},
-	"keywords": [
-		"clamav",
-		"virus",
-		"clamscan",
-		"upload",
-		"virus scanning",
-		"clam",
-		"clamd",
-		"security"
-	],
-	"license": "MIT",
-	"engines": {
-		"node": ">=0.10.13"
-	}
+  "name": "clamscan",
+  "version": "0.1.0",
+  "author": "Kyle Farris <kfarris@chomponllc.com> (http://chomponllc.com)",
+  "description": "Use Node JS to scan files on your server with ClamAV's clamscan binary. This is especially useful for scanning uploaded files provided by un-trusted sources.",
+  "main": "index.js",
+  "contributors": [],
+  "scripts": {
+    "test": "echo 'Error: no test specified' && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:kylefarris/clamscan.git"
+  },
+  "dependencies": {
+    "underscore": "1.5.x"
+  },
+  "keywords": [
+    "clamav",
+    "virus",
+    "clamscan",
+    "upload",
+    "virus scanning",
+    "clam",
+    "clamd",
+    "security"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=0.10.13"
+  },
+  "bugs": {
+    "url": "https://github.com/kylefarris/clamscan/issues"
+  },
+  "devDependencies": {}
 }
