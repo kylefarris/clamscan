@@ -139,6 +139,10 @@ This allows you to scan many files that might be in different directories or may
 #### Example
 
 ```javascript
+var scan_status = {
+	good: 0,
+	bad: 0
+};
 var files = [
     '/path/to/file/1.jpg',
     '/path/to/file/2.mov',
@@ -158,6 +162,13 @@ clam.scan_files(files, function(err, good_files, bad_files) {
     } else {
         // Do some error handling
     }
+}, function(err, file, is_infected) {
+	if(is_infected) {
+		scan_status.bad++;
+	} else {
+		scan_status.good++;
+	}
+	console.log("Scan Status: " + (scan_status.bad + scan_status.good) + "/" + files.length);
 });
 ```
 
