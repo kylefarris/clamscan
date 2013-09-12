@@ -92,8 +92,9 @@ module.exports = function(options){
 		// -----
 		// @param	Array		all_files	List of files (with paths) to be scanned
 		// @param	Function	callback	What to do when all files have been scanned
+		// @param	Function	file_cb		What to do after each file has been scanned
 		// *****************************************************************************
-		this.do_multiscan = function(all_files,callback) {
+		this.do_multiscan = function(all_files,end_cb,file_cb) {
 			var chunks = [];
 			var chunk = 0;
 			var self = this;
@@ -114,6 +115,9 @@ module.exports = function(options){
 						self.completed_files++;
 						if(infected || err) self.bad_files.push(file);
 						if(!infected) self.good_files.push(file);
+						
+						if(__.isFunction(file_cb)) file_cb(err,file,infected);
+						
 						if(self.completed_files % self.settings.max_forks == 0 || self.completed_files == all_files.length) {
 							// Fires when all files have been scanned
 							if(self.completed_files == all_files.length) {
@@ -124,7 +128,7 @@ module.exports = function(options){
 									console.log("node-clam: Good Files: ");
 									console.dir(self.good_files);
 								}
-								if(__.isFunction(callback)) callback(null,self.good_files,self.bad_files);
+								if(__.isFunction(end_cb)) end_cb(null,self.good_files,self.bad_files);
 								self.reset();
 							} 
 							// All files have not been scanned yet, do next chunk.
@@ -182,11 +186,12 @@ module.exports = function(options){
 	// Scans an array of files. You should provide the full paths of the files. If
 	// The file is not found, the default 
 	// -----
-	// @param	Array	files	A list of files (full paths) to be scanned.
-	// @param	Function	callback	What to do after the scan
+	// @param	Array		files		A list of files (full paths) to be scanned.
+	// @param	Function	end_cb		What to do after the scan
+	// @param	Function	file_cb		What to do after each file has been scanned
 	// ****************************************************************************
-	NodeClam.prototype.scan_files = function(files,callback) {
-		this.do_multiscan(files,callback);
+	NodeClam.prototype.scan_files = function(files,end_cb,file_cb) {
+		this.do_multiscan(files,end_cb,file_cb);
 	}
 
 	// ****************************************************************************
@@ -194,15 +199,16 @@ module.exports = function(options){
 	// and Bad Files.
 	// -----
 	// @param	String		path		The directory to scan files of
-	// @param	Function	callback	What to do when all files have been scanned
+	// @param	Function	en_cb	    What to do when all files have been scanned
+	// @param   Function    file_cb     What to do after each file has been scanned
 	// ****************************************************************************
-	NodeClam.prototype.scan_dir = function(path,callback) {
+	NodeClam.prototype.scan_dir = function(path,end_cb,file_cb) {
 		var self = this;
 		fs.readdir(path, function(err,all_files) {
 			if(!err) {
-				self.do_multiscan(all_files,callback);
+				self.do_multiscan(all_files,end_cb,file_cb);
 			} else {
-				callback(err);
+				end_cb(err);
 			}
 		});
 	}
