@@ -163,9 +163,14 @@ module.exports = function(options){
 		// Execute the clam binary with the proper flags
 		exec(command, function(err, stdout, stderr) { 
 			if(err || stderr) {
-				if(self.settings.debug_mode)
-					console.log(err);
-				callback(err, file, null);
+				// The exit code of a positive virus scan is 1. So not an error, just a positive match
+                if(err.code === 1) {
+                    callback(null, file, true);
+                } else {
+                    if(self.settings.debug_mode)
+						console.log(err);
+					callback(err, file, null);
+                }
 			} else {
 				var result = stdout.trim();
 				
@@ -174,6 +179,7 @@ module.exports = function(options){
 						console.log(file + ' is OK!');
 					callback(null, file, false);
 				} else {
+					// Not sure if this will ever be called
 					if(self.settings.debug_mode)
 						console.log(file + ' is INFECTED!');
 					callback(null, file, true);
