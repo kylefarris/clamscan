@@ -164,13 +164,14 @@ module.exports = function(options){
 		exec(command, function(err, stdout, stderr) { 
 			if(err || stderr) {
 				// The exit code of a positive virus scan is 1. So not an error, just a positive match
-                if(err.code === 1) {
-                    callback(null, file, true);
-                } else {
-                    if(self.settings.debug_mode)
-						console.log(err);
-					callback(err, file, null);
-                }
+		                if(err.code === 1) {
+		                    callback(null, file, true);
+		                } else {
+		                    if(self.settings.debug_mode) {
+					console.log(err);
+	                    	    }
+				    callback(err, file, null);
+		                }
 			} else {
 				var result = stdout.trim();
 				
