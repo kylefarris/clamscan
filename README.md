@@ -4,16 +4,6 @@ Use Node JS to scan files on your server with ClamAV's clamscan binary. This is 
 
 This module has the ability to scan many files at once if you set the max_forks greater than 1. By default it is set to scan 2 at a time. Using this technique may not prove to be more efficient depending on your setup. Scans are called via `child_process.exec` and, so, each execution (scan) is a new child process. The more CPU cores you have, the higher you can make this number. If you have 8 cores, I wouldn't go higher than 7. If you have 4, set this number to 3. If you have a 2-core machine, you can safely set this to 2, per my testing.
 
-## Changelog
-
-### 0.2.1
-
-BUG FIX: ClamAV returns an exit code 1 when it detects a virus but `exec` was interpreting that response as an error. Checking the response with type-sensitive equivalence resolves this bug.
-
-### 0.2.2
-
-DOCS: Corrected the installation instructions for `clamav`. Thank you @jshamley !
-
 ## Dependencies
 
 You will need to install ClamAV's clamscan binary on your server. On linux, it's quite simple.
@@ -47,7 +37,7 @@ All of the values listed in the example below represent the default values for t
 You can simply do this:
 
 ```javascript
-var clam = require('clamscan');
+var clam = require('clamscan')();
 ```
 
 And, you'll be good to go. 

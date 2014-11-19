@@ -163,13 +163,17 @@ module.exports = function(options){
 		// Execute the clam binary with the proper flags
 		exec(command, function(err, stdout, stderr) { 
 			if(err || stderr) {
-				if(err.code === 1) {
-					callback(null, file, true);
-				} else {
-					if(self.settings.debug_mode)
-						console.log(err);
-					callback(err, file, null);
-				}
+                if(err) {
+    				if(err.hasOwnProperty('code') && err.code === 1) {
+	    				callback(null, file, true);
+		    		} else {
+			    		if(self.settings.debug_mode)
+				    		console.log(err);
+					    callback(err, file, null);
+				    }
+                } else {
+                    console.error(stderr);
+                }
 			} else {
 				var result = stdout.trim();
 				
@@ -209,6 +213,9 @@ module.exports = function(options){
 	NodeClam.prototype.scan_dir = function(path,end_cb,file_cb) {
 		var self = this;
 		fs.readdir(path, function(err,all_files) {
+			for (var i in all_files) {
+				all_files[i] = path.replace(/\/$/,'') + '/' + all_files[i];
+			}
 			if(!err) {
 				self.do_multiscan(all_files,end_cb,file_cb);
 			} else {
