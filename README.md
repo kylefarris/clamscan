@@ -10,17 +10,21 @@ This module has the ability to scan many files at once if you set the max_forks 
 
 BUG FIX: ClamAV returns an exit code 1 when it detects a virus but `exec` was interpreting that response as an error. Checking the response with type-sensitive equivalence resolves this bug.
 
+### 0.2.2
+
+DOCS: Corrected the installation instructions for `clamav`. Thank you @jshamley !
+
 ## Dependencies
 
 You will need to install ClamAV's clamscan binary on your server. On linux, it's quite simple.
 
 Fedora-based distros:
 	
-	sudo yum install clamscan
+	sudo yum install clamav
 	
 Debian-based distros:
 	
-	sudo apt-get install clamscan
+	sudo apt-get install clamav
 	
 As for OSX, I've not tried it, but, here's a promising looking site: http://www.clamxav.com/index.php . I would stick with linux varieties, though...
 
