@@ -65,7 +65,7 @@ var clam = require('clamscan')({
     max_forks: 1, // Do this if you only have one CPU core (12 for a monster machine)
     clam_path: '/usr/bin/clam', // I dunno, maybe your clamscan is just call "clam"
     remove_infected: true, // Removes files if they are infected
-    quarantine_path: '~/infected/', // Move file here. remove_infected must be FALSE, though.
+    quarantine_infected: '~/infected/', // Move file here. remove_infected must be FALSE, though.
     scan_archives: false, // Choosing false here will save some CPU cycles
     scan_recursively: true, // Choosing false here will save some CPU cycles
     scan_log: '/var/log/node-clam', // You're a detail-oriented security professional.

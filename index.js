@@ -252,8 +252,8 @@ function build_clam_flags(settings) {
 		flags_array.push('--remove=yes');
 	} else {
 		flags_array.push('--remove=no');
-		if(!__.isEmpty(settings.quarantine_path) && settings.quarantine_infected === true) 
-			flags_array.push('--move=' + settings.quarantine_path);
+		if(!__.isEmpty(settings.quarantine_infected)) 
+			flags_array.push('--move=' + settings.quarantine_infected);
 	}
 	
 	if(settings.scan_archives === true) {
