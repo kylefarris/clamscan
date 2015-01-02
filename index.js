@@ -18,91 +18,98 @@ var exec = require('child_process').exec;
 // ****************************************************************************
 module.exports = function(options){
 	
-	this.default_scanner = 'clamdscan';
-	
-	// Configuration Settings
-	this.settings = {
-		remove_infected: false,
-		quarantine_infected: false,
-		scan_log: null,
-		debug_mode: false,
-		file_list: null,
-		scan_recursively: true,
-		clamscan: {
-			path: '/usr/bin/clamscan',
-			scan_archives: true,
-			db: null,
-			active: true
-		},
-		clamdscan: {
-			path: '/usr/bin/clamdscan',
-			config_file: '/etc/clamd.conf',
-			multiscan: true,
-			reload_db: false,
-			active: true
-		},
-		preference: this.default_scanner
-	};
+	// ****************************************************************************
+	// NodeClam class definition
+	// -----
+	// @param	Object	options		Key => Value pairs to override default settings
+	// ****************************************************************************
+	function NodeClam(options) {
+		this.default_scanner = 'clamdscan';
+		
+		// Configuration Settings
+		this.settings = {
+			remove_infected: false,
+			quarantine_infected: false,
+			scan_log: null,
+			debug_mode: false,
+			file_list: null,
+			scan_recursively: true,
+			clamscan: {
+				path: '/usr/bin/clamscan',
+				scan_archives: true,
+				db: null,
+				active: true
+			},
+			clamdscan: {
+				path: '/usr/bin/clamdscan',
+				config_file: '/etc/clamd.conf',
+				multiscan: true,
+				reload_db: false,
+				active: true
+			},
+			preference: this.default_scanner
+		};
 
-	// Override defaults with user preferences
-	this.settings = __.extend(this.settings,options);
-	
-	// Backwards compatibilty
-	if (this.settings.quarantine_path && !__.isEmpty(this.settings.quarantine_path)) {
-		this.settings.quarantine_infected = this.settings.quarantine_path;
-	}
-	
-	// Determine whether to use clamdscan or clamscan
-	this.scanner = this.default_scanner;
-	if (this.settings.preference == 'clamscan' && this.settings.clamscan.active === true) {
-		this.scanner = 'clamscan';
-	}
-	
-	// Check to make sure preferred scanner exists
-	if (!fs.existsSync(this.settings[this.scanner].path)) {
-		// Fall back to other option:
-		if (this.scanner == 'clamdscan' && this.settings.clamscan.active === true) {
-			this.scanner == 'clamscan';
-		} else if (this.scanner == 'clamscan' && this.settings.clamdscan.active === true {
-			this.scanner == 'clamdscan';
-		} else {
-			throw new Error("No valid virus scanning binaries are active and available!");
+		// Override defaults with user preferences
+		this.settings = __.extend(this.settings,options);
+		
+		// Backwards compatibilty
+		if (this.settings.quarantine_path && !__.isEmpty(this.settings.quarantine_path)) {
+			this.settings.quarantine_infected = this.settings.quarantine_path;
 		}
 		
-		// Neither scanners are available!
+		// Determine whether to use clamdscan or clamscan
+		this.scanner = this.default_scanner;
+		if (this.settings.preference == 'clamscan' && this.settings.clamscan.active === true) {
+			this.scanner = 'clamscan';
+		}
+		
+		// Check to make sure preferred scanner exists
 		if (!fs.existsSync(this.settings[this.scanner].path)) {
-			throw new Error("No valid virus scanning binaries have been found in the paths provided!");
+			// Fall back to other option:
+			if (this.scanner == 'clamdscan' && this.settings.clamscan.active === true) {
+				this.scanner == 'clamscan';
+			} else if (this.scanner == 'clamscan' && this.settings.clamdscan.active === true) {
+				this.scanner == 'clamdscan';
+			} else {
+				throw new Error("No valid virus scanning binaries are active and available!");
+			}
+			
+			// Neither scanners are available!
+			if (!fs.existsSync(this.settings[this.scanner].path)) {
+				throw new Error("No valid virus scanning binaries have been found in the paths provided!");
+			}
 		}
-	}
-	
-	// Make sure quarantine path exists at specified location
-	if (!__.isEmpty(this.settings.quarantine_infected) && !fs.existsSync(this.settings.quarantine_infected)) {
-		this.quarantine_infected = false;
-		throw new Error("Quarantine path (" + this.quarantine_infected + ") is invalid.");
 		
-		if (this.settings.debug_mode)
-			console.log("node-clam: Quarantine path (" + this.quarantine_infected + ") is invalid.");
-	}
-	
-	// Make sure scan_log exists at specified location
-	if (!__.isEmpty(this.settings.scan_log) && fs.existsSync(this.settings.scan_log)) {
-		this.scan_log = null;
-		
-		if (this.settings.debug_mode)
-			console.log("node-clam: Scan Log path (" + this.scan_log + ") is invalid.");
-	}
-	
-	// If using clamscan, make sure definition db exists at specified location
-	if (this.scanner == 'clamscan') {
-		if (!__.isEmpty(this.settings.clamscan.db) && !fs.existsSync(this.settings.db)) {
-			this.db = null;
-			if(this.settings.debug_mode)
-				console.log("node-clam: Definitions DB path (" + this.db + ") is invalid.");
+		// Make sure quarantine path exists at specified location
+		if (!__.isEmpty(this.settings.quarantine_infected) && !fs.existsSync(this.settings.quarantine_infected)) {
+			this.quarantine_infected = false;
+			throw new Error("Quarantine path (" + this.quarantine_infected + ") is invalid.");
+			
+			if (this.settings.debug_mode)
+				console.log("node-clam: Quarantine path (" + this.quarantine_infected + ") is invalid.");
 		}
+		
+		// Make sure scan_log exists at specified location
+		if (!__.isEmpty(this.settings.scan_log) && fs.existsSync(this.settings.scan_log)) {
+			this.scan_log = null;
+			
+			if (this.settings.debug_mode)
+				console.log("node-clam: Scan Log path (" + this.scan_log + ") is invalid.");
+		}
+		
+		// If using clamscan, make sure definition db exists at specified location
+		if (this.scanner == 'clamscan') {
+			if (!__.isEmpty(this.settings.clamscan.db) && !fs.existsSync(this.settings.db)) {
+				this.db = null;
+				if(this.settings.debug_mode)
+					console.log("node-clam: Definitions DB path (" + this.db + ") is invalid.");
+			}
+		}
+		
+		// Build clam flags
+		this.clam_flags = build_clam_flags(this.scanner, this.settings);
 	}
-	
-	// Build clam flags
-	this.clam_flags = build_clam_flags(this.scanner, this.settings);
 	
 	// ****************************************************************************
 	// Checks if a particular file is infected.
@@ -147,7 +154,7 @@ module.exports = function(options){
 					callback(null, file, true);
 				}
 			}
-		}
+		});
 	}
 	
 	// ****************************************************************************
@@ -178,12 +185,12 @@ module.exports = function(options){
 			(function scan_file() {
 				file = files.shift();
 				self.is_infected(file, function(err, file, infected) {
-					var completed_files++;
+					completed_files++;
 					
 					if(!infected) {
-						var good_files.push(file);
+						good_files.push(file);
 					} else if(infected || err) {
-						var bad_files.push(file);
+						bad_files.push(file);
 					}
 					
 					if(__.isFunction(file_cb)) file_cb(err, file, infected);
@@ -271,6 +278,8 @@ module.exports = function(options){
 	// @param   Function    file_cb     What to do after each file has been scanned
 	// ****************************************************************************
 	NodeClam.prototype.scan_dir = function(path,end_cb,file_cb) {
+		var self = this;
+		
 		path = path || '';
 		end_cb = end_cb || null;
 		files_cb = file_cb || null;
@@ -287,7 +296,7 @@ module.exports = function(options){
 	
 		// Get all files recursively
 		if (this.settings.scan_recursively && typeof file_cb == 'function') {
-			exec('find ' + path. function(err, stdout, stderr) {
+			exec('find ' + path, function(err, stdout, stderr) {
 				if (err || stderr) {
 					if(this.settings.debug_mode === true)
 						console.error(stderr);
@@ -303,7 +312,7 @@ module.exports = function(options){
 			fs.readdir(path, function(err, files) {
 				files.filter(function (file) {
 					return fs.statSync(file).isFile();
-				}
+				});
 				
 				self.scan_files(files, end_file, file_cb);
 			});
@@ -321,18 +330,18 @@ module.exports = function(options){
 				if (err || stderr) {
 					if(this.settings.debug_mode === true)
 						console.error(stderr);
-					return end_cb(err, null, null);
+					return end_cb(err, [], []);
 				} else {
 					var result = stdout.trim();
 					
 					if(result.match(/OK$/)) {
 						if(self.settings.debug_mode)
 							console.log(path + ' is OK!');
-						return end_cb(null, [path], null);
+						return end_cb(null, [path], []);
 					} else {
 						if(self.settings.debug_mode)
 							console.log(path + ' is INFECTED!');
-						return end_cb(null, null, [path]);
+						return end_cb(null, [], [path]);
 					}
 				}
 			});
@@ -340,7 +349,7 @@ module.exports = function(options){
 	}
 	
 	return new NodeClam(options);
-}
+};
 
 // *****************************************************************************
 // Builds out the flags based on the configuration the user provided
