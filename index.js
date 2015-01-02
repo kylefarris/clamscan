@@ -321,18 +321,18 @@ module.exports = function(options){
 				if (err || stderr) {
 					if(this.settings.debug_mode === true)
 						console.error(stderr);
-					return end_cb(err, path, null);
+					return end_cb(err, null, null);
 				} else {
 					var result = stdout.trim();
 					
 					if(result.match(/OK$/)) {
 						if(self.settings.debug_mode)
 							console.log(path + ' is OK!');
-						return end_cb(null, path, false);
+						return end_cb(null, [path], null);
 					} else {
 						if(self.settings.debug_mode)
 							console.log(path + ' is INFECTED!');
-						return end_cb(null, path, true);
+						return end_cb(null, null, [path]);
 					}
 				}
 			});
