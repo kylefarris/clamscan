@@ -1,12 +1,10 @@
 ## NodeJS Clamscan Virus Scanning Utility
 
-Use Node JS to scan files on your server with ClamAV's clamscan binary. This is especially useful for scanning uploaded files provided by un-trusted sources.
-
-This module has the ability to scan many files at once if you set the max_forks greater than 1. By default it is set to scan 2 at a time. Using this technique may not prove to be more efficient depending on your setup. Scans are called via `child_process.exec` and, so, each execution (scan) is a new child process. The more CPU cores you have, the higher you can make this number. If you have 8 cores, I wouldn't go higher than 7. If you have 4, set this number to 3. If you have a 2-core machine, you can safely set this to 2, per my testing.
+Use Node JS to scan files on your server with ClamAV's clamscan binary or clamdscan daemon. This is especially useful for scanning uploaded files provided by un-trusted sources.
 
 ## Dependencies
 
-You will need to install ClamAV's clamscan binary on your server. On linux, it's quite simple.
+You will need to install ClamAV's clamscan binary and/or have clamdscan daemon running on your server. On linux, it's quite simple.
 
 Fedora-based distros:
 	
@@ -46,15 +44,26 @@ __BUT__: If you want more control, you can specify all sorts of options.
 
 ```javascript
 var clam = require('clamscan')({
-    max_forks: 2, // Num of files to scan at once (should be no more than # of CPU cores)
-    clam_path: '/usr/bin/clamscan', // Path to clamscan binary on your server
     remove_infected: false, // If true, removes infected files
     quarantine_infected: false, // False: Don't quarantine, Path: Moves files to this place.
-    scan_archives: true, // If true, scan archives (ex. zip, rar, tar, dmg, iso, etc...)
-    scan_recursively: true, // If true, deep scan folders recursively
-    scan_log: null, // Path to a writeable log file to write scan results into
-    db: null, // Path to a custom virus definition database
-    debug_mode: false // Whether or not to log info/debug/error msgs to the console
+	scan_log: null, // Path to a writeable log file to write scan results into
+	debug_mode: false // Whether or not to log info/debug/error msgs to the console
+	file_list: null, // path to file containing list of files to scan
+	scan_recursively: true, // If true, deep scan folders recursively
+	clamscan: {
+		path: '/usr/bin/clamscan', // Path to clamscan binary on your server
+		db: null, // Path to a custom virus definition database
+		scan_archives: true, // If true, scan archives (ex. zip, rar, tar, dmg, iso, etc...)
+		active: true // If true, this module will consider using the clamscan binary
+	},
+    clamdscan: {
+		path: '/usr/bin/clamdscan', // Path to the clamdscan binary on your server
+		config_file: null, // Specify config file if it's in an unusual place
+		multiscan: true, // Scan using all available cores! Yay!
+		reload_db: false, // If true, will re-load the DB on every call (slow)
+		active: true // If true, this module will consider using the clamdscan binary
+	},
+	preference: 'clamdscan' // If clamdscan is found and active, it will be used by default
 });
 ```
 
@@ -62,15 +71,26 @@ Here is a _non-default values example_ (to help you get an idea of what the prop
 
 ```javascript
 var clam = require('clamscan')({
-    max_forks: 1, // Do this if you only have one CPU core (12 for a monster machine)
-    clam_path: '/usr/bin/clam', // I dunno, maybe your clamscan is just call "clam"
     remove_infected: true, // Removes files if they are infected
     quarantine_infected: '~/infected/', // Move file here. remove_infected must be FALSE, though.
-    scan_archives: false, // Choosing false here will save some CPU cycles
     scan_recursively: true, // Choosing false here will save some CPU cycles
     scan_log: '/var/log/node-clam', // You're a detail-oriented security professional.
-    db: '/usr/bin/better_clam_db', // Path to a custom virus definition database
     debug_mode: true // This will put some debug info in your js console
+	file_list: '/home/webuser/scan_files.txt', // path to file containing list of files to scan
+	clamscan: {
+		path: '/usr/bin/clam', // I dunno, maybe your clamscan is just call "clam"
+		db: '/usr/bin/better_clam_db', // Path to a custom virus definition database
+		scan_archives: false, // Choosing false here will save some CPU cycles
+		active: false // you don't want to use this at all because it's evil
+	},
+    clamdscan: {
+		path: '/bin/clamdscan', // Special path to the clamdscan binary on your server
+		config_file: __dirname + '/logs/clamscan-log', // logs file in your app directory
+		multiscan: false, // You hate speed and multi-threaded awesome-sauce
+		reload_db: true, // You want your scans to run slow like with clamscan
+		active: false // you don't want to use this at all because it's evil
+	},
+	preference: 'clamscan' // If clamscan is found and active, it will be used by default	
 });
 ```
 
@@ -107,7 +127,11 @@ clam.is_infected('/a/picture/for_example.jpg', function(err, file, is_infected) 
  
 ### .scan_dir(dir_path, end_callback, file_callback) 
  
-Allows you to scan an entire directory for infected files.
+Allows you to scan an entire directory for infected files. This obeys your `recursive` option even for `clamdscan` which does not have a native way to turn this feature off. If you have multiple paths, send them in an array to `scan_files`. 
+
+__TLDR:__ For maximum speed, don't supply a `file_callback`.
+
+If you choose to supply a `file_callback`, the scan will run a little bit slower (depending on number of files to be scanned) for `clamdscan`. If you are using `clamscan`, while it will work, I'd highly advise you to NOT pass a `file_callback`... it will run incredibly slow.
 
 #### Parameters
 
@@ -138,7 +162,7 @@ clam.scan_dir('/some/path/to/scan', function(err, good_files, bad_files) {
 
 ### .scan_files(files, end_callback, file_callback)
 
-This allows you to scan many files that might be in different directories or maybe only certain files of a single directory. This is essentially a wrapper for `is_infected` that simplifies the process of scanning many files but not a whole directory.
+This allows you to scan many files that might be in different directories or maybe only certain files of a single directory. This is essentially a wrapper for `is_infected` that simplifies the process of scanning many files or directories.
 
 #### Parameters
 
