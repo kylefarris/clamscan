@@ -41,5 +41,8 @@ __NOTE:__ There are some breaking changes on this release. Since this is still a
 
 ### 0.6.2 (2014-01-05)
 
+* Fixed major bug in the scan_files method that was causing it to only scan half the files passed to it.
+
+### 0.6.3 (2014-01-05)
+
 * Removed the unnecessary "index_old.js" file put there for reference during the 0.5.0 -> 0.6.0 semi-rewrite.
-* 
