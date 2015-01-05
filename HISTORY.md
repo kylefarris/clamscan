@@ -34,3 +34,12 @@ __NOTE:__ There are some breaking changes on this release. Since this is still a
 * `db` option has been moved to `clam.db`
 * `scan_archives` option has been moved to `clam.scan_archives`
 * `scan_files` now supports directories as well and will obey your `scan_recursively` option.
+
+### 0.6.1 (2015-01-05)
+
+* Updated description in package.json file.
+
+### 0.6.2 (2014-01-05)
+
+* Removed the unnecessary "index_old.js" file put there for reference during the 0.5.0 -> 0.6.0 semi-rewrite.
+* 

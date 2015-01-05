@@ -183,8 +183,10 @@ module.exports = function(options){
 			files = [files];
 		}
 		
+		var num_files = files.length;
+		
 		if (this.settings.debug_mode === true) {
-			console.log("node-clam: Scanning a list of passed files.");
+			console.log("node-clam: Scanning a list of " + num_files + " passed files.");
 		}
 		
 		// Slower but more verbose way...
@@ -194,6 +196,9 @@ module.exports = function(options){
 				self.is_infected(file, function(err, file, infected) {
 					completed_files++;
 					
+					if (self.settings.debug_mode)
+                        console.log("node-clam: " + completed_files + "/" + num_files + " have been scanned!");
+					
 					if(!infected) {
 						good_files.push(file);
 					} else if(infected || err) {
@@ -202,7 +207,7 @@ module.exports = function(options){
 					
 					if(__.isFunction(file_cb)) file_cb(err, file, infected);
 					
-					if(completed_files >= files.length) {
+					if(completed_files >= num_files) {
 						if(self.settings.debug_mode) {
 							console.log('node-clam: Scan Complete!');
 							console.log("node-clam: Bad Files: ");
