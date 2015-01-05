@@ -8,6 +8,7 @@
 var __ = require('underscore');
 var fs = require('fs');
 var exec = require('child_process').exec;
+var spawn = require('child_process').spawn;
 
 // ****************************************************************************
 // Return a new NodeClam object.
@@ -91,7 +92,7 @@ module.exports = function(options){
 		}
 		
 		// Make sure scan_log exists at specified location
-		if (!__.isEmpty(this.settings.scan_log) && fs.existsSync(this.settings.scan_log)) {
+		if (!__.isEmpty(this.settings.scan_log) && !fs.existsSync(this.settings.scan_log)) {
 			this.scan_log = null;
 			
 			if (this.settings.debug_mode)
@@ -118,11 +119,13 @@ module.exports = function(options){
 	// @param	Function	callback	What to do after the scan
 	// ****************************************************************************
 	NodeClam.prototype.is_infected = function(file, callback) {
+		var self = this;
+		
 		if(this.settings.debug_mode)
 			console.log("node-clam: Scanning " + file);
-			
-		var command = this.settings[this.scanner].path + this.clam_flags + file;
 		
+		// Build the actual command to run
+		var command = this.settings[this.scanner].path + this.clam_flags + file;
 		if(this.settings.debug_mode === true)
 			console.log('node-clam: Configured clam command: ' + command);
 			
@@ -134,11 +137,11 @@ module.exports = function(options){
 	    				callback(null, file, true);
 		    		} else {
 			    		if(self.settings.debug_mode)
-				    		console.log(err);
+				    		console.log("node-clam: " + err);
 					    callback(err, file, null);
 				    }
 				} else {
-					console.error(stderr);
+					console.error("node-clam: " + stderr);
 					callback(err, file, null);
 				}
 			} else {
@@ -146,11 +149,11 @@ module.exports = function(options){
 				
 				if(result.match(/OK$/)) {
 					if(self.settings.debug_mode)
-						console.log(file + ' is OK!');
+						console.log("node-clam: " + file + ' is OK!');
 					callback(null, file, false);
 				} else {
 					if(self.settings.debug_mode)
-						console.log(file + ' is INFECTED!');
+						console.log("node-clam: " + file + ' is INFECTED!');
 					callback(null, file, true);
 				}
 			}
@@ -180,6 +183,10 @@ module.exports = function(options){
 			files = [files];
 		}
 		
+		if (this.settings.debug_mode === true) {
+			console.log("node-clam: Scanning a list of passed files.");
+		}
+		
 		// Slower but more verbose way...
 		if (typeof file_cb === 'function') {
 			(function scan_file() {
@@ -199,9 +206,9 @@ module.exports = function(options){
 						if(self.settings.debug_mode) {
 							console.log('node-clam: Scan Complete!');
 							console.log("node-clam: Bad Files: ");
-							console.dir(self.bad_files);
+							console.dir(bad_files);
 							console.log("node-clam: Good Files: ");
-							console.dir(self.good_files);
+							console.dir(good_files);
 						}
 						if(__.isFunction(end_cb)) end_cb(null, good_files, bad_files);
 					} 
@@ -237,7 +244,8 @@ module.exports = function(options){
 				return file.replace(/ /g,'\\ '); 
 			}).join(' ');
 			
-			var command = this.settings.clamscan.path + this.clam_flags + items;
+			// Build the actual command to run
+			var command = this.settings[this.scanner].path + this.clam_flags + items;
 			if(this.settings.debug_mode === true)
 				console.log('node-clam: Configured clam command: ' + command);
 				
@@ -293,7 +301,7 @@ module.exports = function(options){
 	
 		if(this.settings.debug_mode)
 			console.log("node-clam: Scanning Directory: " + path);
-	
+		
 		// Get all files recursively
 		if (this.settings.scan_recursively && typeof file_cb == 'function') {
 			exec('find ' + path, function(err, stdout, stderr) {
@@ -307,6 +315,7 @@ module.exports = function(options){
 				}
 			});
 		} 
+		
 		// Clamdscan always does recursive, so, here's a way to avoid that if you want...
 		else if (this.settings.scan_recursively === false && this.scanner === 'clamdscan') {
 			fs.readdir(path, function(err, files) {
@@ -320,7 +329,7 @@ module.exports = function(options){
 		
 		// If you don't care about individual file progress (which is very slow for clamscan but fine for clamdscan...)
 		else if (this.settings.scan_recursively && typeof file_cb !== 'function') {
-			var command = this.settings.clamscan.path + this.clam_flags + path;
+			var command = this.settings[this.scanner].path + this.clam_flags + path;
 		
 			if(this.settings.debug_mode === true)
 				console.log('node-clam: Configured clam command: ' + command);
@@ -328,8 +337,10 @@ module.exports = function(options){
 			// Execute the clam binary with the proper flags
 			exec(command, function(err, stdout, stderr) {
 				if (err || stderr) {
-					if(this.settings.debug_mode === true)
+					if(self.settings.debug_mode === true) {
+						console.log("An Error Occurred.");
 						console.error(stderr);
+					}
 					return end_cb(err, [], []);
 				} else {
 					var result = stdout.trim();
