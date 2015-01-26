@@ -84,27 +84,29 @@ module.exports = function(options){
 		
 		// Make sure quarantine path exists at specified location
 		if (!__.isEmpty(this.settings.quarantine_infected) && !fs.existsSync(this.settings.quarantine_infected)) {
+			var err_msg = "Quarantine path (" + this.quarantine_infected + ") is invalid.";
 			this.quarantine_infected = false;
-			throw new Error("Quarantine path (" + this.quarantine_infected + ") is invalid.");
+			throw new Error(err_msg);
 			
 			if (this.settings.debug_mode)
-				console.log("node-clam: Quarantine path (" + this.quarantine_infected + ") is invalid.");
+				console.log("node-clam: " + err_msg);
 		}
 		
 		// Make sure scan_log exists at specified location
 		if (!__.isEmpty(this.settings.scan_log) && !fs.existsSync(this.settings.scan_log)) {
+			var err_msg = "node-clam: Scan Log path (" + this.scan_log + ") is invalid.";
 			this.scan_log = null;
-			
 			if (this.settings.debug_mode)
-				console.log("node-clam: Scan Log path (" + this.scan_log + ") is invalid.");
+				console.log(err_msg);
 		}
 		
 		// If using clamscan, make sure definition db exists at specified location
 		if (this.scanner == 'clamscan') {
 			if (!__.isEmpty(this.settings.clamscan.db) && !fs.existsSync(this.settings.db)) {
+				var err_msg = "node-clam: Definitions DB path (" + this.db + ") is invalid.";
 				this.db = null;
 				if(this.settings.debug_mode)
-					console.log("node-clam: Definitions DB path (" + this.db + ") is invalid.");
+					console.log(err_msg);
 			}
 		}
 		
@@ -197,7 +199,7 @@ module.exports = function(options){
 					completed_files++;
 					
 					if (self.settings.debug_mode)
-                        console.log("node-clam: " + completed_files + "/" + num_files + " have been scanned!");
+						console.log("node-clam: " + completed_files + "/" + num_files + " have been scanned!");
 					
 					if(!infected) {
 						good_files.push(file);
