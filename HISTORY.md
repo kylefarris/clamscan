@@ -51,6 +51,6 @@ __NOTE:__ There are some breaking changes on this release. Since this is still a
 
 * Fixed error messages
 
-### 0.6.4 (2015-05-29)
+### 0.6.5 (2015-05-29)
 
 * Fixed a bug caused by not passing a `file_cb` paramter to the `scan_file` method. Thanks nicolaspeixoto!
