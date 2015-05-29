@@ -5,7 +5,8 @@
   "description": "Use Node JS to scan files on your server with ClamAV's clamscan binary or clamdscan daemon. This is especially useful for scanning uploaded files provided by un-trusted sources.",
   "main": "index.js",
   "contributors": [
-    "dietervds"
+    "dietervds",
+    "nicolaspeixoto"
   ],
   "scripts": {
     "test": "echo 'Error: no test specified' && exit 1"
