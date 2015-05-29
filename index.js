@@ -258,39 +258,38 @@ module.exports = function(options){
 				
 			// Execute the clam binary with the proper flags
 			exec(command, function(err, stdout, stderr) {
-			  if(self.settings.debug_mode === true){
-			    console.log('stdout:');
-			    console.log(stdout);
-			  }
-			  if (err && stderr) {
-			    if(self.settings.debug_mode === true){
-			      console.log('an error Occurred');
-			      console.error(stderr);
-			      console.log(err);
-			    }
-			    return end_cb(err, null, null);
-			  }     
+				if(self.settings.debug_mode === true){
+			    		console.log('stdout:');
+			    		console.log(stdout);
+			  	}
+			  	if (err && stderr) {
+			    		if(self.settings.debug_mode === true){
+			      			console.log('an error Occurred');
+			      			console.error(stderr);
+			      			console.log(err);
+			    		}
+			    		return end_cb(err, null, null);
+			  	}     
 
-			  stdout.trim()
-			    .split(String.fromCharCode(10))
-			    .forEach(function(result){
-			      var path = result.match(/^(.*): /)[1];
-			      if(result.match(/OK$/)) {
-			        if(self.settings.debug_mode === true){
-			          console.log(path + ' is OK!');
-			        }
-			        good_files.push(path);
-			      }
-			      else{
-			        if(self.settings.debug_mode === true){
-			          console.log(path + ' is INFECTED!');
-			        }
-			        bad_files.push(path); 
-			      }
-			    }
-			  );
+			  	stdout.trim()
+			    		.split(String.fromCharCode(10))
+			    		.forEach(function(result){
+			      			var path = result.match(/^(.*): /)[1];
+			      			if (result.match(/OK$/)) {
+			        			if (self.settings.debug_mode === true){
+			          				console.log(path + ' is OK!');
+			        			}
+			        			good_files.push(path);
+			      			}
+			      			else {
+			        			if (self.settings.debug_mode === true){
+			          				console.log(path + ' is INFECTED!');
+			        			}
+			        			bad_files.push(path); 
+			      			}
+			    		});
 			          
-			  return end_cb(null, good_files, bad_files);       
+			  	return end_cb(null, good_files, bad_files);       
 			});
 		}
 	}
