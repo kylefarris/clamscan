@@ -25,6 +25,8 @@ module.exports = function(options){
 	// @param	Object	options		Key => Value pairs to override default settings
 	// ****************************************************************************
 	function NodeClam(options) {
+		options = options || {};
+		
 		this.default_scanner = 'clamdscan';
 		
 		// Configuration Settings
@@ -52,9 +54,17 @@ module.exports = function(options){
 		};
 
 		// Override defaults with user preferences
+		if (options.hasOwnProperty('clamscan') && Object.keys(options.clamscan).length > 0) {
+			this.settings.clamscan = __.extend(this.settings.clamscan, options.clamscan);
+			delete options.clamscan;
+		}
+		if (options.hasOwnProperty('clamdscan') && Object.keys(options.clamdscan).length > 0) {
+			this.settings.clamdscan = __.extend(this.settings.clamdscan, options.clamdscan);
+			delete options.clamdscan;
+		}
 		this.settings = __.extend(this.settings,options);
 		
-		// Backwards compatibilty
+		// Backwards compatibilty section
 		if (this.settings.quarantine_path && !__.isEmpty(this.settings.quarantine_path)) {
 			this.settings.quarantine_infected = this.settings.quarantine_path;
 		}
@@ -78,14 +88,14 @@ module.exports = function(options){
 			
 			// Neither scanners are available!
 			if (!fs.existsSync(this.settings[this.scanner].path)) {
-				throw new Error("No valid virus scanning binaries have been found in the paths provided!");
+				throw new Error("No valid virus scanning binaries have been found in the paths provided (clamscan: "+this.settings.clamscan.path+", clamdscan: "+this.settings.clamdscan.path+")!");
 			}
 		}
 		
-		// Make sure quarantine path exists at specified location
+		// Make sure quarantine infected path exists at specified location
 		if (!__.isEmpty(this.settings.quarantine_infected) && !fs.existsSync(this.settings.quarantine_infected)) {
-			var err_msg = "Quarantine path (" + this.quarantine_infected + ") is invalid.";
-			this.quarantine_infected = false;
+			var err_msg = "Quarantine infected path (" + this.settings.quarantine_infected + ") is invalid.";
+			this.settings.quarantine_infected = false;
 			throw new Error(err_msg);
 			
 			if (this.settings.debug_mode)
@@ -94,14 +104,14 @@ module.exports = function(options){
 		
 		// Make sure scan_log exists at specified location
 		if (!__.isEmpty(this.settings.scan_log) && !fs.existsSync(this.settings.scan_log)) {
-			var err_msg = "node-clam: Scan Log path (" + this.scan_log + ") is invalid.";
+			var err_msg = "node-clam: Scan Log path (" + this.settings.scan_log + ") is invalid.";
 			this.scan_log = null;
 			if (this.settings.debug_mode)
 				console.log(err_msg);
 		}
 		
 		// If using clamscan, make sure definition db exists at specified location
-		if (this.scanner == 'clamscan') {
+		if (this.scanner === 'clamscan') {
 			if (!__.isEmpty(this.settings.clamscan.db) && !fs.existsSync(this.settings.db)) {
 				var err_msg = "node-clam: Definitions DB path (" + this.db + ") is invalid.";
 				this.db = null;
@@ -118,9 +128,24 @@ module.exports = function(options){
 	// Checks if a particular file is infected.
 	// -----
 	// @param	String		file		Path to the file to check
-	// @param	Function	callback	What to do after the scan
+	// @param	Function	callback	(optional) What to do after the scan
 	// ****************************************************************************
 	NodeClam.prototype.is_infected = function(file, callback) {
+		// Verify string is passed to the file parameter
+		if (typeof file !== 'string' || file.trim() === '') {
+			var err = new Error("Invalid or empty file name provided.");
+			if (callback && typeof callback === 'function') {
+				return callback(err, '', null);
+			} else {
+				throw err;
+			}
+		}
+		
+		// Verify second param, if supplied, is a function
+		if (callback && typeof callback !== 'function') {
+			throw new Error("Invalid callback provided. Second paramter, if provided, must be a function!");
+		}
+		
 		var self = this;
 		
 		if(this.settings.debug_mode)
@@ -140,7 +165,7 @@ module.exports = function(options){
 		    		} else {
 			    		if(self.settings.debug_mode)
 				    		console.log("node-clam: " + err);
-					    callback(err, file, null);
+					    callback(new Error(err), file, null);
 				    }
 				} else {
 					console.error("node-clam: " + stderr);

@@ -1,0 +1,3 @@
+good_file_1.txt
+good_file_2.txt
+bad_file_1.txt

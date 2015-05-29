@@ -58,7 +58,7 @@ var clam = require('clamscan')({
 	},
     clamdscan: {
 		path: '/usr/bin/clamdscan', // Path to the clamdscan binary on your server
-		config_file: null, // Specify config file if it's in an unusual place
+		config_file: '/etc/clamd.conf', // Specify config file if it's in an unusual place
 		multiscan: true, // Scan using all available cores! Yay!
 		reload_db: false, // If true, will re-load the DB on every call (slow)
 		active: true // If true, this module will consider using the clamdscan binary
@@ -103,7 +103,7 @@ This method allows you to scan a single file.
 #### Parameters: 
 
 * `file_path` (string) Represents a path to the file to be scanned.
-* `callback` (function) Will be called when the scan is complete. It takes 3 parameters:
+* `callback` (function) (optional) Will be called when the scan is complete. It takes 3 parameters:
  * `err` (string or null) A standard error message string (null if no error)
  * `file` (string) The original `file_path` passed into the `is_infected` method.
  * `is_infected` (boolean) __True__: File is infected; __False__: File is clean.

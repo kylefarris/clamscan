@@ -1,0 +1,1 @@
+Sample file to scan. Nothing important here... just don't delete this if you expect the tests to work.
