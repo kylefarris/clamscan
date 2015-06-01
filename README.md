@@ -104,7 +104,7 @@ This method allows you to scan a single file.
 
 * `file_path` (string) Represents a path to the file to be scanned.
 * `callback` (function) (optional) Will be called when the scan is complete. It takes 3 parameters:
- * `err` (string or null) A standard error message string (null if no error)
+ * `err` (object or null) A standard javascript Error object (null if no error)
  * `file` (string) The original `file_path` passed into the `is_infected` method.
  * `is_infected` (boolean) __True__: File is infected; __False__: File is clean.
 
@@ -129,19 +129,26 @@ clam.is_infected('/a/picture/for_example.jpg', function(err, file, is_infected) 
  
 Allows you to scan an entire directory for infected files. This obeys your `recursive` option even for `clamdscan` which does not have a native way to turn this feature off. If you have multiple paths, send them in an array to `scan_files`. 
 
-__TLDR:__ For maximum speed, don't supply a `file_callback`.
+__TL;DR:__ For maximum speed, don't supply a `file_callback`.
 
 If you choose to supply a `file_callback`, the scan will run a little bit slower (depending on number of files to be scanned) for `clamdscan`. If you are using `clamscan`, while it will work, I'd highly advise you to NOT pass a `file_callback`... it will run incredibly slow.
+
+#### NOTE:
+
+The `good_files` and `bad_files` parameters of the `end_callback` callback in this method will only contain the directories that were scanned in __all__ __but__ the following scenarios:
+
+* A `file_callback` callback is provided, and `scan_recursively` is set to _true_.
+* The scanner is set to `clamdscan` and `scan_recursively` is set to _false_.
 
 #### Parameters
 
 * `dir_path` (string) Full path to the directory to scan.
 * `end_callback` (function) Will be called when the entire directory has been completely scanned. This callback takes 3 parameters:
- * `err`(string or null) A standard error message string (null if no error)
+ * `err` (object) A standard javascript Error object (null if no error)
  * `good_files` (array) List of the full paths to all files that are _clean_.
  * `bad_files` (array) List of the full paths to all files that are _infected_.
 * `file_callback` (function) Will be called after each file in the directory has been scanned. This is useful for keeping track of the progress of the scan. This callback takes 3 parameters:
- * `err` (string or null) A standard error message string (null if no error)
+ * `err` (object or null) A standard Javascript Error object (null if no error)
  * `file` (string) Path to the file that just got scanned.
  * `is_infected` (boolean) __True__: File is infected; __False__: File is clean.
  
@@ -168,11 +175,11 @@ This allows you to scan many files that might be in different directories or may
 
 * `files` (array) A list of strings representing full paths to files you want scanned.
 * `end_callback` (function) Will be called when the entire directory has been completely scanned. This callback takes 3 parameters:
- * `err` A standard error message string (null if no error)
+ * `err` (object) A standard javascript Error object (null if no error)
  * `good_files` (array) List of the full paths to all files that are _clean_.
  * `bad_files` (array) List of the full paths to all files that are _infected_.
 * `file_callback` (function) Will be called after each file in the directory has been scanned. This is useful for keeping track of the progress of the scan. This callback takes 3 parameters:
- * `err` (string or null) A standard error message string (null if no error)
+ * `err` (object or null)A standard javascript Error object (null if no error)
  * `file` (string) Path to the file that just got scanned.
  * `is_infected` (boolean) __True__: File is infected; __False__: File is clean.
 

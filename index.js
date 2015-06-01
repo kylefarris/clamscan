@@ -174,6 +174,11 @@ module.exports = function(options){
 			} else {
 				var result = stdout.trim();
 				
+				if(self.settings.debug_mode) {
+					console.log('node-clam: file size: ' + fs.statSync(file).size);
+					console.log('node-clam: ' + result);
+				}
+				
 				if(result.match(/OK$/)) {
 					if(self.settings.debug_mode)
 						console.log("node-clam: " + file + ' is OK!');
@@ -198,7 +203,7 @@ module.exports = function(options){
 	NodeClam.prototype.scan_files = function(files, end_cb, file_cb) {
 		files = files || [];
 		end_cb = end_cb || null;
-		files_cb = file_cb || null;
+		file_cb = file_cb || null;
 		
 		var bad_files = [];
 		var good_files = [];
@@ -329,7 +334,7 @@ module.exports = function(options){
 	// method also allows for non-recursive scanning with the clamdscan binary.
 	// -----
 	// @param	String		path		The directory to scan files of
-	// @param	Function	en_cb	    What to do when all files have been scanned
+	// @param	Function	end_cb	    What to do when all files have been scanned
 	// @param   Function    file_cb     What to do after each file has been scanned
 	// ****************************************************************************
 	NodeClam.prototype.scan_dir = function(path,end_cb,file_cb) {
@@ -337,10 +342,16 @@ module.exports = function(options){
 		
 		path = path || '';
 		end_cb = end_cb || null;
-		files_cb = file_cb || null;
-	
+		file_cb = file_cb || null;
+        
+        // Verify path provided is a string
 		if (typeof path !== 'string' || path.length <= 0) {
 			return end_cb(new Error("Invalid path provided! Path must be a string!"));
+		}
+        
+        // Verify second param, if supplied, is a function
+		if (end_cb && typeof end_cb !== 'function') {
+			return end_cb(new Error("Invalid end-scan callback provided. Second paramter, if provided, must be a function!"));
 		}
 		
 		// Trim trailing slash
@@ -350,7 +361,7 @@ module.exports = function(options){
 			console.log("node-clam: Scanning Directory: " + path);
 		
 		// Get all files recursively
-		if (this.settings.scan_recursively && typeof file_cb == 'function') {
+		if (this.settings.scan_recursively && typeof file_cb === 'function') {
 			exec('find ' + path, function(err, stdout, stderr) {
 				if (err || stderr) {
 					if(this.settings.debug_mode === true)
@@ -384,12 +395,19 @@ module.exports = function(options){
 			// Execute the clam binary with the proper flags
 			exec(command, function(err, stdout, stderr) {
 				if (err || stderr) {
-					if(self.settings.debug_mode === true) {
-						console.log("An Error Occurred.");
-						console.error(stderr);
-					}
-					return end_cb(err, [], []);
-				} else {
+                    if (err) {
+                        if(err.hasOwnProperty('code') && err.code === 1) {
+                            end_cb(null, [], [path]);
+                        } else {
+                            if(self.settings.debug_mode)
+                                console.log("node-clam: " + err);
+                            end_cb(new Error(err), [], [path]);
+                        }
+                    } else {
+                        console.error("node-clam: " + stderr);
+                        end_cb(err, [], [path]);
+                    }
+                } else {
 					var result = stdout.trim();
 					
 					if(result.match(/OK$/)) {
@@ -423,8 +441,13 @@ function build_clam_flags(scanner, settings) {
 	// Flags specific to clamscan 
 	if (scanner == 'clamscan') {
 		flags_array.push('--stdout');
+		
 		// Remove infected files
-		if (settings.remove_infected === true) flags_array.push('--remove=yes');
+		if (settings.remove_infected === true) {
+            flags_array.push('--remove=yes');
+        } else {
+            flags_array.push('--remove=no');
+        }
 		// Database file
 		if (!__.isEmpty(settings.clamscan.db)) flags_array.push('--database=' + settings.clamscan.db);
 		// Scan archives
@@ -443,6 +466,8 @@ function build_clam_flags(scanner, settings) {
 	
 	// Flags specific to clamdscan 
 	else if (scanner == 'clamdscan') {
+		flags_array.push('--fdpass');
+		
 		// Remove infected files
 		if (settings.remove_infected === true) flags_array.push('--remove');
 		// Specify a config file

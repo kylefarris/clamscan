@@ -51,6 +51,10 @@ __NOTE:__ There are some breaking changes on this release. Since this is still a
 
 * Fixed error messages
 
-### 0.6.5 (2015-05-29)
+### 0.7.0 (2015-06-01)
 
 * Fixed a bug caused by not passing a `file_cb` paramter to the `scan_file` method. Thanks nicolaspeixoto!
+* Added tests
+* Fixed poor validation of method parameters
+* Changed API of `scan_dir` such that the paramaters passed to the `end_cb` for certain situations. See documentation for details.
+* Changed `err` paramter in all callbacks from a simple string to a proper javascript `Error` object.
