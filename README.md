@@ -144,13 +144,13 @@ The `good_files` and `bad_files` parameters of the `end_callback` callback in th
 
 * `dir_path` (string) Full path to the directory to scan.
 * `end_callback` (function) Will be called when the entire directory has been completely scanned. This callback takes 3 parameters:
- * `err` (object) A standard javascript Error object (null if no error)
- * `good_files` (array) List of the full paths to all files that are _clean_.
- * `bad_files` (array) List of the full paths to all files that are _infected_.
+    * `err` (object) A standard javascript Error object (null if no error)
+    * `good_files` (array) List of the full paths to all files that are _clean_.
+    * `bad_files` (array) List of the full paths to all files that are _infected_.
 * `file_callback` (function) Will be called after each file in the directory has been scanned. This is useful for keeping track of the progress of the scan. This callback takes 3 parameters:
- * `err` (object or null) A standard Javascript Error object (null if no error)
- * `file` (string) Path to the file that just got scanned.
- * `is_infected` (boolean) __True__: File is infected; __False__: File is clean.
+    * `err` (object or null) A standard Javascript Error object (null if no error)
+    * `file` (string) Path to the file that just got scanned.
+    * `is_infected` (boolean) __True__: File is infected; __False__: File is clean.
  
 #### Example
 ```javascript
