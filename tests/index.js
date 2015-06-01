@@ -356,5 +356,12 @@ describe('scan_dir', function() {
 });
 
 describe('scan_files', function() {
+    reset_clam();
     
+    it('should exist', function() {
+        should.exist(clamscan.scan_files);
+    });
+    it('should be a function', function() {
+        clamscan.scan_files.should.be.a('function');
+    });
 });
