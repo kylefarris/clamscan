@@ -104,9 +104,9 @@ This method allows you to scan a single file.
 
 * `file_path` (string) Represents a path to the file to be scanned.
 * `callback` (function) (optional) Will be called when the scan is complete. It takes 3 parameters:
- * `err` (object or null) A standard javascript Error object (null if no error)
- * `file` (string) The original `file_path` passed into the `is_infected` method.
- * `is_infected` (boolean) __True__: File is infected; __False__: File is clean.
+    * `err` (object or null) A standard javascript Error object (null if no error)
+    * `file` (string) The original `file_path` passed into the `is_infected` method.
+    * `is_infected` (boolean) __True__: File is infected; __False__: File is clean.
 
 
 #### Example:
@@ -175,13 +175,13 @@ This allows you to scan many files that might be in different directories or may
 
 * `files` (array) A list of strings representing full paths to files you want scanned.
 * `end_callback` (function) Will be called when the entire directory has been completely scanned. This callback takes 3 parameters:
- * `err` (object) A standard javascript Error object (null if no error)
- * `good_files` (array) List of the full paths to all files that are _clean_.
- * `bad_files` (array) List of the full paths to all files that are _infected_.
+    * `err` (object) A standard javascript Error object (null if no error)
+    * `good_files` (array) List of the full paths to all files that are _clean_.
+    * `bad_files` (array) List of the full paths to all files that are _infected_.
 * `file_callback` (function) Will be called after each file in the directory has been scanned. This is useful for keeping track of the progress of the scan. This callback takes 3 parameters:
- * `err` (object or null)A standard javascript Error object (null if no error)
- * `file` (string) Path to the file that just got scanned.
- * `is_infected` (boolean) __True__: File is infected; __False__: File is clean.
+    * `err` (object or null)A standard javascript Error object (null if no error)
+    * `file` (string) Path to the file that just got scanned.
+    * `is_infected` (boolean) __True__: File is infected; __False__: File is clean.
 
 #### Example
 

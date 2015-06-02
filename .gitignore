@@ -15,3 +15,4 @@ node_modules
 npm-debug.log
 tests/clamscan-log
 tests/infected/*
+tests/bad_scan_files/*
