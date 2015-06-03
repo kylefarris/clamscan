@@ -48,7 +48,7 @@ var clam = require('clamscan')({
     quarantine_infected: false, // False: Don't quarantine, Path: Moves files to this place.
 	scan_log: null, // Path to a writeable log file to write scan results into
 	debug_mode: false // Whether or not to log info/debug/error msgs to the console
-	file_list: null, // path to file containing list of files to scan
+	file_list: null, // path to file containing list of files to scan (for scan_files method)
 	scan_recursively: true, // If true, deep scan folders recursively
 	clamscan: {
 		path: '/usr/bin/clamscan', // Path to clamscan binary on your server
@@ -218,6 +218,48 @@ clam.scan_files(files, function(err, good_files, bad_files) {
 	console.log("Scan Status: " + (scan_status.bad + scan_status.good) + "/" + files.length);
 });
 ```
+
+#### Scanning files listed in file list
+
+If this modules is configured with a valid path to a file containing a newline-delimited list of files, it will use the list in that file when scanning if the first paramter passed is falsy.
+
+__Files List:__
+
+```
+/some/path/to/file.zip
+/some/other/path/to/file.exe
+/one/more/file/to/scan.rb
+```
+
+__Script:__
+
+```javascript
+var clam = require('clamscan')({
+    file_list: '/path/to/file_list.txt'
+});
+
+clam.scan_files(null, function(err, good_files, bad_files) {
+    // doo stuff...
+});
+```
+
+#### Changing Configuration After Instantiation
+
+You can set settings directly on an instance of this module using the following syntax:
+
+```javascript
+var clam = require('clamscan')({ /** Some configs here... */});
+
+// will quarantine files
+clam.settings.quarantine_infected = true;
+clam.is_infected('/some/file.txt');
+
+// will not quarantine files
+clam.settings.quarantine_infected = false;
+clam.is_infected('/some/file.txt');
+```
+
+Just keep in mind that some of the nice validation that happens on instantiation won't happen if it's done this way. Of course, you could also just create a new instance with different a different initial configuration.
 
 ## Contribute
 

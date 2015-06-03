@@ -9,5 +9,6 @@ module.exports = {
 		path: '/usr/bin/clamdscan',  				// required for testing (change for your system)
 		config_file: '/etc/clamd.d/daemon.conf'  	// required for testing (change for your system)
 	},
-	debug_mode: false
+	debug_mode: false,
+    testing_mode: true
 };

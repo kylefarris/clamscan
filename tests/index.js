@@ -7,6 +7,8 @@ var config = require('./test_config');
 var clam = require('../index.js');
 var good_scan_file = __dirname + '/good_scan_dir/good_file_1.txt';
 var good_scan_dir = __dirname + '/good_scan_dir';
+var good_file_list = __dirname + '/good_files_list.txt';
+var bad_file_list = __dirname + '/bad_files_list.txt';
 var clamscan;
 
 var check = function(done, f) {
@@ -18,8 +20,9 @@ var check = function(done, f) {
     }
 };
 
-var reset_clam = function() {
-    clamscan = clam(__.extend({},config));
+var reset_clam = function(overrides) {
+    overrides = overrides || {};
+    clamscan = clam(__.extend({},config,overrides));
 }
 
 describe('Module', function() {
@@ -28,45 +31,49 @@ describe('Module', function() {
     });
     
     it('should return an object when intantiated', function() {
-        clamscan = clam();
+        reset_clam();
         clamscan.should.be.a('object');
     });
     
     it('should have certain config properties defined', function() {
-        expect(clamscan.settings.remove_infected, 'remove_infected').to.not.be.undefined;
-        expect(clamscan.settings.quarantine_infected, 'quarantine_infected').to.not.be.undefined;
-        expect(clamscan.settings.scan_log, 'scan_log').to.not.be.undefined;
-        expect(clamscan.settings.debug_mode, 'debug_mode').to.not.be.undefined;
-        expect(clamscan.settings.file_list, 'file_list').to.not.be.undefined;
-        expect(clamscan.settings.scan_recursively, 'scan_recursively').to.not.be.undefined;
-        expect(clamscan.settings.clamscan, 'clamscan').to.not.be.undefined;
-        expect(clamscan.settings.clamdscan, 'clamdscan').to.not.be.undefined;
-        expect(clamscan.settings.preference, 'preference').to.not.be.undefined;
+        reset_clam();
+        expect(clamscan.defaults.remove_infected, 'remove_infected').to.not.be.undefined;
+        expect(clamscan.defaults.quarantine_infected, 'quarantine_infected').to.not.be.undefined;
+        expect(clamscan.defaults.scan_log, 'scan_log').to.not.be.undefined;
+        expect(clamscan.defaults.debug_mode, 'debug_mode').to.not.be.undefined;
+        expect(clamscan.defaults.file_list, 'file_list').to.not.be.undefined;
+        expect(clamscan.defaults.scan_recursively, 'scan_recursively').to.not.be.undefined;
+        expect(clamscan.defaults.clamscan, 'clamscan').to.not.be.undefined;
+        expect(clamscan.defaults.clamdscan, 'clamdscan').to.not.be.undefined;
+        expect(clamscan.defaults.preference, 'preference').to.not.be.undefined;
     });
     
     it('should have the proper global default values set', function() {
-        expect(clamscan.settings.remove_infected).to.eql(false);
-        expect(clamscan.settings.quarantine_infected).to.eql(false);
-        expect(clamscan.settings.scan_log).to.eql(null);
-        expect(clamscan.settings.debug_mode).to.eql(false);
-        expect(clamscan.settings.file_list).to.eql(null);
-        expect(clamscan.settings.scan_recursively).to.eql(true);
-        expect(clamscan.settings.preference).to.eql('clamdscan');
+        reset_clam();
+        expect(clamscan.defaults.remove_infected).to.eql(false);
+        expect(clamscan.defaults.quarantine_infected).to.eql(false);
+        expect(clamscan.defaults.scan_log).to.eql(null);
+        expect(clamscan.defaults.debug_mode).to.eql(false);
+        expect(clamscan.defaults.file_list).to.eql(null);
+        expect(clamscan.defaults.scan_recursively).to.eql(true);
+        expect(clamscan.defaults.preference).to.eql('clamdscan');
     });
     
     it('should have the proper clamscan default values set', function() {
-        expect(clamscan.settings.clamscan.path).to.eql('/usr/bin/clamscan');
-        expect(clamscan.settings.clamscan.db).to.eql(null);
-        expect(clamscan.settings.clamscan.scan_archives).to.be.eql(true);
-        expect(clamscan.settings.clamscan.active).to.eql(true);
+        reset_clam();
+        expect(clamscan.defaults.clamscan.path).to.eql('/usr/bin/clamscan');
+        expect(clamscan.defaults.clamscan.db).to.eql(null);
+        expect(clamscan.defaults.clamscan.scan_archives).to.be.eql(true);
+        expect(clamscan.defaults.clamscan.active).to.eql(true);
     });
     
     it('should have the proper clamdscan default values set', function() {
-        expect(clamscan.settings.clamdscan.path).to.eql('/usr/bin/clamdscan');
-        expect(clamscan.settings.clamdscan.config_file).to.eql('/etc/clamd.conf');
-        expect(clamscan.settings.clamdscan.multiscan).to.be.eql(true);
-        expect(clamscan.settings.clamdscan.reload_db).to.eql(false);
-        expect(clamscan.settings.clamdscan.active).to.eql(true);
+        reset_clam();
+        expect(clamscan.defaults.clamdscan.path).to.eql('/usr/bin/clamdscan');
+        expect(clamscan.defaults.clamdscan.config_file).to.eql('/etc/clamd.conf');
+        expect(clamscan.defaults.clamdscan.multiscan).to.be.eql(true);
+        expect(clamscan.defaults.clamdscan.reload_db).to.eql(false);
+        expect(clamscan.defaults.clamdscan.active).to.eql(true);
     });
     
     it('should accept an options array and merge them with the object defaults', function() {
@@ -120,16 +127,31 @@ describe('Module', function() {
         
     });
     
-    it('should fail to load if no valid scanner is found', function() {
+    it('should fail if an invalid scanner preference is supplied', function() {
+        expect(function() { reset_clam({preference: 'clamscan'}); }).to.not.throw(Error);
+        expect(function() { reset_clam({preference: 'badscanner'}); }).to.throw(Error);
+    });
+    
+    it('should fail to load if no active & valid scanner is found', function() {
         
     });
     
     it('should fail to load if specified quarantine path (if specified) does not exist or is not writable', function() {
-        
+        expect(function() { reset_clam({quarantine_infected: __dirname + '/infected'}); }).to.not.throw(Error);
+        expect(function() { reset_clam({quarantine_infected: __dirname + '/should/not/exist'}); }).to.throw(Error);
     });
     
     it('should set definition database (clamscan) to null if specified db is not found', function() {
+        reset_clam(__.extend({}, config, __.extend({},config.clamscan,{scan_log: __dirname + '/should/not/exist'})));
+        expect(clamscan.settings.scan_log).to.be.null;
+    });
+    
+    it('should be able have configuration settings changed after instantiation', function() {
+        reset_clam({scan_log: null});
+        expect(clamscan.settings.scan_log).to.be.null;
         
+        clamscan.settings.scan_log = config.scan_log;
+        expect(clamscan.settings.scan_log).to.be.eql(config.scan_log);
     });
 });
 
@@ -263,6 +285,224 @@ describe('scan_files', function() {
     });
     it('should be a function', function() {
         clamscan.scan_files.should.be.a('function');
+    });
+    
+    it('should return err to the "err" parameter of the "end_cb" callback if an array with a bad string is provided as first parameter', function(done) {
+        clamscan.scan_files([''], function(err, good_files, bad_files) {
+            check(done, function() {
+                expect(err).to.be.instanceof(Error);
+                expect(good_files).to.be.empty;
+            });
+        });
+    });
+    
+    it('should return err to the "err" parameter of the "end_cb" callback if an empty array is provided as first parameter', function(done) {
+        clamscan.scan_files([], function(err, good_files, bad_files) {
+            check(done, function() {
+                expect(err).to.be.instanceof(Error);
+                expect(good_files).to.be.empty;
+            });
+        });
+    });
+    
+    it('should return err to the "err" parameter of the "end_cb" callback if nothing is provided as first parameter', function(done) {
+        clamscan.scan_files(undefined, function(err, good_files, bad_files) {
+            check(done, function() {
+                expect(err).to.be.instanceof(Error);
+                expect(good_files).to.be.empty;
+            });
+        });
+    });
+    
+    it('should return err to the "err" parameter of the "end_cb" callback if null is provided as first parameter', function(done) {
+        clamscan.scan_files(null, function(err, good_files, bad_files) {
+            check(done, function() {
+                expect(err).to.be.instanceof(Error);
+                expect(good_files).to.be.empty;
+            });
+        });
+    });
+    
+    it('should return err to the "err" parameter of the "end_cb" callback if an empty string is provided as first parameter', function(done) {
+        clamscan.scan_files('', function(err, good_files, bad_files) {
+            check(done, function() {
+                expect(err).to.be.instanceof(Error);
+                expect(good_files).to.be.empty;
+            });
+        });
+    });
+    
+    it('should return err to the "err" parameter of the "end_cb" callback if TRUE is provided as first parameter', function(done) {
+        clamscan.scan_files(true, function(err, good_files, bad_files) {
+            check(done, function() {
+                expect(err).to.be.instanceof(Error);
+                expect(good_files).to.be.empty;
+            });
+        });
+    });
+    
+    it('should return err to the "err" parameter of the "end_cb" callback if an integer is provided as first parameter', function(done) {
+        clamscan.scan_files(5, function(err, good_files, bad_files) {
+            check(done, function() {
+                expect(err).to.be.instanceof(Error);
+                expect(good_files).to.be.empty;
+            });
+        });
+    });
+    
+    it('should return err to the "err" parameter of the "end_cb" callback if a float is provided as first parameter', function(done) {
+        clamscan.scan_files(5.5, function(err, good_files, bad_files) {
+            check(done, function() {
+                expect(err).to.be.instanceof(Error);
+                expect(good_files).to.be.empty;
+            });
+        });
+    });
+    
+    it('should return err to the "err" parameter of the "end_cb" callback if a Infinity is provided as first parameter', function(done) {
+        clamscan.scan_files(Infinity, function(err, good_files, bad_files) {
+            check(done, function() {
+                expect(err).to.be.instanceof(Error);
+                expect(good_files).to.be.empty;
+            });
+        });
+    });
+    
+    it('should return err to the "err" parameter of the "end_cb" callback if a RegEx is provided as first parameter', function(done) {
+        clamscan.scan_files(/foobar/, function(err, good_files, bad_files) {
+            check(done, function() {
+                expect(err).to.be.instanceof(Error);
+                expect(good_files).to.be.empty;
+            });
+        });
+    });
+    
+    it('should return err to the "err" parameter of the "end_cb" callback if an Standard Object is provided as first parameter', function(done) {
+        clamscan.scan_files({}, function(err, good_files, bad_files) {
+            check(done, function() {
+                expect(err).to.be.instanceof(Error);
+                expect(good_files).to.be.empty;
+            });
+        });
+    });
+    
+    it('should return err to the "err" parameter of the "end_cb" callback if a NaN is provided as first parameter', function(done) {
+        clamscan.scan_files(NaN, function(err, good_files, bad_files) {
+            check(done, function() {
+                expect(err).to.be.instanceof(Error);
+                expect(good_files).to.be.empty;
+            });
+        });
+    });
+    
+    it('should return err to the "err" parameter of the "end_cb" callback if a string-returning function is provided as first parameter', function(done) {
+        clamscan.scan_files(function() { return good_scan_file; }, function(err, good_files, bad_files) {
+            check(done, function() {
+                expect(err).to.be.instanceof(Error);
+                expect(good_files).to.be.empty;
+            });
+        });
+    });
+    
+    it('should return err to the "err" parameter of the "end_cb" callback if a String object is provided as first parameter', function(done) {
+        clamscan.scan_files(new String(good_scan_file), function(err, good_files, bad_files) {
+            check(done, function() {
+                expect(err).to.be.instanceof(Error);
+                expect(good_files).to.be.empty;
+            });
+        });
+    });
+    
+    it('should NOT return err to the "err" parameter of the "end_cb" callback if an array with a non-empty string or strings is provided as first parameter', function(done) {
+        clamscan.scan_files([good_scan_file], function(err, good_files, bad_files) {
+            check(done, function() {
+                expect(err).to.not.be.instanceof(Error);
+                expect(good_files).to.not.be.empty;
+                expect(good_files).to.eql([good_scan_file]);
+            });
+        });
+    });
+    
+    it('should NOT return err to the "err" parameter of the "end_cb" callback if a non-empty string is provided as first parameter', function(done) {
+        clamscan.scan_files(good_scan_file, function(err, good_files, bad_files) {
+            check(done, function() {
+                expect(err).to.not.be.instanceof(Error);
+                expect(good_files).to.not.be.empty;
+                expect(good_files).to.eql([good_scan_file]);
+            });
+        });
+    });
+    
+    it('should NOT return error to the "err" parameter of the "end_cb" callback if nothing is provided as first parameter but file_list is configured in settings', function(done) {
+        clamscan.settings.file_list = good_file_list;
+        clamscan.scan_files(undefined, function(err, good_files, bad_files) {
+            check(done, function() {
+                expect(err).to.not.be.instanceof(Error);
+                expect(good_files).to.not.be.empty;
+                expect(good_files).to.have.length(2);
+                expect(bad_files).to.be.empty;
+            });
+        });
+    });
+    
+    it('should return error to the "err" parameter of the "end_cb" callback if nothing is provided as first parameter and file_list is configured in settings but has inaccessible files', function(done) {
+        clamscan.settings.file_list = bad_file_list;
+        clamscan.scan_files(undefined, function(err, good_files, bad_files) {
+            check(done, function() {
+                expect(err).to.be.instanceof(Error);
+                expect(bad_files).to.not.be.empty;
+                expect(bad_files).to.have.length(2);
+                expect(good_files).to.be.empty;
+            });
+        });
+    });
+    
+    it('should NOT return error to the "err" parameter of the "end_cb" callback if FALSE is provided as first parameter but file_list is configured in settings', function(done) {
+        clamscan.settings.file_list = good_file_list;
+        clamscan.scan_files(false, function(err, good_files, bad_files) {
+            check(done, function() {
+                expect(err).to.not.be.instanceof(Error);
+                expect(good_files).to.not.be.empty;
+                expect(good_files).to.have.length(2);
+                expect(bad_files).to.be.empty;
+            });
+        });
+    });
+    
+    it('should NOT return error to the "err" parameter of the "end_cb" callback if NaN is provided as first parameter but file_list is configured in settings', function(done) {
+        clamscan.settings.file_list = good_file_list;
+        clamscan.scan_files(NaN, function(err, good_files, bad_files) {
+            check(done, function() {
+                expect(err).to.not.be.instanceof(Error);
+                expect(good_files).to.not.be.empty;
+                expect(good_files).to.have.length(2);
+                expect(bad_files).to.be.empty;
+            });
+        });
+    });
+    
+    it('should NOT return error to the "err" parameter of the "end_cb" callback if NULL is provided as first parameter but file_list is configured in settings', function(done) {
+        clamscan.settings.file_list = good_file_list;
+        clamscan.scan_files(null, function(err, good_files, bad_files) {
+            check(done, function() {
+                expect(err).to.not.be.instanceof(Error);
+                expect(good_files).to.not.be.empty;
+                expect(good_files).to.have.length(2);
+                expect(bad_files).to.be.empty;
+            });
+        });
+    });
+    
+    it('should NOT return error to the "err" parameter of the "end_cb" callback if an empty string is provided as first parameter but file_list is configured in settings', function(done) {
+        clamscan.settings.file_list = good_file_list;
+        clamscan.scan_files('', function(err, good_files, bad_files) {
+            check(done, function() {
+                expect(err).to.not.be.instanceof(Error);
+                expect(good_files).to.not.be.empty;
+                expect(good_files).to.have.length(2);
+                expect(bad_files).to.be.empty;
+            });
+        });
     });
 });
 
