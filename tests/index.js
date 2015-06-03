@@ -133,7 +133,13 @@ describe('Module', function() {
     });
     
     it('should fail to load if no active & valid scanner is found', function() {
+        var clamdscan_options = __.extend({},config.clamdscan, {path: __dirname + '/should/not/exist', active: true});
+        var clamscan_options = __.extend({},config.clamscan, {path: __dirname + '/should/not/exist', active: true});
+       
+        var options = __.extend({}, config, {clamdscan: clamdscan_options});
+        options = __.extend({}, options, {clamscan: clamscan_options});
         
+        expect(function() { reset_clam(options); }).to.throw(Error);
     });
     
     it('should fail to load if specified quarantine path (if specified) does not exist or is not writable', function() {
