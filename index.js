@@ -180,7 +180,11 @@ NodeClam.prototype.is_clamav_binary_sync = function(scanner) {
         clamscan: path + ' --version'
     };
     
-    if (!fs.existsSync(path) || execSync(version_cmds[scanner]).toString().match(/ClamAV/) === null) {
+    /* 
+     * Saving this line for version 1.0 release--the one that requires Node 0> .12 
+     * if (!fs.existsSync(path) || execSync(version_cmds[scanner]).toString().match(/ClamAV/) === null) {
+     */
+    if (!fs.existsSync(path)) {
         if (this.settings.testing_mode) {
             console.log("node-clam: Could not verify the " + scanner + " binary.");
         }
