@@ -59,3 +59,12 @@ __NOTE:__ There are some breaking changes on this release. Since this is still a
 * Changed API of `scan_dir` such that the paramaters passed to the `end_cb` are different in certain defined situations. See the "NOTE" section of the `scan_dir` documentation for details.
 * Changed `err` paramter in all callbacks from a simple string to a proper javascript `Error` object.
 * Added documentation for how to use a file_list file for scanning.
+
+### 0.7.1 (2015-06-05)
+
+* Added node dependency of > 0.12 to `package.json` file
+
+### 0.8.0 (2015-06-05)
+
+* Removed item causing node > 0.12 dependency.
+* Removed dependency of node > 0.12 in `package.json` file.
