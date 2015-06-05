@@ -264,3 +264,7 @@ Just keep in mind that some of the nice validation that happens on instantiation
 ## Contribute
 
 Got a missing feature you'd like to use? Found a bug? Go ahead and fork this repo, build the feature and issue a pull request.
+
+### Items for version 1.0 release:
+
+* Slight change of API to allow for a completely asynchronous module (ie, removal of all `fs.xxSync` items).
