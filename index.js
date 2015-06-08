@@ -105,9 +105,9 @@ function NodeClam(options) {
     
     // If using clamscan, make sure definition db exists at specified location
     if (this.scanner === 'clamscan') {
-        if (!__.isEmpty(this.settings.clamscan.db) && !fs.existsSync(this.settings.db)) {
-            var err_msg = "node-clam: Definitions DB path (" + this.db + ") is invalid.";
-            this.db = null;
+        if (!__.isEmpty(this.settings.clamscan.db) && !fs.existsSync(this.settings.clamscan.db)) {
+            var err_msg = "node-clam: Definitions DB path (" + this.settings.clamscan.db + ") is invalid.";
+            this.settings.clamscan.db = null;
             if(this.settings.debug_mode)
                 console.log(err_msg);
         }
