@@ -68,3 +68,7 @@ __NOTE:__ There are some breaking changes on this release. Since this is still a
 
 * Removed item causing node > 0.12 dependency.
 * Removed dependency of node > 0.12 in `package.json` file.
+
+### 0.8.1 (2015-06-09)
+
+* Fixed check for database file. Issue #6

@@ -6,7 +6,8 @@
   "main": "index.js",
   "contributors": [
     "dietervds",
-    "nicolaspeixoto"
+    "nicolaspeixoto",
+	"urg <Patrick McAndrew>"
   ],
   "scripts": {
     "test": "make test"
