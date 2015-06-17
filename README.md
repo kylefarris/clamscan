@@ -14,7 +14,9 @@ Debian-based distros:
 	
 	sudo apt-get install clamav
 	
-As for OSX, I've not tried it, but, here's a promising looking site: http://www.clamxav.com/index.php . I would stick with linux varieties, though...
+For OS X, you can install clamav with brew:
+
+	sudo brew install clamav
 
 This module is not intended to work on a Windows server. This would be a welcome addition if someone wants to add that feature (I may get around to it one day but have no urgent need for this).
 
