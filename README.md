@@ -59,6 +59,9 @@ var clam = require('clamscan')({
 		active: true // If true, this module will consider using the clamscan binary
 	},
     clamdscan: {
+        socket: false, // Socket file for connecting via TCP
+        host: false, // IP of host to connect to TCP interface
+        port: false, // Port of host to use when connecting via TCP interface
 		path: '/usr/bin/clamdscan', // Path to the clamdscan binary on your server
 		config_file: '/etc/clamd.conf', // Specify config file if it's in an unusual place
 		multiscan: true, // Scan using all available cores! Yay!
@@ -86,6 +89,9 @@ var clam = require('clamscan')({
 		active: false // you don't want to use this at all because it's evil
 	},
     clamdscan: {
+        socket: '/var/run/clamd.scan/clamd.sock', // This is pretty typical
+        host: '127.0.0.1', // If you want to connect locally but not through socket
+        port: 12345, // Because, why not
 		path: '/bin/clamdscan', // Special path to the clamdscan binary on your server
 		config_file: __dirname + '/logs/clamscan-log', // logs file in your app directory
 		multiscan: false, // You hate speed and multi-threaded awesome-sauce
@@ -96,7 +102,28 @@ var clam = require('clamscan')({
 });
 ```
 
-## API 
+## API
+
+### .get_version(callback)
+
+This method allows you to determine the version of clamav you are interfacing with
+
+#### Parameters:
+
+* `callback` (function) (optional) Will be called when the scan is complete. It takes 2 parameters:
+    * `err` (object or null) A standard javascript Error object (null if no error)
+    * `version` (string) The version of the clamav server you're interfacing with
+    
+#### Example:
+```javascript
+clam.get_version(function(err, version) {
+    if(err) {
+        console.log(err);
+    }
+    console.log(version);
+});
+```
+
  
 ### .is_infected(file_path, callback)
 
@@ -267,6 +294,11 @@ Just keep in mind that some of the nice validation that happens on instantiation
 
 Got a missing feature you'd like to use? Found a bug? Go ahead and fork this repo, build the feature and issue a pull request.
 
+## Resources used to help develop this module:
+
+https://stuffivelearned.org/doku.php?id=apps:clamav:general:remoteclamdscan
+
 ### Items for version 1.0 release:
 
 * Slight change of API to allow for a completely asynchronous module (ie, removal of all `fs.xxSync` items).
+* Allow the ability to scan Buffers, Streams, and Strings directly.
