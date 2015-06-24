@@ -197,6 +197,28 @@ describe('build_clam_flags', function() {
     });
 });
 
+describe('get_version', function() {
+    reset_clam();
+    
+    it('should exist', function() {
+        should.exist(clamscan.get_version);
+    });
+    it('should be a function', function() {
+        clamscan.get_version.should.be.a('function');
+    });
+});
+
+describe('init_socket', function() {
+    reset_clam();
+    
+    it('should exist', function() {
+        should.exist(clamscan.init_socket);
+    });
+    it('should be a function', function() {
+        clamscan.init_socket.should.be.a('function');
+    });
+});
+
 describe('is_infected', function() {
     reset_clam();
     

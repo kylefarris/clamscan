@@ -102,29 +102,8 @@ function NodeClam(options) {
         }
     }
     
-    // Check the availability of the clamd service if socket or host/port are provided
-    if (this.clamdscan.socket || this.clamdscan.host) {
-        this.init_socket(function(err, client) {
-            if (self.settings.clamdscan.local_fallback !== true) {
-                if (err) throw err;
-            }
-            
-            client.write('PING');
-            client.on('data', function(data) {
-                if (data.toString() === 'PONG') {
-                    if (self.settings.debug_mode) {
-                        console.log("Established connection to clamscan server.");
-                    }
-                } else {
-                    // I'm not even sure this case is possible, but...
-                    throw new Error("Could not establish connection to the remote clamscan server.");
-                }
-            });
-        });
-    }
-    
     // Make sure quarantine infected path exists at specified location
-    if (!__.isEmpty(this.settings.quarantine_infected) && !fs.existsSync(this.settings.quarantine_infected)) {
+    if (!this.clamdscan.socket && !this.clamdscan.host && this.settings.clamdscan.local_fallback === true && !__.isEmpty(this.settings.quarantine_infected) && !fs.existsSync(this.settings.quarantine_infected)) {
         var err_msg = "Quarantine infected path (" + this.settings.quarantine_infected + ") is invalid.";
         this.settings.quarantine_infected = false;
         throw new Error(err_msg);
@@ -134,7 +113,7 @@ function NodeClam(options) {
     }
     
     // Make sure scan_log exists at specified location
-    if (!__.isEmpty(this.settings.scan_log) && !fs.existsSync(this.settings.scan_log)) {
+    if (!this.clamdscan.socket && !this.clamdscan.host && this.settings.clamdscan.local_fallback === true && !__.isEmpty(this.settings.scan_log) && !fs.existsSync(this.settings.scan_log)) {
         var err_msg = "node-clam: Scan Log path (" + this.settings.scan_log + ") is invalid.";
         this.settings.scan_log = null;
         if (this.settings.debug_mode)
@@ -142,7 +121,7 @@ function NodeClam(options) {
     }
     
     // If using clamscan, make sure definition db exists at specified location
-    if (this.scanner === 'clamscan') {
+    if (!this.clamdscan.socket && !this.clamdscan.host && this.scanner === 'clamscan') {
         if (!__.isEmpty(this.settings.clamscan.db) && !fs.existsSync(this.settings.clamscan.db)) {
             var err_msg = "node-clam: Definitions DB path (" + this.settings.clamscan.db + ") is invalid.";
             this.settings.clamscan.db = null;
@@ -151,8 +130,67 @@ function NodeClam(options) {
         }
     }
     
+    // Check the availability of the clamd service if socket or host/port are provided
+    if (this.clamdscan.socket || this.clamdscan.host) {
+        this.init_socket(function(err, client) {
+            client.write('PING');
+            client.on('data', function(data) {
+                if (data.toString() === 'PONG') {
+                    if (self.settings.debug_mode) {
+                        console.log("node-clam: Established connection to clamscan server.");
+                    }
+                } else {
+                    // I'm not even sure this case is possible, but...
+                    throw new Error("Could not establish connection to the remote clamscan server.");
+                }
+            });
+        });
+    }
+    
     // Build clam flags
     this.clam_flags = build_clam_flags(this.scanner, this.settings);
+}
+
+// ****************************************************************************
+// Establish the clamav version of a remote clamav daemon
+// -----
+// @param   Function    cb  What to do when version is established
+// @return  VOID
+// ****************************************************************************
+NodeClam.prototype.get_version(cb) {
+    this.init_socket(function(err, client) {
+        if (err) {
+            if (self.settings.clamdscan.local_fallback === true) {
+                var command = this.settings[this.scanner].path + this.clam_flags + '--version';
+                if(this.settings.debug_mode === true)
+                    console.log('node-clam: Configured clam command: ' + command);
+                    
+                // Execute the clam binary with the proper flags
+                exec(command, function(cmd_err, stdout, stderr) {
+                    if (cmd_err) {
+                        if(err.hasOwnProperty('code') && err.code === 1) {
+                            return cb(null, stdout);
+                        } else {
+                            if(self.settings.debug_mode)
+                                console.log("node-clam: " + cmd_err);
+                            return cb(new Error(cmd_err), null);
+                        }
+                    } else {
+                        console.error("node-clam: " + stderr);
+                        return cb(cmd_err, null);
+                    }
+                    
+                    return cb(null, stdout);
+                });
+            } else {
+                return cb(err, null);
+            }
+        }
+        client.write('VERSION');
+        client.on('data', function(data) {
+            cb(null, data.toString());
+        });
+    });
 }
 
 // ****************************************************************************
@@ -173,9 +211,11 @@ NodeClam.prototype.init_socket(cb) {
     } else {
         client.connect(this.clamdscan.port, this.clamdscan.host);
         client.on('lookup', function(err, address, family) {
-            if (err) cb(err, null);
+            if (self.settings.clamdscan.local_fallback !== true) {
+                throw err;
+            }
             if (self.settings.debug_mode) {
-                console.log("Establishing connection to: " + address + " (" + (family ? family : 'Unknown IP Type') + ")");
+                console.log("node-clam: Establishing connection to: " + address + " (" + (family ? family : 'Unknown IP Type') + ")");
             }
         });
     }
@@ -185,19 +225,23 @@ NodeClam.prototype.init_socket(cb) {
     });
     
     client.on('error', function(err) {
-        cb(err, null);
+        if (self.settings.clamdscan.local_fallback !== true) {
+            throw err;
+        } else {
+            cb(err, client);
+        }
     });
 
     client.on('timeout', function() {
         if (self.settings.debug_mode) {
-            console.log('Socket connection timed out.');
+            console.log('node-clam: Socket connection timed out.');
         }
         client.close();
     });
     
     client.on('close', function() {
         if (self.settings.debug_mode) {
-            console.log('Connection closed');
+            console.log('node-clam: Socket connection closed.');
         }
     });
 };
