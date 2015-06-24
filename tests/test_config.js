@@ -6,7 +6,10 @@ module.exports = {
 		path: '/usr/bin/clamscan',  				// required for testing (change for your system)
 	},
 	clamdscan: {
-		path: '/usr/bin/clamdscan',  				// required for testing (change for your system)
+        socket: '/var/run/clamd.scan/clamd.sock',   // required for testing (change for your system) - can be set to null
+        host: '127.0.0.1',                          // required for testing (change for your system) - can be set to null
+        port: 12345,                                // required for testing (change for your system) - can be set to null
+		path: '/usr/bin/clamdscan',  				
 		config_file: '/etc/clamd.d/daemon.conf'  	// required for testing (change for your system)
 	},
 	debug_mode: false

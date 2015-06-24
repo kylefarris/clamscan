@@ -11,6 +11,7 @@ var exec = require('child_process').exec;
 var execSync = require('child_process').execSync;
 var spawn = require('child_process').spawn;
 var os = require('os');
+var net = require('net');
 	
 // ****************************************************************************
 // NodeClam class definition
@@ -18,6 +19,8 @@ var os = require('os');
 // @param	Object	options		Key => Value pairs to override default settings
 // ****************************************************************************
 function NodeClam(options) {
+    var self = this;
+    
     options = options || {};
     
     this.default_scanner = 'clamdscan';
@@ -32,6 +35,10 @@ function NodeClam(options) {
         scan_recursively: true,
         clamscan: {
             path: '/usr/bin/clamscan',
+            socket: false,
+            host: false,
+            port: false,
+            local_fallback: true,
             scan_archives: true,
             db: null,
             active: true
@@ -67,7 +74,12 @@ function NodeClam(options) {
     // Determine whether to use clamdscan or clamscan
     this.scanner = this.default_scanner;
     if (typeof this.settings.preference !== 'string' || ['clamscan','clamdscan'].indexOf(this.settings.preference) === -1) {
-        throw new Error("Invalid virus scanner preference defined!");
+        // Disable local fallback of socket connection if no valid scanner is found.
+        if (this.clamdscan.socket || this.clamdscan.host) {
+            this.settings.clamdscan.local_fallback = false;
+        } else {
+            throw new Error("Invalid virus scanner preference defined!");
+        }
     }
     if (this.settings.preference === 'clamscan' && this.settings.clamscan.active === true) {
         this.scanner = 'clamscan';
@@ -81,8 +93,34 @@ function NodeClam(options) {
         } else if (this.scanner == 'clamscan' && this.settings.clamdscan.active === true && this.is_clamav_binary_sync('clamdscan')) {
             this.scanner == 'clamdscan';
         } else {
-            throw new Error("No valid & active virus scanning binaries are active and available!");
+            // Disable local fallback of socket connection if preferred scanner is not a valid binary
+            if (this.clamdscan.socket || this.clamdscan.host) {
+                this.settings.clamdscan.local_fallback = false;
+            } else {
+                throw new Error("No valid & active virus scanning binaries are active and available!");
+            }
         }
+    }
+    
+    // Check the availability of the clamd service if socket or host/port are provided
+    if (this.clamdscan.socket || this.clamdscan.host) {
+        this.init_socket(function(err, client) {
+            if (self.settings.clamdscan.local_fallback !== true) {
+                if (err) throw err;
+            }
+            
+            client.write('PING');
+            client.on('data', function(data) {
+                if (data.toString() === 'PONG') {
+                    if (self.settings.debug_mode) {
+                        console.log("Established connection to clamscan server.");
+                    }
+                } else {
+                    // I'm not even sure this case is possible, but...
+                    throw new Error("Could not establish connection to the remote clamscan server.");
+                }
+            });
+        });
     }
     
     // Make sure quarantine infected path exists at specified location
@@ -108,7 +146,7 @@ function NodeClam(options) {
         if (!__.isEmpty(this.settings.clamscan.db) && !fs.existsSync(this.settings.clamscan.db)) {
             var err_msg = "node-clam: Definitions DB path (" + this.settings.clamscan.db + ") is invalid.";
             this.settings.clamscan.db = null;
-            if(this.settings.debug_mode)
+            if (this.settings.debug_mode)
                 console.log(err_msg);
         }
     }
@@ -116,6 +154,53 @@ function NodeClam(options) {
     // Build clam flags
     this.clam_flags = build_clam_flags(this.scanner, this.settings);
 }
+
+// ****************************************************************************
+// Create socket connection to a remote (or local) clamav daemon.
+// -----
+// @param   Function    cb  What to do when socket client is established
+// @return  VOID
+// ****************************************************************************
+NodeClam.prototype.init_socket(cb) {
+    if (typeof cb !== 'function') {
+        throw new Error("Invalid value provided to socket init method's callback parameter. Value must be a function!");
+    }
+    
+    var client = new net.Socket();
+    
+    if (this.clamdscan.socket) {
+        client.connect(this.clamdscan.socket);
+    } else {
+        client.connect(this.clamdscan.port, this.clamdscan.host);
+        client.on('lookup', function(err, address, family) {
+            if (err) cb(err, null);
+            if (self.settings.debug_mode) {
+                console.log("Establishing connection to: " + address + " (" + (family ? family : 'Unknown IP Type') + ")");
+            }
+        });
+    }
+    
+    client.on('connect', function() {
+        cb(null, client);
+    });
+    
+    client.on('error', function(err) {
+        cb(err, null);
+    });
+
+    client.on('timeout', function() {
+        if (self.settings.debug_mode) {
+            console.log('Socket connection timed out.');
+        }
+        client.close();
+    });
+    
+    client.on('close', function() {
+        if (self.settings.debug_mode) {
+            console.log('Connection closed');
+        }
+    });
+};
 
 // ****************************************************************************
 // Checks to see if a particular path contains a clamav binary

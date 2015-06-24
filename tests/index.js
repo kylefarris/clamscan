@@ -69,6 +69,10 @@ describe('Module', function() {
     
     it('should have the proper clamdscan default values set', function() {
         reset_clam();
+        expect(clamscan.defaults.clamdscan.socket).to.eql(false);
+        expect(clamscan.defaults.clamdscan.host).to.eql(false);
+        expect(clamscan.defaults.clamdscan.port).to.eql(false);
+        expect(clamscan.defaults.clamdscan.local_fallback).to.eql(true);
         expect(clamscan.defaults.clamdscan.path).to.eql('/usr/bin/clamdscan');
         expect(clamscan.defaults.clamdscan.config_file).to.eql('/etc/clamd.conf');
         expect(clamscan.defaults.clamdscan.multiscan).to.be.eql(true);
@@ -86,11 +90,15 @@ describe('Module', function() {
             scan_recursively: true,
             clamscan: {
                 path: config.clamscan.path,
-                db: '/usr/bin/better_clam_db', 
+                db: '/usr/bin/better_clam_db',
                 scan_archives: false,
                 active: false 
             },
             clamdscan: {
+                socket: config.clamdscan.socket, 
+                host: config.clamdscan.host, 
+                port: config.clamdscan.port, 
+                local_fallback: false, 
                 path: config.clamdscan.path, 
                 config_file: config.clamdscan.config_file,
                 multiscan: false,
@@ -116,7 +124,11 @@ describe('Module', function() {
         expect(clamscan.settings.clamscan.active).to.eql(false);
         
         // clamdscan
+        expect(clamscan.settings.clamdscan.socket).to.eql(config.clamdscan.socket);
+        expect(clamscan.settings.clamdscan.host).to.eql(config.clamdscan.host);
+        expect(clamscan.settings.clamdscan.port).to.eql(config.clamdscan.port);
         expect(clamscan.settings.clamdscan.path).to.eql(config.clamdscan.path);
+        expect(clamscan.settings.clamdscan.local_fallback).to.eql(false);
         expect(clamscan.settings.clamdscan.config_file).to.eql(config.clamdscan.config_file);
         expect(clamscan.settings.clamdscan.multiscan).to.be.eql(false);
         expect(clamscan.settings.clamdscan.reload_db).to.eql(true);
@@ -124,6 +136,10 @@ describe('Module', function() {
     });
     
     it('should failover to alternate scanner if preferred scanner is not found', function() {
+        
+    });
+    
+    it('should try and fallback to local daemon if socket connection can not be established (if specified by local_fallback option)', function() {
         
     });
     
