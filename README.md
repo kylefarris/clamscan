@@ -7,16 +7,16 @@ Use Node JS to scan files on your server with ClamAV's clamscan binary or clamds
 You will need to install ClamAV's clamscan binary and/or have clamdscan daemon running on your server. On linux, it's quite simple.
 
 Fedora-based distros:
-	
-	sudo yum install clamav
-	
+    
+    sudo yum install clamav
+    
 Debian-based distros:
-	
-	sudo apt-get install clamav
-	
+    
+    sudo apt-get install clamav
+    
 For OS X, you can install clamav with brew:
 
-	sudo brew install clamav
+    sudo brew install clamav
 
 This module is not intended to work on a Windows server. This would be a welcome addition if someone wants to add that feature (I may get around to it one day but have no urgent need for this).
 
@@ -48,27 +48,28 @@ __BUT__: If you want more control, you can specify all sorts of options.
 var clam = require('clamscan')({
     remove_infected: false, // If true, removes infected files
     quarantine_infected: false, // False: Don't quarantine, Path: Moves files to this place.
-	scan_log: null, // Path to a writeable log file to write scan results into
-	debug_mode: false // Whether or not to log info/debug/error msgs to the console
-	file_list: null, // path to file containing list of files to scan (for scan_files method)
-	scan_recursively: true, // If true, deep scan folders recursively
-	clamscan: {
-		path: '/usr/bin/clamscan', // Path to clamscan binary on your server
-		db: null, // Path to a custom virus definition database
-		scan_archives: true, // If true, scan archives (ex. zip, rar, tar, dmg, iso, etc...)
-		active: true // If true, this module will consider using the clamscan binary
-	},
+    scan_log: null, // Path to a writeable log file to write scan results into
+    debug_mode: false // Whether or not to log info/debug/error msgs to the console
+    file_list: null, // path to file containing list of files to scan (for scan_files method)
+    scan_recursively: true, // If true, deep scan folders recursively
+    clamscan: {
+        path: '/usr/bin/clamscan', // Path to clamscan binary on your server
+        db: null, // Path to a custom virus definition database
+        scan_archives: true, // If true, scan archives (ex. zip, rar, tar, dmg, iso, etc...)
+        active: true // If true, this module will consider using the clamscan binary
+    },
     clamdscan: {
         socket: false, // Socket file for connecting via TCP
         host: false, // IP of host to connect to TCP interface
         port: false, // Port of host to use when connecting via TCP interface
-		path: '/usr/bin/clamdscan', // Path to the clamdscan binary on your server
-		config_file: '/etc/clamd.conf', // Specify config file if it's in an unusual place
-		multiscan: true, // Scan using all available cores! Yay!
-		reload_db: false, // If true, will re-load the DB on every call (slow)
-		active: true // If true, this module will consider using the clamdscan binary
-	},
-	preference: 'clamdscan' // If clamdscan is found and active, it will be used by default
+        path: '/usr/bin/clamdscan', // Path to the clamdscan binary on your server
+        local_fallback: false, // Do no fail over to binary-method of scanning
+        config_file: '/etc/clamd.conf', // Specify config file if it's in an unusual place
+        multiscan: true, // Scan using all available cores! Yay!
+        reload_db: false, // If true, will re-load the DB on every call (slow)
+        active: true // If true, this module will consider using the clamdscan binary
+    },
+    preference: 'clamdscan' // If clamdscan is found and active, it will be used by default
 });
 ```
 
@@ -81,26 +82,46 @@ var clam = require('clamscan')({
     scan_recursively: true, // Choosing false here will save some CPU cycles
     scan_log: '/var/log/node-clam', // You're a detail-oriented security professional.
     debug_mode: true // This will put some debug info in your js console
-	file_list: '/home/webuser/scan_files.txt', // path to file containing list of files to scan
-	clamscan: {
-		path: '/usr/bin/clam', // I dunno, maybe your clamscan is just call "clam"
-		db: '/usr/bin/better_clam_db', // Path to a custom virus definition database
-		scan_archives: false, // Choosing false here will save some CPU cycles
-		active: false // you don't want to use this at all because it's evil
-	},
+    file_list: '/home/webuser/scan_files.txt', // path to file containing list of files to scan
+    clamscan: {
+        path: '/usr/bin/clam', // I dunno, maybe your clamscan is just call "clam"
+        db: '/usr/bin/better_clam_db', // Path to a custom virus definition database
+        scan_archives: false, // Choosing false here will save some CPU cycles
+        active: false // you don't want to use this at all because it's evil
+    },
     clamdscan: {
         socket: '/var/run/clamd.scan/clamd.sock', // This is pretty typical
         host: '127.0.0.1', // If you want to connect locally but not through socket
         port: 12345, // Because, why not
-		path: '/bin/clamdscan', // Special path to the clamdscan binary on your server
-		config_file: __dirname + '/logs/clamscan-log', // logs file in your app directory
-		multiscan: false, // You hate speed and multi-threaded awesome-sauce
-		reload_db: true, // You want your scans to run slow like with clamscan
-		active: false // you don't want to use this at all because it's evil
-	},
-	preference: 'clamscan' // If clamscan is found and active, it will be used by default	
+        path: '/bin/clamdscan', // Special path to the clamdscan binary on your server
+        local_fallback: true, // Use local preferred binary to scan if socket/tcp fails
+        config_file: '/etc/clamd.d/daemon.conf', // A fairly typical config location
+        multiscan: false, // You hate speed and multi-threaded awesome-sauce
+        reload_db: true, // You want your scans to run slow like with clamscan
+        active: false // you don't want to use this at all because it's evil
+    },
+    preference: 'clamscan' // If clamscan is found and active, it will be used by default   
 });
 ```
+
+#### A note about using this module via sockets or TCP
+
+As of version 0.9, this module supports communication with a local or remote ClamAV daemon through Unix Domain sockets or a TCP port. If you supply both in your configuration object, the UNIX Domain option will be used. The module will not fallback to using the alternative Host/Port method. If you wish to connect via Host/Port and not a Socket, please either omit the `socket` property in the config object or use `socket: null`.
+
+If you specify a valid clamscan/clamdscan binary in your config and you set `clamdscan.local_fallback: true` in your config, this module will fallback to the traditional way this module has worked&mdash;using a binary directly.
+
+Also, there are some caveats to using the socket/tcp based approach:
+
+* The following configuration items are not honored (unless the module falls back to binary method):
+    * `remove_infected` - remote clamd service config will dictate this
+    * `quarantine_infected` - remote clamd service config will dictate this
+    * `scan_log` - remote clamd service config will dictate this
+    * `file_list` - this simply won't be available
+    * `clamscan.db` - only available on fallback
+    * `clamscan.scan_archives` - only available on fallback
+    * `clamscan.path` - only available on fallback
+    * `clamdscan.config_file` - only available on fallback
+    * `clamdscan.path` - only available on fallback
 
 ## API
 
@@ -216,8 +237,8 @@ This allows you to scan many files that might be in different directories or may
 
 ```javascript
 var scan_status = {
-	good: 0,
-	bad: 0
+    good: 0,
+    bad: 0
 };
 var files = [
     '/path/to/file/1.jpg',
@@ -239,12 +260,12 @@ clam.scan_files(files, function(err, good_files, bad_files) {
         // Do some error handling
     }
 }, function(err, file, is_infected) {
-	if(is_infected) {
-		scan_status.bad++;
-	} else {
-		scan_status.good++;
-	}
-	console.log("Scan Status: " + (scan_status.bad + scan_status.good) + "/" + files.length);
+    if(is_infected) {
+        scan_status.bad++;
+    } else {
+        scan_status.good++;
+    }
+    console.log("Scan Status: " + (scan_status.bad + scan_status.good) + "/" + files.length);
 });
 ```
 
@@ -297,6 +318,7 @@ Got a missing feature you'd like to use? Found a bug? Go ahead and fork this rep
 ## Resources used to help develop this module:
 
 https://stuffivelearned.org/doku.php?id=apps:clamav:general:remoteclamdscan
+http://cpansearch.perl.org/src/JMEHNLE/ClamAV-Client-0.11/lib/ClamAV/Client.pm
 
 ### Items for version 1.0 release:
 
