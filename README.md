@@ -138,10 +138,10 @@ This method allows you to determine the version of clamav you are interfacing wi
 #### Example:
 ```javascript
 clam.get_version(function(err, version) {
-    if(err) {
+    if (err) {
         console.log(err);
     }
-    console.log(version);
+    console.log("ClamAV Version: " + version);
 });
 ```
 
@@ -150,24 +150,28 @@ clam.get_version(function(err, version) {
 
 This method allows you to scan a single file.
 
+#### Alias:
+
+`.scan_file`
+
 #### Parameters: 
 
 * `file_path` (string) Represents a path to the file to be scanned.
 * `callback` (function) (optional) Will be called when the scan is complete. It takes 3 parameters:
     * `err` (object or null) A standard javascript Error object (null if no error)
     * `file` (string) The original `file_path` passed into the `is_infected` method.
-    * `is_infected` (boolean) __True__: File is infected; __False__: File is clean.
+    * `is_infected` (boolean) __True__: File is infected; __False__: File is clean. __NULL__: Unable to scan.
 
 
 #### Example:
 ```javascript
 clam.is_infected('/a/picture/for_example.jpg', function(err, file, is_infected) {
-    if(err) {
+    if (err) {
         console.log(err);
         return false;
     }
 
-    if(is_infected) {
+    if (is_infected) {
         res.send({msg: "File is infected!"});
     } else {
         res.send({msg: "File is clean!"});
@@ -200,13 +204,13 @@ The `good_files` and `bad_files` parameters of the `end_callback` callback in th
 * `file_callback` (function) Will be called after each file in the directory has been scanned. This is useful for keeping track of the progress of the scan. This callback takes 3 parameters:
     * `err` (object or null) A standard Javascript Error object (null if no error)
     * `file` (string) Path to the file that just got scanned.
-    * `is_infected` (boolean) __True__: File is infected; __False__: File is clean.
+    * `is_infected` (boolean) __True__: File is infected; __False__: File is clean. __NULL__: Unable to scan file.
  
 #### Example
 ```javascript
 clam.scan_dir('/some/path/to/scan', function(err, good_files, bad_files) {
-    if(!err) {
-        if(bad_files.length > 0) {
+    if (!err) {
+        if (bad_files.length > 0) {
             res.send({msg: "Your directory was infected. The offending files have been quarantined."});
         } else {
             res.send({msg: "Everything looks good! No problems here!."});
@@ -231,7 +235,7 @@ This allows you to scan many files that might be in different directories or may
 * `file_callback` (function) Will be called after each file in the directory has been scanned. This is useful for keeping track of the progress of the scan. This callback takes 3 parameters:
     * `err` (object or null)A standard javascript Error object (null if no error)
     * `file` (string) Path to the file that just got scanned.
-    * `is_infected` (boolean) __True__: File is infected; __False__: File is clean.
+    * `is_infected` (boolean) __True__: File is infected; __False__: File is clean. __NULL__: Unable to scan file.
 
 #### Example
 
@@ -246,8 +250,8 @@ var files = [
     '/path/to/file/3.rb'
 ];
 clam.scan_files(files, function(err, good_files, bad_files) {
-    if(!err) {
-        if(bad_files.length > 0) {
+    if (!err) {
+        if (bad_files.length > 0) {
             res.send({
                 msg: good_files.length + ' files were OK. ' + bad_files.length + ' were infected!',
                 bad: bad_files,
@@ -260,13 +264,79 @@ clam.scan_files(files, function(err, good_files, bad_files) {
         // Do some error handling
     }
 }, function(err, file, is_infected) {
-    if(is_infected) {
+    if (is_infected) {
         scan_status.bad++;
     } else {
         scan_status.good++;
     }
     console.log("Scan Status: " + (scan_status.bad + scan_status.good) + "/" + files.length);
 });
+```
+
+### .scan_stream(stream, callback)
+
+This method allows one to scan a binary stream. __NOTE__: This method will only work if the scanning method is a TCP or UNIX Domain socket. In other words, this will not work if you are using the local binary method.
+
+#### Parameters
+
+* `stream` (stream) A nodejs stream object
+* `callback` (function) Will be called after the stream has been scanned (or attempted to be scanned):
+    * `err` (object or null) A standard javascript Error object (null if no error)
+    * `is_infected` (boolean) __True__: Stream is infected; __False__: Stream is clean. __NULL__: Unable to scan file.
+
+#### Examples
+
+__Contrived Example:__
+
+```javascript
+var Readable = require('stream').Readable;
+var rs = Readable();
+
+rs.push('foooooo');
+rs.push('barrrrr');
+rs.push(null);
+
+clam.scan_stream(stream, function(err, is_infected) {
+    if (err) {
+        console.log(err);
+    } else {
+        if (is_infected) {
+            console.log("Stream is infected! Booo!");
+        } else {
+            console.log("Stream is not infected! Yay!");
+        }
+    }
+});
+```
+
+__Slightly More "Realistic" Example:__
+
+This example shows how to scan every HTTP request as it comes in to your server using middleware funcionality in express (definitely not advisable!).
+
+```javascript
+var express = require('express');
+var app = express();
+
+app.use(function (req, res, next) {
+    clam.scan_stream(req, function(err, is_infected) {
+        if (err) {
+            console.log("Unable to scan request for viruses!", err});
+            res.status(500).send({error: "There was an error accepting your request!"});
+        } else {
+            if (is_infected) {
+                res.status(500).send({error: "Your request is virus-infected!");
+            } else {
+                next();
+            }
+        }
+    });
+});
+
+app.get('/', function(req, res) {
+    // should never get here if request has virus.
+});
+
+var server = app.listen(3000);
 ```
 
 #### Scanning files listed in file list

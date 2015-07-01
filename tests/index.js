@@ -215,7 +215,7 @@ describe('init_socket', function() {
         should.exist(clamscan.init_socket);
     });
     it('should be a function', function() {
-        clamscan.init_socket.should.be.a('function');
+        clamscan.get_version.should.be.a('function');
     });
 });
 

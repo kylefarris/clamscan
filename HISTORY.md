@@ -72,3 +72,11 @@ __NOTE:__ There are some breaking changes on this release. Since this is still a
 ### 0.8.1 (2015-06-09)
 
 * Fixed check for database file. Issue #6
+
+### 0.9.0 (2015-07-01)
+
+* Added support for TCP/UNIX Domain socket communication to local or remote clamav services.
+* Added a `get_version` method.
+* NULL is now returned to the third paramter of the `is_infected` 
+* Created alias: `scan_file` for `is_infected`.
+* Minor code clean-up
