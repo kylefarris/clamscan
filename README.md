@@ -1,8 +1,10 @@
 ## NodeJS Clamscan Virus Scanning Utility
 
-Use Node JS to scan files on your server with ClamAV's clamscan binary or clamdscan daemon. This is especially useful for scanning uploaded files provided by un-trusted sources.
+Use Node JS to scan files on your server with ClamAV's clamscan/clamdscan binary or via TCP to a remote server or local UNIX Domain socket. This is especially useful for scanning uploaded files provided by un-trusted sources.
 
 ## Dependencies
+
+### To use local binary method of scanning:
 
 You will need to install ClamAV's clamscan binary and/or have clamdscan daemon running on your server. On linux, it's quite simple.
 
@@ -18,7 +20,17 @@ For OS X, you can install clamav with brew:
 
     sudo brew install clamav
 
-This module is not intended to work on a Windows server. This would be a welcome addition if someone wants to add that feature (I may get around to it one day but have no urgent need for this).
+### To use ClamAV using TCP sockets:
+
+You will need access to either:
+
+1. A local UNIX Domain socket for a local instance of `clamd` (usually: `/var/run/clamd.scan/clamd.sock`)
+1. A local/remote `clamd` daemon
+    * Must know the port the daemon is running on
+    * If running on remote server, you must have the IP address/domain name
+    * If running on remote server, it's firewall must have the appropriate TCP port(s) open
+    
+__NOTE:__ This module is not intended to work on a Windows server. This would be a welcome addition if someone wants to add that feature (I may get around to it one day but have no urgent need for this).
 
 ## How to Install
 
@@ -389,6 +401,7 @@ Got a missing feature you'd like to use? Found a bug? Go ahead and fork this rep
 
 https://stuffivelearned.org/doku.php?id=apps:clamav:general:remoteclamdscan
 http://cpansearch.perl.org/src/JMEHNLE/ClamAV-Client-0.11/lib/ClamAV/Client.pm
+https://github.com/yongtang/clamav.js
 
 ### Items for version 1.0 release:
 
