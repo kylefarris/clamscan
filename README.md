@@ -25,7 +25,7 @@ For OS X, you can install clamav with brew:
 You will need access to either:
 
 1. A local UNIX Domain socket for a local instance of `clamd` 
-    * Follow instructions in [user-content-to-use-local-binary-method-of-scanning To use local binary method of scanning].
+    * Follow instructions in [To use local binary method of scanning](#user-content-to-use-local-binary-method-of-scanning).
     * Socket file is usually: `/var/run/clamd.scan/clamd.sock`
 1. A local/remote `clamd` daemon
     * Must know the port the daemon is running on
