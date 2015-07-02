@@ -27,10 +27,12 @@ You will need access to either:
 1. A local UNIX Domain socket for a local instance of `clamd` 
     * Follow instructions in [To use local binary method of scanning](#user-content-to-use-local-binary-method-of-scanning).
     * Socket file is usually: `/var/run/clamd.scan/clamd.sock`
+    * Make sure `clamd` is running on your local server
 1. A local/remote `clamd` daemon
     * Must know the port the daemon is running on
     * If running on remote server, you must have the IP address/domain name
     * If running on remote server, it's firewall must have the appropriate TCP port(s) open
+    * Make sure `clamd` is running on your local/remote server
     
 __NOTE:__ This module is not intended to work on a Windows server. This would be a welcome addition if someone wants to add that feature (I may get around to it one day but have no urgent need for this).
 
