@@ -926,7 +926,7 @@ module.exports = function(options) {
 // ****************************************************************************
 function is_readable_stream(obj) {
     var stream = require('stream');
-    return typeof (obj._read === 'function') && typeof (obj._readableState === 'object');
+    return typeof (obj.pipe === 'function') && typeof (obj._readableState === 'object');
 }
 
 // ****************************************************************************
