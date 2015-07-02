@@ -12,6 +12,7 @@ var execSync = require('child_process').execSync;
 var spawn = require('child_process').spawn;
 var os = require('os');
 var net = require('net');
+var ClamAVChannel = require('./ClamAVChannel.js');
 
 var counter = 0;
 	
@@ -104,7 +105,7 @@ function NodeClam(options) {
         }
     }
     
-    // Make sure quarantine infected path exists at specified location
+    // Make sure quarantine_infected path exists at specified location
     if (!this.settings.clamdscan.socket && !this.settings.clamdscan.host && this.settings.clamdscan.local_fallback === true && !__.isEmpty(this.settings.quarantine_infected) && !fs.existsSync(this.settings.quarantine_infected)) {
         var err_msg = "Quarantine infected path (" + this.settings.quarantine_infected + ") is invalid.";
         this.settings.quarantine_infected = false;
@@ -130,7 +131,7 @@ function NodeClam(options) {
     }
     
     // Check the availability of the clamd service if socket or host/port are provided
-    if (this.settings.clamdscan.socket || this.settings.clamdscan.host) {
+    if (this.settings.clamdscan.socket || this.settings.clamdscan.host || this.settings.clamdscan.port) {
         if (self.settings.debug_mode) console.log(++counter + ": node-clam: Initially testing socket/tcp connection to clamscan server.");
         this.init_socket('test_availability', function(err, client) {
             if (self.settings.debug_mode) console.log(++counter + ": node-clam: Established connection to clamscan server fot testing!");
@@ -221,14 +222,21 @@ NodeClam.prototype.init_socket = function(label, cb) {
     
     if (this.settings.clamdscan.socket) {
         client.connect(this.settings.clamdscan.socket);
-    } else {
-        client.connect(this.settings.clamdscan.port, this.settings.clamdscan.host);
+    } else if (this.settings.port) {
+        if (!_.isEmpty(this.settings.clamdscan.host)) {
+            client.connect(this.settings.clamdscan.port, this.settings.clamdscan.host);
+        } else {
+            client.connect(this.settings.clamdscan.port);
+        }
         client.on('lookup', function(err, address, family) {
             if (err && self.settings.clamdscan.local_fallback !== true) {
                 throw err;
             }
-            if (self.settings.debug_mode) console.log(++counter + ": node-clam: Establishing connection to: " + address + " (" + (family ? 'IPv' + family : 'Unknown IP Type') + ") - " + label);
+            if (self.settings.debug_mode) 
+                console.log(++counter + ": node-clam: Establishing connection to: " + address + " (" + (family ? 'IPv' + family : 'Unknown IP Type') + ") - " + label);
         });
+    } else {
+        return cb(new Error("Could not determine connection to stream server for scanning of stream over socket."), null);
     }
     
     client.on('connect', function() {
@@ -236,9 +244,9 @@ NodeClam.prototype.init_socket = function(label, cb) {
         
         // Determine information about what server the client is connected to
         if (client.remotePort && client.remotePort.toString() === self.settings.clamdscan.port.toString()) {
-            if (self.settings.debug_mode) console.log(++counter + ": node-clam: using remote server to scan file: " + client.remoteAddress + ':' + client.remotePort);
+            if (self.settings.debug_mode) console.log(++counter + ": node-clam: using remote server: " + client.remoteAddress + ':' + client.remotePort);
         } else if (self.settings.clamdscan.socket) {
-            if (self.settings.debug_mode) console.log(++counter + ": node-clam: using local unix domain socket to scan file: " + self.settings.clamdscan.socket);
+            if (self.settings.debug_mode) console.log(++counter + ": node-clam: using local unix domain socket: " + self.settings.clamdscan.socket);
         } else {
             if (self.settings.debug_mode) {
                 var meta = client.address();
@@ -252,6 +260,7 @@ NodeClam.prototype.init_socket = function(label, cb) {
     });
     
     client.on('error', function(err) {
+        client.destroy();
         if (self.settings.clamdscan.local_fallback !== true) {
             throw err;
         } else {
@@ -419,7 +428,14 @@ NodeClam.prototype.is_infected = function(file, callback) {
                 // Scan using local unix domain socket (much simpler process)
                 if (self.settings.clamdscan.socket) {
                     if (self.settings.debug_mode) console.log(++counter + ": node-clam: scanning with local domain socket now.");
-                    client.write('SCAN ' + file);
+                    
+                    if (settings.clamdscan.multiscan === true) {
+                        // Use Multiple threads (faster)
+                        client.write('MULTISCAN ' + file);
+                    } else {
+                        // Use single or default # of threads (potentially slower)
+                        client.write('SCAN ' + file);
+                    }
                     client.on('data', function(data) {
                         if (self.settings.debug_mode) console.log(++counter + ": node-clam: Received response from remote clamd service.");
                         process_result(data.toString(), self.settings.debug_mode, function(err, is_infected) { callback(err, file, is_infected); });
@@ -826,23 +842,22 @@ NodeClam.prototype.scan_dir = function(path, end_cb, file_cb) {
 }
 
 // ****************************************************************************
-// Scans a node Stream.
+// Scans a node Stream object
 // -----
 // @param	Stream		stream		The stream to scan
 // @param	Function	callback	What to do when the socket responds with results
 // ****************************************************************************
 NodeClam.prototype.scan_stream = function(stream, callback) {
-    var stream = require('stream');
     var self = this;
 
     // Verify second param, if supplied, is a function
     if (callback && typeof callback !== 'function') {
-        throw new Error("Invalid callback provided to scan_stream. Second paramter, if provided, must be a function!");
+        throw new Error("Invalid callback provided to scan_stream. Second paramter must be a function!");
     }
 
-    // Verify string is passed to the file parameter
+    // Verify stream is passed to the first parameter
     if (!is_readable_stream(stream)) {
-        var err = new Error("Invalid stream provided to scan provided.");
+        var err = new Error("Invalid stream provided to scan.");
         if (callback && typeof callback === 'function') {
             return callback(err, null);
         } else {
@@ -850,69 +865,38 @@ NodeClam.prototype.scan_stream = function(stream, callback) {
         }
     }
     
-    // Verify that they have a valid socket or TCP host/port config
+    // Verify that they have a valid socket or host/port config
     if (!this.settings.clamdscan.socket && (!this.settings.clamdscan.port || !this.settings.clamdscan.host)) {
-        var err = new Error("Invalid information provided to connect to clamav service.");
+        var err = new Error("Invalid information provided to connect to clamav service. A unix socket or port (+ optional host) is required!");
         if (callback && typeof callback === 'function') {
             return callback(err, null);
         } else {
             throw err;
         }
     }
+    
+    // Where to buffer string response (not a real "Buffer", per se...
+    var response_buffer = '';
     
     // Get a socket client
     this.init_socket('scan_stream', function(err, client) {
-        if (self.settings.debug_mode) console.log(++counter + ": node-clam: requesting stream connection.");
-        client.write('STREAM');
         client.on('data', function(data) {
-            client.end();
+            response_buffer += data;
             
-            var port = data.toString().replace(/[^\d]+/g,'');
-            
-            if (port.match(/^\d+$/)) {
-                if (self.settings.debug_mode) console.log(++counter + ": node-clam: Stream request response: " + data.toString());
-                
-                var connection_obj = {port: port};
-                if (self.settings.clamdscan.socket) connection_obj.path = self.settings.clamdscan.socket;
-                else if (self.settings.clamdscan.host) connection_obj.path = self.settings.clamdscan.host;
-                else {
-                    return callback(new Error("Could not determine connection to stream server for scanning of stream over socket."), null);
-                }
-                
-                var stream_socket = net.connect(connection_obj, function() {
-                    if (self.settings.debug_mode) console.log(++counter + ": node-clam: Connected to remote clamav stream server. Prepared to stream: scan_stream");
-                    stream.pipe(stream_socket);
-                });
-                
-                stream_socket.on('data', function(data) {
-                    var response = data.toString();
-                    
-                    if (self.settings.debug_mode) console.log(++counter + ": node-clam: Received data after streaming file to remote server (1).  Got Response: " + response);
-                    process_result(response, self.settings.debug_mode, function(err, is_infected) { callback(err, file, is_infected); });
-                });
-                
-                stream_socket.on('error', function(err) {
-                    if (self.settings.debug_mode) console.log(++counter + ": node-clam: got error when communicating with stream socket: scan_stream");
-                    callback(err, null);
-                });
-                
-                stream_socket.on('end', function() {
-                    if (self.settings.debug_mode) console.log(++counter + ": node-clam: Got all responses from stream server: scan_stream!");
-                });
-                
-                stream_socket.on('close', function() {
-                    if (self.settings.debug_mode) console.log(++counter + ": node-clam: Stream socket connection closed: scan_stream.");
-                });
-                
-            } else {
-                var response = data.toString();
-                if (self.settings.debug_mode) console.log(++counter + ": node-clam: Received data after streaming file to remote server (2). Got Response: " + response);
-                process_result(response, self.settings.debug_mode, function(err, is_infected) { callback(err, file, is_infected); });
+            if (data.toString().indexOf("\n") !== -1) {
+                client.destroy();
+                response_buffer = response_buffer.substring(0, response_buffer.indexOf("\n"));
+                return process_result(response_buffer, self.settings.debug_mode, callback);
             }
+        });
+        
+        // Pipe stream over ClamAV INSTREAM channel
+        var stream_channel = new ClamAVChannel();
+        stream.pipe(stream_channel).pipe(client).on('error', function(err) {
+            callback(err, null);
         });
     });
 };
-
 
 module.exports = function(options) {
     return new NodeClam(options);
@@ -941,7 +925,7 @@ function process_result(result, debug_mode, cb) {
     result = result.trim();
     
     if (result.match(/OK$/)) {
-        if (debug_mode) console.log("node-clam: " + file + ' is OK!');
+        if (debug_mode) console.log("node-clam: File is OK!");
         return cb(null, false);
     } 
     
