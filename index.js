@@ -12,6 +12,8 @@ var execSync = require('child_process').execSync;
 var spawn = require('child_process').spawn;
 var os = require('os');
 var net = require('net');
+var node_path = require('path');
+var recursive = require('recursive-readdir');
 var ClamAVChannel = require('./ClamAVChannel.js');
 
 var counter = 0;
@@ -416,7 +418,7 @@ NodeClam.prototype.is_infected = function(file, callback) {
             this.init_socket('is_infected', function(err, client) {
                 if (self.settings.debug_mode) console.log(++counter + ": node-clam: scanning with local domain socket now.");
             
-                if (settings.clamdscan.multiscan === true) {
+                if (self.settings.clamdscan.multiscan === true) {
                     // Use Multiple threads (faster)
                     client.write('MULTISCAN ' + file);
                 } else {
@@ -518,15 +520,54 @@ NodeClam.prototype.scan_files = function(files, end_cb, file_cb) {
         return end_cb(null, good_files, bad_files);
     };
     
+    // Use this method when scanning using local binaries
+    var local_scan = function() {
+        // List files by space and escape 
+        var items = files.map(function(file) {
+            return file.replace(/ /g,'\\ '); 
+        }).join(' ');
+        
+        // Build the actual command to run
+        var command = self.settings[self.scanner].path + self.clam_flags + items;
+        if (self.settings.debug_mode === true)
+            console.log('node-clam: Configured clam command: ' + command);
+        
+        // Execute the clam binary with the proper flags
+        exec(command, function(err, stdout, stderr) {
+            if (self.settings.debug_mode === true) {
+                console.log('node-clam: stdout:', stdout);
+            }
+            if (err && stderr) {
+                if (self.settings.debug_mode === true){
+                    console.log('node-clam: An error occurred.');
+                    console.error(err);
+                    console.log('node-clam: ' + stderr);
+                }
+                
+                if (stderr.length > 0) {
+                    bad_files = stderr.split(os.EOL).map(function(err_line) {
+                        var match = err_line.match(/^ERROR: Can't access file (.*)+$/); //'// fix for some bad syntax highlighters
+                        if (match !== null && match.length > 1 && typeof match[1] === 'string') {
+                            return match[1];
+                        }
+                        return '';
+                    });
+                    
+                    bad_files = __.compact(bad_files);
+                }
+            }     
+
+            return parse_stdout(err, stdout);
+        });
+    };
+    
     // The function that actually scans the files
     var do_scan = function(files) {
         var num_files = files.length;
     
-        if (self.settings.debug_mode === true) {
-            console.log("node-clam: Scanning a list of " + num_files + " passed files.");
-        }
+        if (self.settings.debug_mode === true) console.log("node-clam: Scanning a list of " + num_files + " passed files.");
         
-        // Slower but more verbose way...
+        // Slower but more verbose/informative way...
         if (typeof file_cb === 'function') {
             (function scan_file() {
                 file = files.shift();
@@ -563,7 +604,7 @@ NodeClam.prototype.scan_files = function(files, end_cb, file_cb) {
             })();
         }
         
-        // The MUCH quicker but less-verbose way
+        // The much quicker but less-verbose way
         else {
             var all_files = [];
             
@@ -572,68 +613,124 @@ NodeClam.prototype.scan_files = function(files, end_cb, file_cb) {
                 all_files = __.uniq(__.compact(all_files));
                 
                 // If file list is empty, return error
-                if (all_files.length <= 0)
-                    return end_cb(new Error("No valid files provided to scan!"), [], []);
+                if (all_files.length <= 0) return end_cb(new Error("No valid files provided to scan!"), [], []);
                 
-                // List files by space and escape 
-                var items = files.map(function(file) {
-                    return file.replace(/ /g,'\\ '); 
-                }).join(' ');
-                
-                // Build the actual command to run
-                var command = self.settings[self.scanner].path + self.clam_flags + items;
-                if (self.settings.debug_mode === true)
-                    console.log('node-clam: Configured clam command: ' + command);
-                
-                // Execute the clam binary with the proper flags
-                exec(command, function(err, stdout, stderr) {
-                    if (self.settings.debug_mode === true) {
-                        console.log('node-clam: stdout:', stdout);
-                    }
-                    if (err && stderr) {
-                        if (self.settings.debug_mode === true){
-                            console.log('node-clam: An error occurred.');
-                            console.error(err);
-                            console.log('node-clam: ' + stderr);
-                        }
-                        
-                        if (stderr.length > 0) {
-                            bad_files = stderr.split(os.EOL).map(function(err_line) {
-                                var match = err_line.match(/^ERROR: Can't access file (.*)+$/); //'// fix for some bad syntax highlighters
-                                if (match !== null && match.length > 1 && typeof match[1] === 'string') {
-                                    return match[1];
-                                }
-                                return '';
-                            });
+                // If scanning via sockets, use that method, otherwise use local_scan
+                if (self.settings.clamdscan.socket || self.settings.clamdscan.host) {
+                    if (self.settings.debug_mode) console.log(++counter + ": node-clam: Scanning file array with sockets.");
+                    all_files.forEach(function(f) {
+                        self.is_infected(f, function(err, file, is_infected) {
+                            completed_files++;
                             
-                            bad_files = __.compact(bad_files);
-                        }
-                    }     
-
-                    return parse_stdout(err, stdout);
-                });
+                            if (err) {
+                                if (__.isFunction(end_cb)) return end_cb(err, good_files, bad_files);
+                                else if (self.settings.debug_mode) console.log('node-clam: Error: ' + err);
+                            }
+                            
+                            if (is_infected) {
+                                bad_files.push(file);
+                            } else {
+                                good_files.push(file);
+                            }
+                            
+                            // Call file_cb for each file scanned
+                            if (__.isFunction(file_cb)) file_cb(err, file, is_infected);
+                            
+                            if (completed_files >= num_files) {
+                                if (self.settings.debug_mode) {
+                                    console.log('node-clam: Scan Complete!');
+                                    console.log("node-clam: Bad Files: ");
+                                    console.dir(bad_files);
+                                    console.log("node-clam: Good Files: ");
+                                    console.dir(good_files);
+                                }
+                                if (__.isFunction(end_cb)) return end_cb(null, good_files, bad_files);
+                            }
+                        });
+                    });
+                } else {
+                    local_scan();
+                }
             };
             
-            if (self.scanner === 'clamdscan' && self.scan_recursively === false) {
+            // If clamdscan is the preferred binary but we don't want to scan recursively
+            // then convert all path entries to a list of files found in the first layer of that path
+            if (self.scan_recursively === false && self.scanner === 'clamdscan') {
+                // Check each file in array and remove entries that are directories
                 (function get_dir_files() {
+                    // If there are still files to be checked...
+                    if (files.length > 0) {
+                        // Get last file in list
+                        var file = files.pop();
+                        // Get file's info
+                        fs.stat(file, function(err, file_stats) {
+                            if (err) return end_cb(err, good_files, bad_files);
+                            
+                            // If file is a directory...
+                            if (file_stats.isDirectory()) {
+                                // ... get a list of it's files
+                                fs.readdir(file, function(err, dir_files) {
+                                    if (err) return end_cb(err, good_files, bad_files);
+                                    
+                                    // Loop over directory listing to get only files (no directories)
+                                    (function remove_dirs() {
+                                        // If there are still directory files to be checked...
+                                        if (dir_files.length > 0) {
+                                            // Get directory file info
+                                            var dir_file = dir_files.pop();
+                                            fs.stat(dir_file, function(err, dir_file_stats) {
+                                                if (err) return end_cb(err, good_files, bad_files);
+                                                
+                                                // If directoy file is a file (not a directory...)
+                                                if (dir_file_stats.isFile()) {
+                                                    // Add file to all_files list
+                                                    all_files.push(file);
+                                                }
+                                                // Check next directory file
+                                                setTimeout(remove_dirs, 0);
+                                            });
+                                        } else {
+                                            // Get next file from files array
+                                            setTimeout(get_dir_files, 0);
+                                        }
+                                    })();
+                                });
+                            } else {
+                                // Add file to all_files
+                                all_files.push(file);
+                            }
+                            // Get next file from files array
+                            setTimeout(get_dir_files, 0);
+                        });
+                    } else {
+                        // Scan the files in the all_files array
+                        finish_scan();
+                    }
+                })();
+            } else if (self.scan_recursively === true && typeof file_cb === 'function') {
+                // In this case, we want to get a list of all files recursively within a 
+                // directory and scan them individually so that we can get a file-by-file
+                // update of the scan (probably not a great idea)
+                (function get_all_files() {
                     if (files.length > 0) {
                         var file = files.pop();
-                        fs.stat(file, function(err, file) {
-                            if (!file.isFile()) {
-                                fs.readdir(file, function(err, dir_file) {
-                                    all_files = __.uniq(all_files.concat(dir_file));
-                                });
+                        fs.stat(file, function(err, stats) {
+                            if (err) return end_cb(err, good_files, bad_files);
+                            if (stats.isDirectory()) {
+                                all_files = all_files.concat(recursive(file));
                             } else {
                                 all_files.push(file);
                             }
-                            get_dir_files();
+                            get_all_files();
                         });
                     } else {
                         finish_scan();
                     }
                 })();
             } else {
+                // Just scan all the files
                 all_files = files;
+                // Scan the files in the all_files array
                 finish_scan();
             }
         }
@@ -700,8 +797,8 @@ NodeClam.prototype.scan_dir = function(path, end_cb, file_cb) {
         return end_cb(new Error("Invalid end-scan callback provided. Second paramter, if provided, must be a function!"));
     }
     
-    // Trim trailing slash
-    path = path.replace(/\/$/, '');
+    // Normalize and then trim trailing slash
+    path = node_path.normalize(path).replace(/\/$/, '');
     
     // Execute the clam binary with the proper flags
     var local_scan = function() {
@@ -772,7 +869,7 @@ NodeClam.prototype.scan_dir = function(path, end_cb, file_cb) {
                 this.init_socket('is_infected', function(err, client) {
                     if (self.settings.debug_mode) console.log(++counter + ": node-clam: scanning with local domain socket now.");
                 
-                    if (settings.clamdscan.multiscan === true) {
+                    if (self.settings.clamdscan.multiscan === true) {
                         // Use Multiple threads (faster)
                         client.write('MULTISCAN ' + path);
                     } else {

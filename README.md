@@ -291,7 +291,7 @@ clam.scan_files(files, function(err, good_files, bad_files) {
 
 ### .scan_stream(stream, callback)
 
-This method allows one to scan a binary stream. __NOTE__: This method will only work if the scanning method is a TCP or UNIX Domain socket. In other words, this will not work if you are using the local binary method.
+This method allows you to scan a binary stream. __NOTE__: This method will only work if the scanning method is a TCP or UNIX Domain socket. In other words, this will not work if you are using the local binary method.
 
 #### Parameters
 
@@ -403,9 +403,9 @@ Got a missing feature you'd like to use? Found a bug? Go ahead and fork this rep
 
 ## Resources used to help develop this module:
 
-https://stuffivelearned.org/doku.php?id=apps:clamav:general:remoteclamdscan
-http://cpansearch.perl.org/src/JMEHNLE/ClamAV-Client-0.11/lib/ClamAV/Client.pm
-https://github.com/yongtang/clamav.js
+* https://stuffivelearned.org/doku.php?id=apps:clamav:general:remoteclamdscan
+* http://cpansearch.perl.org/src/JMEHNLE/ClamAV-Client-0.11/lib/ClamAV/Client.pm
+* https://github.com/yongtang/clamav.js
 
 ### Items for version 1.0 release:
 

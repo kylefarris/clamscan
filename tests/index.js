@@ -321,6 +321,21 @@ describe('is_infected', function() {
     });
 });
 
+// This is just an alias to 'is_infected', so, no need to test much more.
+describe('scan_file', function() {
+    reset_clam();
+    
+    it('should exist', function() {
+        should.exist(clamscan.scan_file);
+    });
+    it('should be a function', function() {
+        clamscan.scan_file.should.be.a('function');
+    });
+    it('should be an alias of is_infected', function() {
+        expect(clamscan.scan_file).to.eql(clamscan.is_infected);
+    });
+});
+
 describe('scan_files', function() {
     reset_clam();
     
@@ -619,7 +634,7 @@ describe('scan_dir', function() {
         });
     });
     
-    it('should suppliy bad_files array with scanned path when directory has infected files', function(done) {
+    it('should supply bad_files array with scanned path when directory has infected files', function(done) {
         var scan_dir = __dirname + '/bad_scan_dir';
         var scan_file = __dirname + '/bad_scan_dir/bad_file_1.txt';
         

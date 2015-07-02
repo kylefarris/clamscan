@@ -17,6 +17,7 @@
     "url": "git@github.com:kylefarris/clamscan.git"
   },
   "dependencies": {
+    "recursive-readdir": "^1.2.1",
     "underscore": "1.5.x"
   },
   "keywords": [
