@@ -79,4 +79,5 @@ __NOTE:__ There are some breaking changes on this release. Since this is still a
 * Added a `get_version` method.
 * NULL is now returned to the third paramter of the `is_infected` 
 * Created alias: `scan_file` for `is_infected`.
+* Created a `scan_stream` method.
 * Minor code clean-up
