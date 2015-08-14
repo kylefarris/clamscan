@@ -9,9 +9,10 @@ var __ = require('underscore');
 var fs = require('fs');
 var exec = require('child_process').exec;
 var execSync = require('child_process').execSync;
+var execFile = require('child_process').execFile;
 var spawn = require('child_process').spawn;
 var os = require('os');
-	
+
 // ****************************************************************************
 // NodeClam class definition
 // -----
@@ -19,9 +20,9 @@ var os = require('os');
 // ****************************************************************************
 function NodeClam(options) {
     options = options || {};
-    
+
     this.default_scanner = 'clamdscan';
-    
+
     // Configuration Settings
     this.defaults = Object.freeze({
         remove_infected: false,
@@ -45,7 +46,7 @@ function NodeClam(options) {
         },
         preference: this.default_scanner
     });
-    
+
     this.settings = __.extend({},this.defaults);
 
     // Override defaults with user preferences
@@ -58,12 +59,12 @@ function NodeClam(options) {
         delete options.clamdscan;
     }
     this.settings = __.extend({},this.settings,options);
-    
+
     // Backwards compatibilty section
     if (this.settings.quarantine_path && !__.isEmpty(this.settings.quarantine_path)) {
         this.settings.quarantine_infected = this.settings.quarantine_path;
     }
-    
+
     // Determine whether to use clamdscan or clamscan
     this.scanner = this.default_scanner;
     if (typeof this.settings.preference !== 'string' || ['clamscan','clamdscan'].indexOf(this.settings.preference) === -1) {
@@ -72,7 +73,7 @@ function NodeClam(options) {
     if (this.settings.preference === 'clamscan' && this.settings.clamscan.active === true) {
         this.scanner = 'clamscan';
     }
-    
+
     // Check to make sure preferred scanner exists and actually is a clamscan binary
     if (!this.is_clamav_binary_sync(this.scanner)) {
         // Fall back to other option:
@@ -84,17 +85,17 @@ function NodeClam(options) {
             throw new Error("No valid & active virus scanning binaries are active and available!");
         }
     }
-    
+
     // Make sure quarantine infected path exists at specified location
     if (!__.isEmpty(this.settings.quarantine_infected) && !fs.existsSync(this.settings.quarantine_infected)) {
         var err_msg = "Quarantine infected path (" + this.settings.quarantine_infected + ") is invalid.";
         this.settings.quarantine_infected = false;
         throw new Error(err_msg);
-        
+
         if (this.settings.debug_mode)
             console.log("node-clam: " + err_msg);
     }
-    
+
     // Make sure scan_log exists at specified location
     if (!__.isEmpty(this.settings.scan_log) && !fs.existsSync(this.settings.scan_log)) {
         var err_msg = "node-clam: Scan Log path (" + this.settings.scan_log + ") is invalid.";
@@ -102,7 +103,7 @@ function NodeClam(options) {
         if (this.settings.debug_mode)
             console.log(err_msg);
     }
-    
+
     // If using clamscan, make sure definition db exists at specified location
     if (this.scanner === 'clamscan') {
         if (!__.isEmpty(this.settings.clamscan.db) && !fs.existsSync(this.settings.clamscan.db)) {
@@ -112,7 +113,7 @@ function NodeClam(options) {
                 console.log(err_msg);
         }
     }
-    
+
     // Build clam flags
     this.clam_flags = build_clam_flags(this.scanner, this.settings);
 }
@@ -135,12 +136,12 @@ NodeClam.prototype.is_clamav_binary = function(scanner, cb) {
         }
         return cb(false);
     }
-    
+
     var version_cmds = {
         clamdscan: path + ' -c ' + this.settings.clamdscan.config_file + ' --version',
         clamscan: path + ' --version'
     };
-    
+
     fs.exists(path, function(exists) {
         if (exists === false) {
             if (this.settings.debug_mode) {
@@ -148,6 +149,7 @@ NodeClam.prototype.is_clamav_binary = function(scanner, cb) {
             }
             return cb(false);
         }
+
         exec(version_cmds[scanner], function(err, stdout, stderr) {
             if (stdout.toString().match(/ClamAV/) === null) {
                 if (this.settings.debug_mode) {
@@ -174,14 +176,14 @@ NodeClam.prototype.is_clamav_binary_sync = function(scanner) {
         }
         return false;
     }
-    
+
     var version_cmds = {
         clamdscan: path + ' -c ' + this.settings.clamdscan.config_file + ' --version',
         clamscan: path + ' --version'
     };
-    
-    /* 
-     * Saving this line for version 1.0 release--the one that requires Node 0> .12 
+
+    /*
+     * Saving this line for version 1.0 release--the one that requires Node 0> .12
      * if (!fs.existsSync(path) || execSync(version_cmds[scanner]).toString().match(/ClamAV/) === null) {
      */
     if (!fs.existsSync(path)) {
@@ -190,7 +192,7 @@ NodeClam.prototype.is_clamav_binary_sync = function(scanner) {
         }
         return false;
     }
-    
+
     return true;
 }
 
@@ -215,19 +217,16 @@ NodeClam.prototype.is_infected = function(file, callback) {
             throw err;
         }
     }
-    
+
     var self = this;
-    
-    if(this.settings.debug_mode)
+
+    if(this.settings.debug_mode) {
         console.log("node-clam: Scanning " + file);
-    
-    // Build the actual command to run
-    var command = this.settings[this.scanner].path + this.clam_flags + file;
-    if(this.settings.debug_mode === true)
-        console.log('node-clam: Configured clam command: ' + command);
-        
+        console.log('node-clam: Configured clam command: ' + this.settings[this.scanner].path + ' ' + this.build_clam_args(file).join(' '));
+    }
+
     // Execute the clam binary with the proper flags
-    exec(command, function(err, stdout, stderr) {
+    execFile(this.settings[this.scanner].path, this.build_clam_args(file), function(err, stdout, stderr) {
         if (err || stderr) {
             if (err) {
                 if(err.hasOwnProperty('code') && err.code === 1) {
@@ -243,12 +242,12 @@ NodeClam.prototype.is_infected = function(file, callback) {
             }
         } else {
             var result = stdout.trim();
-            
+
             if(self.settings.debug_mode) {
                 console.log('node-clam: file size: ' + fs.statSync(file).size);
                 console.log('node-clam: ' + result);
             }
-            
+
             if(result.match(/OK$/)) {
                 if(self.settings.debug_mode)
                     console.log("node-clam: " + file + ' is OK!');
@@ -263,7 +262,7 @@ NodeClam.prototype.is_infected = function(file, callback) {
 }
 
 // ****************************************************************************
-// Scans an array of files or paths. You must provide the full paths of the 
+// Scans an array of files or paths. You must provide the full paths of the
 // files and/or paths.
 // -----
 // @param	Array		files		A list of files or paths (full paths) to be scanned.
@@ -274,30 +273,30 @@ NodeClam.prototype.scan_files = function(files, end_cb, file_cb) {
     files = files || [];
     end_cb = end_cb || null;
     file_cb = file_cb || null;
-    
+
     var bad_files = [];
     var good_files = [];
     var completed_files = 0;
     var self = this;
     var file, file_list;
-    
+
     // Verify second param, if supplied, is a function
     if (end_cb && typeof end_cb !== 'function') {
         throw new Error("Invalid end-scan callback provided. Second paramter, if provided, must be a function!");
     }
-    
+
     // Verify second param, if supplied, is a function
     if (file_cb && typeof file_cb !== 'function') {
         throw new Error("Invalid per-file callback provided. Third paramter, if provided, must be a function!");
     }
-    
+
     // The function that parses the stdout from clamscan/clamdscan
-    var parse_stdout = function(err, stdout) {            
+    var parse_stdout = function(err, stdout) {
         stdout.trim()
             .split(String.fromCharCode(10))
             .forEach(function(result){
                 if (result.match(/^[\-]+$/) !== null) return;
-                
+
                 //console.log("PATH: " + result)
                 var path = result.match(/^(.*): /);
                 if (path && path.length > 0) {
@@ -305,7 +304,7 @@ NodeClam.prototype.scan_files = function(files, end_cb, file_cb) {
                 } else {
                     path = '<Unknown File Path!>';
                 }
-                
+
                 if (result.match(/OK$/)) {
                     if (self.settings.debug_mode === true){
                         console.log(path + ' is OK!');
@@ -315,41 +314,41 @@ NodeClam.prototype.scan_files = function(files, end_cb, file_cb) {
                     if (self.settings.debug_mode === true){
                         console.log(path + ' is INFECTED!');
                     }
-                    bad_files.push(path); 
+                    bad_files.push(path);
                 }
             });
-        
-        if (err) 
+
+        if (err)
             return end_cb(err, [], bad_files);
         return end_cb(null, good_files, bad_files);
     };
-    
+
     // The function that actually scans the files
     var do_scan = function(files) {
         var num_files = files.length;
-    
+
         if (self.settings.debug_mode === true) {
             console.log("node-clam: Scanning a list of " + num_files + " passed files.");
         }
-        
+
         // Slower but more verbose way...
         if (typeof file_cb === 'function') {
             (function scan_file() {
                 file = files.shift();
                 self.is_infected(file, function(err, file, infected) {
                     completed_files++;
-                    
+
                     if (self.settings.debug_mode)
                         console.log("node-clam: " + completed_files + "/" + num_files + " have been scanned!");
-                    
+
                     if(!infected) {
                         good_files.push(file);
                     } else if(infected || err) {
                         bad_files.push(file);
                     }
-                    
+
                     if(__.isFunction(file_cb)) file_cb(err, file, infected);
-                    
+
                     if(completed_files >= num_files) {
                         if(self.settings.debug_mode) {
                             console.log('node-clam: Scan Complete!');
@@ -359,7 +358,7 @@ NodeClam.prototype.scan_files = function(files, end_cb, file_cb) {
                             console.dir(good_files);
                         }
                         if(__.isFunction(end_cb)) end_cb(null, good_files, bad_files);
-                    } 
+                    }
                     // All files have not been scanned yet, scan next item.
                     else {
                         // Using setTimeout to avoid crazy stack trace madness.
@@ -368,31 +367,30 @@ NodeClam.prototype.scan_files = function(files, end_cb, file_cb) {
                 });
             })();
         }
-        
+
         // The MUCH quicker but less-verbose way
         else {
             var all_files = [];
-            
+
             var finish_scan = function() {
                 // Make sure there are no dupes and no falsy values... just cause we can
                 all_files = __.uniq(__.compact(all_files));
-                
+
                 // If file list is empty, return error
                 if (all_files.length <= 0)
                     return end_cb(new Error("No valid files provided to scan!"), [], []);
-                
-                // List files by space and escape 
+
+                // List files by space and escape
                 var items = files.map(function(file) {
-                    return file.replace(/ /g,'\\ '); 
-                }).join(' ');
-                
+                    return file.replace(/ /g,'\\ ');
+                });
+
                 // Build the actual command to run
-                var command = self.settings[self.scanner].path + self.clam_flags + items;
                 if(self.settings.debug_mode === true)
-                    console.log('node-clam: Configured clam command: ' + command);
-                
+                    console.log('node-clam: Configured clam command: ' + self.settings[self.scanner].path + ' ' +self.build_clam_args(items).join(' '));
+
                 // Execute the clam binary with the proper flags
-                exec(command, function(err, stdout, stderr) {
+                execFile(self.settings[self.scanner].path, self.build_clam_args(items), function(err, stdout, stderr) {
                     if(self.settings.debug_mode === true) {
                         console.log('node-clam: stdout:', stdout);
                     }
@@ -402,7 +400,7 @@ NodeClam.prototype.scan_files = function(files, end_cb, file_cb) {
                             console.error(err);
                             console.log('node-clam: ' + stderr);
                         }
-                        
+
                         if (stderr.length > 0) {
                             bad_files = stderr.split(os.EOL).map(function(err_line) {
                                 var match = err_line.match(/^ERROR: Can't access file (.*)+$/); //'// fix for some bad syntax highlighters
@@ -411,15 +409,15 @@ NodeClam.prototype.scan_files = function(files, end_cb, file_cb) {
                                 }
                                 return '';
                             });
-                            
+
                             bad_files = __.compact(bad_files);
                         }
-                    }     
+                    }
 
                     return parse_stdout(err, stdout);
                 });
             };
-            
+
             if (self.scanner === 'clamdscan' && self.scan_recursively === false) {
                 (function get_dir_files() {
                     if (files.length > 0) {
@@ -444,32 +442,32 @@ NodeClam.prototype.scan_files = function(files, end_cb, file_cb) {
             }
         }
     };
-    
+
     // If string is provided in files param, forgive them... create an array
     if (typeof files === 'string' && files.trim().length > 0) {
         files = files.trim().split(',').map(function(v) { return v.trim(); });
     }
-    
+
     // Do some parameter validation
     if (!__.isArray(files) || files.length <= 0) {
         if (__.isEmpty(this.settings.file_list)) {
             var err = new Error("No files provided to scan and no file list provided!");
             return end_cb(err, [], []);
         }
-        
+
         fs.exists(this.settings.file_list, function(exists) {
             if (exists === false) {
                 var err = new Error("No files provided and file list provided ("+this.settings.file_list+") could not be found!");
                 return end_cb(err, [], []);
             }
-            
+
             fs.readFile(self.settings.file_list, function(err, data) {
                 if (err) {
                     return end_cb(err, [], []);
                 }
                 data = data.toString().split(os.EOL);
                 return do_scan(data);
-            });                
+            });
         });
     } else {
         return do_scan(files);
@@ -477,12 +475,12 @@ NodeClam.prototype.scan_files = function(files, end_cb, file_cb) {
 }
 
 // ****************************************************************************
-// Scans an entire directory. Provides 3 params to end callback: Error, path 
+// Scans an entire directory. Provides 3 params to end callback: Error, path
 // scanned, and whether its infected or not. To scan multiple directories, pass
 // them as an array to the scan_files method.
 // -----
-// NOTE: While possible, it is NOT advisable to use the file_cb parameter when 
-// using the clamscan binary. Doing so with clamdscan is okay, however. This 
+// NOTE: While possible, it is NOT advisable to use the file_cb parameter when
+// using the clamscan binary. Doing so with clamdscan is okay, however. This
 // method also allows for non-recursive scanning with the clamdscan binary.
 // -----
 // @param	String		path		The directory to scan files of
@@ -491,30 +489,30 @@ NodeClam.prototype.scan_files = function(files, end_cb, file_cb) {
 // ****************************************************************************
 NodeClam.prototype.scan_dir = function(path, end_cb, file_cb) {
     var self = this;
-    
+
     path = path || '';
     end_cb = end_cb || null;
     file_cb = file_cb || null;
-    
+
     // Verify path provided is a string
     if (typeof path !== 'string' || path.length <= 0) {
         return end_cb(new Error("Invalid path provided! Path must be a string!"));
     }
-    
+
     // Verify second param, if supplied, is a function
     if (end_cb && typeof end_cb !== 'function') {
         return end_cb(new Error("Invalid end-scan callback provided. Second paramter, if provided, must be a function!"));
     }
-    
+
     // Trim trailing slash
     path = path.replace(/\/$/, '');
 
     if(this.settings.debug_mode)
         console.log("node-clam: Scanning Directory: " + path);
-    
+
     // Get all files recursively
     if (this.settings.scan_recursively && typeof file_cb === 'function') {
-        exec('find ' + path, function(err, stdout, stderr) {
+        execFile('find', [path], function(err, stdout, stderr) {
             if (err || stderr) {
                 if(this.settings.debug_mode === true)
                     console.error(stderr);
@@ -524,8 +522,8 @@ NodeClam.prototype.scan_dir = function(path, end_cb, file_cb) {
                 self.scan_files(files, end_cb, file_cb);
             }
         });
-    } 
-    
+    }
+
     // Clamdscan always does recursive, so, here's a way to avoid that if you want...
     else if (this.settings.scan_recursively === false && this.scanner === 'clamdscan') {
         fs.readdir(path, function(err, files) {
@@ -543,16 +541,14 @@ NodeClam.prototype.scan_dir = function(path, end_cb, file_cb) {
             })();
         });
     }
-    
+
     // If you don't care about individual file progress (which is very slow for clamscan but fine for clamdscan...)
     else if (this.settings.scan_recursively && typeof file_cb !== 'function') {
-        var command = this.settings[this.scanner].path + this.clam_flags + path;
-    
         if(this.settings.debug_mode === true)
-            console.log('node-clam: Configured clam command: ' + command);
-            
+            console.log('node-clam: Configured clam command: ' + this.settings[this.scanner].path + ' ' + this.build_clam_args(path).join(' '));
+
         // Execute the clam binary with the proper flags
-        exec(command, function(err, stdout, stderr) {
+        execFile(this.settings[this.scanner].path, this.build_clam_args(path), function(err, stdout, stderr) {
             if (err || stderr) {
                 if (err) {
                     if(err.hasOwnProperty('code') && err.code === 1) {
@@ -568,7 +564,7 @@ NodeClam.prototype.scan_dir = function(path, end_cb, file_cb) {
                 }
             } else {
                 var result = stdout.trim();
-                
+
                 if(result.match(/OK$/)) {
                     if(self.settings.debug_mode)
                         console.log(path + ' is OK!');
@@ -581,6 +577,26 @@ NodeClam.prototype.scan_dir = function(path, end_cb, file_cb) {
             }
         });
     }
+}
+
+// *****************************************************************************
+// Builds out the args to pass to execFile
+// -----
+// @param	String|Array	item		The file(s) / directory(ies) to append to the args
+// @api		Private
+// *****************************************************************************
+NodeClam.prototype.build_clam_args = function (item) {
+  var args = this.clam_flags.slice();
+
+  if (typeof item === 'string') {
+    args.push(item);
+  }
+
+  if ((item instanceof Array) === true) {
+    args = args.concat(item);
+  }
+
+  return args;
 }
 
 module.exports = function(options) {
@@ -597,11 +613,11 @@ module.exports = function(options) {
 // *****************************************************************************
 function build_clam_flags(scanner, settings) {
 	var flags_array = ['--no-summary'];
-	
-	// Flags specific to clamscan 
+
+	// Flags specific to clamscan
 	if (scanner == 'clamscan') {
 		flags_array.push('--stdout');
-		
+
 		// Remove infected files
 		if (settings.remove_infected === true) {
             flags_array.push('--remove=yes');
@@ -623,11 +639,11 @@ function build_clam_flags(scanner, settings) {
 			flags_array.push('--recursive=no');
 		}
 	}
-	
-	// Flags specific to clamdscan 
+
+	// Flags specific to clamdscan
 	else if (scanner == 'clamdscan') {
 		flags_array.push('--fdpass');
-		
+
 		// Remove infected files
 		if (settings.remove_infected === true) flags_array.push('--remove');
 		// Specify a config file
@@ -637,22 +653,22 @@ function build_clam_flags(scanner, settings) {
 		// Reload the virus DB
 		if (settings.clamdscan.reload_db === true) flags_array.push('--reload');
 	}
-	
+
 	// ***************
 	// Common flags
 	// ***************
-	
+
 	// Remove infected files
 	if (settings.remove_infected !== true) {
-		if (!__.isEmpty(settings.quarantine_infected)) 
+		if (!__.isEmpty(settings.quarantine_infected))
 			flags_array.push('--move=' + settings.quarantine_infected);
 	}
 	// Write info to a log
 	if (!__.isEmpty(settings.scan_log)) flags_array.push('--log=' + settings.scan_log);
 	// Read list of files to scan from a file
 	if (!__.isEmpty(settings.file_list)) flags_array.push('--file-list=' + settings.file_list);
-	
-	
+
+
 	// Build the String
-	return ' ' + flags_array.join(' ') + ' ';
+	return flags_array;
 }
