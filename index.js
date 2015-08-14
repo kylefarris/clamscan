@@ -16,7 +16,7 @@ var os = require('os');
 // ****************************************************************************
 // NodeClam class definition
 // -----
-// @param	Object	options		Key => Value pairs to override default settings
+// @param    Object    options        Key => Value pairs to override default settings
 // ****************************************************************************
 function NodeClam(options) {
     options = options || {};
@@ -199,8 +199,8 @@ NodeClam.prototype.is_clamav_binary_sync = function(scanner) {
 // ****************************************************************************
 // Checks if a particular file is infected.
 // -----
-// @param	String		file		Path to the file to check
-// @param	Function	callback	(optional) What to do after the scan
+// @param    String        file        Path to the file to check
+// @param    Function    callback    (optional) What to do after the scan
 // ****************************************************************************
 NodeClam.prototype.is_infected = function(file, callback) {
     // Verify second param, if supplied, is a function
@@ -265,9 +265,9 @@ NodeClam.prototype.is_infected = function(file, callback) {
 // Scans an array of files or paths. You must provide the full paths of the
 // files and/or paths.
 // -----
-// @param	Array		files		A list of files or paths (full paths) to be scanned.
-// @param	Function	end_cb		What to do after the scan
-// @param	Function	file_cb		What to do after each file has been scanned
+// @param    Array        files        A list of files or paths (full paths) to be scanned.
+// @param    Function    end_cb        What to do after the scan
+// @param    Function    file_cb        What to do after each file has been scanned
 // ****************************************************************************
 NodeClam.prototype.scan_files = function(files, end_cb, file_cb) {
     files = files || [];
@@ -483,8 +483,8 @@ NodeClam.prototype.scan_files = function(files, end_cb, file_cb) {
 // using the clamscan binary. Doing so with clamdscan is okay, however. This
 // method also allows for non-recursive scanning with the clamdscan binary.
 // -----
-// @param	String		path		The directory to scan files of
-// @param	Function	end_cb	    What to do when all files have been scanned
+// @param    String        path        The directory to scan files of
+// @param    Function    end_cb        What to do when all files have been scanned
 // @param   Function    file_cb     What to do after each file has been scanned
 // ****************************************************************************
 NodeClam.prototype.scan_dir = function(path, end_cb, file_cb) {
@@ -582,21 +582,21 @@ NodeClam.prototype.scan_dir = function(path, end_cb, file_cb) {
 // *****************************************************************************
 // Builds out the args to pass to execFile
 // -----
-// @param	String|Array	item		The file(s) / directory(ies) to append to the args
-// @api		Private
+// @param    String|Array    item        The file(s) / directory(ies) to append to the args
+// @api        Private
 // *****************************************************************************
 NodeClam.prototype.build_clam_args = function (item) {
-  var args = this.clam_flags.slice();
+    var args = this.clam_flags.slice();
 
-  if (typeof item === 'string') {
-    args.push(item);
-  }
+    if (typeof item === 'string') {
+        args.push(item);
+    }
 
-  if ((item instanceof Array) === true) {
-    args = args.concat(item);
-  }
+    if ((item instanceof Array) === true) {
+        args = args.concat(item);
+    }
 
-  return args;
+    return args;
 }
 
 module.exports = function(options) {
@@ -606,69 +606,69 @@ module.exports = function(options) {
 // *****************************************************************************
 // Builds out the flags based on the configuration the user provided
 // -----
-// @param	String	scanner		The scanner to use (clamscan or clamdscan)
-// @param	Object	settings	The settings used to build the flags
-// @return	String				The concatenated clamav flags
-// @api		Private
+// @param    String    scanner        The scanner to use (clamscan or clamdscan)
+// @param    Object    settings    The settings used to build the flags
+// @return    String                The concatenated clamav flags
+// @api        Private
 // *****************************************************************************
 function build_clam_flags(scanner, settings) {
-	var flags_array = ['--no-summary'];
+    var flags_array = ['--no-summary'];
 
-	// Flags specific to clamscan
-	if (scanner == 'clamscan') {
-		flags_array.push('--stdout');
+    // Flags specific to clamscan
+    if (scanner == 'clamscan') {
+        flags_array.push('--stdout');
 
-		// Remove infected files
-		if (settings.remove_infected === true) {
+        // Remove infected files
+        if (settings.remove_infected === true) {
             flags_array.push('--remove=yes');
         } else {
             flags_array.push('--remove=no');
         }
-		// Database file
-		if (!__.isEmpty(settings.clamscan.db)) flags_array.push('--database=' + settings.clamscan.db);
-		// Scan archives
-		if (settings.clamscan.scan_archives === true) {
-			flags_array.push('--scan-archive=yes');
-		} else {
-			flags_array.push('--scan-archive=no');
-		}
-		// Recursive scanning (flag is specific, feature is not)
-		if (settings.scan_recursively === true) {
-			flags_array.push('-r');
-		} else {
-			flags_array.push('--recursive=no');
-		}
-	}
+        // Database file
+        if (!__.isEmpty(settings.clamscan.db)) flags_array.push('--database=' + settings.clamscan.db);
+        // Scan archives
+        if (settings.clamscan.scan_archives === true) {
+            flags_array.push('--scan-archive=yes');
+        } else {
+            flags_array.push('--scan-archive=no');
+        }
+        // Recursive scanning (flag is specific, feature is not)
+        if (settings.scan_recursively === true) {
+            flags_array.push('-r');
+        } else {
+            flags_array.push('--recursive=no');
+        }
+    }
 
-	// Flags specific to clamdscan
-	else if (scanner == 'clamdscan') {
-		flags_array.push('--fdpass');
+    // Flags specific to clamdscan
+    else if (scanner == 'clamdscan') {
+        flags_array.push('--fdpass');
 
-		// Remove infected files
-		if (settings.remove_infected === true) flags_array.push('--remove');
-		// Specify a config file
-		if (!__.isEmpty(settings.clamdscan.config_file)) flags_array.push('--config-file=' + settings.clamdscan.config_file);
-		// Turn on multi-threaded scanning
-		if (settings.clamdscan.multiscan === true) flags_array.push('--multiscan');
-		// Reload the virus DB
-		if (settings.clamdscan.reload_db === true) flags_array.push('--reload');
-	}
+        // Remove infected files
+        if (settings.remove_infected === true) flags_array.push('--remove');
+        // Specify a config file
+        if (!__.isEmpty(settings.clamdscan.config_file)) flags_array.push('--config-file=' + settings.clamdscan.config_file);
+        // Turn on multi-threaded scanning
+        if (settings.clamdscan.multiscan === true) flags_array.push('--multiscan');
+        // Reload the virus DB
+        if (settings.clamdscan.reload_db === true) flags_array.push('--reload');
+    }
 
-	// ***************
-	// Common flags
-	// ***************
+    // ***************
+    // Common flags
+    // ***************
 
-	// Remove infected files
-	if (settings.remove_infected !== true) {
-		if (!__.isEmpty(settings.quarantine_infected))
-			flags_array.push('--move=' + settings.quarantine_infected);
-	}
-	// Write info to a log
-	if (!__.isEmpty(settings.scan_log)) flags_array.push('--log=' + settings.scan_log);
-	// Read list of files to scan from a file
-	if (!__.isEmpty(settings.file_list)) flags_array.push('--file-list=' + settings.file_list);
+    // Remove infected files
+    if (settings.remove_infected !== true) {
+        if (!__.isEmpty(settings.quarantine_infected))
+            flags_array.push('--move=' + settings.quarantine_infected);
+    }
+    // Write info to a log
+    if (!__.isEmpty(settings.scan_log)) flags_array.push('--log=' + settings.scan_log);
+    // Read list of files to scan from a file
+    if (!__.isEmpty(settings.file_list)) flags_array.push('--file-list=' + settings.file_list);
 
 
-	// Build the String
-	return flags_array;
+    // Build the String
+    return flags_array;
 }
