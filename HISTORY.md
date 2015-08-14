@@ -72,3 +72,8 @@ __NOTE:__ There are some breaking changes on this release. Since this is still a
 ### 0.8.1 (2015-06-09)
 
 * Fixed check for database file. Issue #6
+
+### 0.8.2 (2015-08-14)
+
+* Updated to `execFile` instead of `exec`
+* Improved test suite
