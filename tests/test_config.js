@@ -3,7 +3,7 @@ var p = require('path');
 
 // walk $PATH to find bin
 var which = function (bin) {
-	var dir, file;
+	var i, file;
 	var path = process.env.PATH.split(p.delimiter);
 	for (i in path) {
 		file = path[i] + p.sep + bin;
