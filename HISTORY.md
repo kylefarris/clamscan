@@ -73,6 +73,11 @@ __NOTE:__ There are some breaking changes on this release. Since this is still a
 
 * Fixed check for database file. Issue #6
 
+### 0.8.2 (2015-08-14)
+
+* Updated to `execFile` instead of `exec`
+* Improved test suite
+
 ### 0.9.0 (2015-07-01)
 
 * Added support for TCP/UNIX Domain socket communication to local or remote clamav services.

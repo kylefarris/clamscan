@@ -7,7 +7,8 @@
   "contributors": [
     "dietervds",
     "nicolaspeixoto",
-    "urg <Patrick McAndrew>"
+    "urg <Patrick McAndrew>",
+    "SaltwaterC <Ștefan Rusu>"
   ],
   "scripts": {
     "test": "make test"
