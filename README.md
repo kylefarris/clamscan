@@ -2,6 +2,12 @@
 
 Use Node JS to scan files on your server with ClamAV's clamscan binary or clamdscan daemon. This is especially useful for scanning uploaded files provided by un-trusted sources.
 
+## !!IMPORTANT!!
+
+If you are using a version prior to 0.8.2, please upgrade! There was a security vulnerability in previous versions that allows a malicious user to execute code on your server. Specific details on how the attack could be implemented will not be disclosed here. Please update to 0.8.2 or greater ASAP. No breaking changes are included, only the security patch.
+
+All other versions in NPM have been deprecated.
+
 ## Dependencies
 
 You will need to install ClamAV's clamscan binary and/or have clamdscan daemon running on your server. On linux, it's quite simple.
