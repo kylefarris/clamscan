@@ -2,6 +2,12 @@
 
 Use Node JS to scan files on your server with ClamAV's clamscan/clamdscan binary or via TCP to a remote server or local UNIX Domain socket. This is especially useful for scanning uploaded files provided by un-trusted sources.
 
+## !!IMPORTANT!!
+
+If you are using a version prior to 0.8.2, please upgrade! There was a security vulnerability in previous versions that allows a malicious user to execute code on your server. Specific details on how the attack could be implemented will not be disclosed here. Please update to 0.8.2 or greater ASAP. No breaking changes are included, only the security patch.
+
+All other versions in NPM have been deprecated.
+
 ## Dependencies
 
 ### To use local binary method of scanning:
@@ -9,13 +15,13 @@ Use Node JS to scan files on your server with ClamAV's clamscan/clamdscan binary
 You will need to install ClamAV's clamscan binary and/or have clamdscan daemon running on your server. On linux, it's quite simple.
 
 Fedora-based distros:
-    
+
     sudo yum install clamav
-    
+
 Debian-based distros:
-    
+
     sudo apt-get install clamav
-    
+
 For OS X, you can install clamav with brew:
 
     sudo brew install clamav
@@ -24,7 +30,7 @@ For OS X, you can install clamav with brew:
 
 You will need access to either:
 
-1. A local UNIX Domain socket for a local instance of `clamd` 
+1. A local UNIX Domain socket for a local instance of `clamd`
     * Follow instructions in [To use local binary method of scanning](#user-content-to-use-local-binary-method-of-scanning).
     * Socket file is usually: `/var/run/clamd.scan/clamd.sock`
     * Make sure `clamd` is running on your local server
@@ -33,7 +39,7 @@ You will need access to either:
     * If running on remote server, you must have the IP address/domain name
     * If running on remote server, it's firewall must have the appropriate TCP port(s) open
     * Make sure `clamd` is running on your local/remote server
-    
+
 __NOTE:__ This module is not intended to work on a Windows server. This would be a welcome addition if someone wants to add that feature (I may get around to it one day but have no urgent need for this).
 
 ## How to Install
@@ -56,7 +62,7 @@ You can simply do this:
 var clam = require('clamscan')();
 ```
 
-And, you'll be good to go. 
+And, you'll be good to go.
 
 __BUT__: If you want more control, you can specify all sorts of options.
 
@@ -116,7 +122,7 @@ var clam = require('clamscan')({
         reload_db: true, // You want your scans to run slow like with clamscan
         active: false // you don't want to use this at all because it's evil
     },
-    preference: 'clamscan' // If clamscan is found and active, it will be used by default   
+    preference: 'clamscan' // If clamscan is found and active, it will be used by default
 });
 ```
 
@@ -150,7 +156,7 @@ This method allows you to determine the version of clamav you are interfacing wi
 * `callback` (function) (optional) Will be called when the scan is complete. It takes 2 parameters:
     * `err` (object or null) A standard javascript Error object (null if no error)
     * `version` (string) The version of the clamav server you're interfacing with
-    
+
 #### Example:
 ```javascript
 clam.get_version(function(err, version) {
@@ -161,7 +167,7 @@ clam.get_version(function(err, version) {
 });
 ```
 
- 
+
 ### .is_infected(file_path, callback)
 
 This method allows you to scan a single file.
@@ -170,7 +176,7 @@ This method allows you to scan a single file.
 
 `.scan_file`
 
-#### Parameters: 
+#### Parameters:
 
 * `file_path` (string) Represents a path to the file to be scanned.
 * `callback` (function) (optional) Will be called when the scan is complete. It takes 3 parameters:
@@ -194,10 +200,10 @@ clam.is_infected('/a/picture/for_example.jpg', function(err, file, is_infected) 
     }
 });
 ```
- 
-### .scan_dir(dir_path, end_callback, file_callback) 
- 
-Allows you to scan an entire directory for infected files. This obeys your `recursive` option even for `clamdscan` which does not have a native way to turn this feature off. If you have multiple paths, send them in an array to `scan_files`. 
+
+### .scan_dir(dir_path, end_callback, file_callback)
+
+Allows you to scan an entire directory for infected files. This obeys your `recursive` option even for `clamdscan` which does not have a native way to turn this feature off. If you have multiple paths, send them in an array to `scan_files`.
 
 __TL;DR:__ For maximum speed, don't supply a `file_callback`.
 
@@ -212,16 +218,16 @@ The `good_files` and `bad_files` parameters of the `end_callback` callback in th
 
 #### Parameters
 
-* `dir_path` (string) Full path to the directory to scan.
-* `end_callback` (function) Will be called when the entire directory has been completely scanned. This callback takes 3 parameters:
+* `dir_path` (string) (required) Full path to the directory to scan.
+* `end_callback` (function) (required) Will be called when the entire directory has been completely scanned. This callback takes 3 parameters:
     * `err` (object) A standard javascript Error object (null if no error)
     * `good_files` (array) List of the full paths to all files that are _clean_.
     * `bad_files` (array) List of the full paths to all files that are _infected_.
-* `file_callback` (function) Will be called after each file in the directory has been scanned. This is useful for keeping track of the progress of the scan. This callback takes 3 parameters:
+* `file_callback` (function) (optional) Will be called after each file in the directory has been scanned. This is useful for keeping track of the progress of the scan. This callback takes 3 parameters:
     * `err` (object or null) A standard Javascript Error object (null if no error)
     * `file` (string) Path to the file that just got scanned.
     * `is_infected` (boolean) __True__: File is infected; __False__: File is clean. __NULL__: Unable to scan file.
- 
+
 #### Example
 ```javascript
 clam.scan_dir('/some/path/to/scan', function(err, good_files, bad_files) {

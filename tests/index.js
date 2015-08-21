@@ -136,20 +136,21 @@ describe('Module', function() {
     });
 
     it('should failover to alternate scanner if preferred scanner is not found', function() {
-
+        reset_clam();
     });
 
     it('should try and fallback to local daemon if socket connection can not be established (if specified by local_fallback option)', function() {
-        
+        reset_clam();
     });
 
-    it('should fail if an invalid scanner preference is supplied', function() {
+    it('should fail if an invalid scanner preference is supplied when socket or host is not specified and local_fallback is not false', function() {
         expect(function() { reset_clam({preference: 'clamscan'}); }).to.not.throw(Error);
-        expect(function() { reset_clam({preference: 'badscanner'}); }).to.throw(Error);
+        expect(function() { reset_clam({preference: 'badscanner'}); }).to.not.throw(Error);
+        expect(function() { reset_clam({clamdscan: { local_fallback: true, socket: false, host: false }, preference: 'badscanner'}); }).to.throw(Error);
     });
 
-    it('should fail to load if no active & valid scanner is found', function() {
-        var clamdscan_options = __.extend({},config.clamdscan, {path: __dirname + '/should/not/exist', active: true});
+    it('should fail to load if no active & valid scanner is found and socket is not available', function() {
+        var clamdscan_options = __.extend({},config.clamdscan, {path: __dirname + '/should/not/exist', active: true, local_fallback: true, socket: false, host: false});
         var clamscan_options = __.extend({},config.clamscan, {path: __dirname + '/should/not/exist', active: true});
 
         var options = __.extend({}, config, {clamdscan: clamdscan_options});
@@ -158,13 +159,33 @@ describe('Module', function() {
         expect(function() { reset_clam(options); }).to.throw(Error);
     });
 
-    it('should fail to load if specified quarantine path (if specified) does not exist or is not writable', function() {
-        expect(function() { reset_clam({quarantine_infected: __dirname + '/infected'}); }).to.not.throw(Error);
-        expect(function() { reset_clam({quarantine_infected: __dirname + '/should/not/exist'}); }).to.throw(Error);
+    it('should fail to load if quarantine path (if specified) does not exist or is not writable and socket is not available', function() {
+        var clamdscan_options = __.extend({},config.clamdscan, {active: true, local_fallback: true, socket: false, host: false});
+        var clamscan_options = __.extend({},config.clamscan, {active: true});
+
+        var options = __.extend({}, config, {clamdscan: clamdscan_options});
+        options = __.extend({}, options, {clamscan: clamscan_options});
+
+        options.quarantine_infected = __dirname + '/should/not/exist';
+        expect(function() { reset_clam(options); }).to.throw(Error);
+
+        options.quarantine_infected = __dirname + '/infected';
+        expect(function() { reset_clam(options); }).to.not.throw(Error);
     });
 
     it('should set definition database (clamscan) to null if specified db is not found', function() {
-        reset_clam(__.extend({}, config, __.extend({},config.clamscan,{scan_log: __dirname + '/should/not/exist'})));
+        var clamdscan_options = __.extend({},config.clamdscan, {active: false, local_fallback: true, socket: false, host: false});
+        var options = __.extend({}, config, {clamdscan: clamdscan_options, scan_log: __dirname + '/should/not/exist'});
+
+        reset_clam(options);
+        expect(clamscan.settings.clamscan.db).to.be.null;
+    });
+
+    it('should set scan_log to null if specified scan_log is not found', function() {
+        var clamdscan_options = __.extend({},config.clamdscan, {active: false, local_fallback: true, socket: false, host: false});
+        var options = __.extend({}, config, {clamdscan: clamdscan_options, scan_log: __dirname + '/should/not/exist'});
+
+        reset_clam(options);
         expect(clamscan.settings.scan_log).to.be.null;
     });
 
@@ -208,7 +229,7 @@ describe('build_clam_flags', function() {
 
 describe('get_version', function() {
     reset_clam();
-    
+
     it('should exist', function() {
         should.exist(clamscan.get_version);
     });
@@ -219,7 +240,7 @@ describe('get_version', function() {
 
 describe('init_socket', function() {
     reset_clam();
-    
+
     it('should exist', function() {
         should.exist(clamscan.init_socket);
     });
@@ -333,7 +354,7 @@ describe('is_infected', function() {
 // This is just an alias to 'is_infected', so, no need to test much more.
 describe('scan_file', function() {
     reset_clam();
-    
+
     it('should exist', function() {
         should.exist(clamscan.scan_file);
     });
@@ -427,7 +448,7 @@ describe('scan_files', function() {
         });
     });
 
-    it('should return err to the "err" parameter of the "end_cb" callback if a Infinity is provided as first parameter', function(done) {
+    it('should return err to the "err" parameter of the "end_cb" callback if Infinity is provided as first parameter', function(done) {
         clamscan.scan_files(Infinity, function(err, good_files, bad_files) {
             check(done, function() {
                 expect(err).to.be.instanceof(Error);
@@ -514,6 +535,7 @@ describe('scan_files', function() {
     });
 
     it('should return error to the "err" parameter of the "end_cb" callback if nothing is provided as first parameter and file_list is configured in settings but has inaccessible files', function(done) {
+        reset_clam();
         clamscan.settings.file_list = bad_file_list;
         clamscan.scan_files(undefined, function(err, good_files, bad_files) {
             check(done, function() {
@@ -526,6 +548,7 @@ describe('scan_files', function() {
     });
 
     it('should NOT return error to the "err" parameter of the "end_cb" callback if FALSE is provided as first parameter but file_list is configured in settings', function(done) {
+        reset_clam();
         clamscan.settings.file_list = good_file_list;
         clamscan.scan_files(false, function(err, good_files, bad_files) {
             check(done, function() {
@@ -538,6 +561,7 @@ describe('scan_files', function() {
     });
 
     it('should NOT return error to the "err" parameter of the "end_cb" callback if NaN is provided as first parameter but file_list is configured in settings', function(done) {
+        reset_clam();
         clamscan.settings.file_list = good_file_list;
         clamscan.scan_files(NaN, function(err, good_files, bad_files) {
             check(done, function() {
@@ -550,6 +574,7 @@ describe('scan_files', function() {
     });
 
     it('should NOT return error to the "err" parameter of the "end_cb" callback if NULL is provided as first parameter but file_list is configured in settings', function(done) {
+        reset_clam();
         clamscan.settings.file_list = good_file_list;
         clamscan.scan_files(null, function(err, good_files, bad_files) {
             check(done, function() {
@@ -562,6 +587,7 @@ describe('scan_files', function() {
     });
 
     it('should NOT return error to the "err" parameter of the "end_cb" callback if an empty string is provided as first parameter but file_list is configured in settings', function(done) {
+        reset_clam();
         clamscan.settings.file_list = good_file_list;
         clamscan.scan_files('', function(err, good_files, bad_files) {
             check(done, function() {
@@ -585,32 +611,33 @@ describe('scan_dir', function() {
     });
 
     it('should require a string representing the directory to be scanned', function() {
-        expect(function() { clamscan.scan_dir(good_scan_dir); },'good string provided').to.not.throw(Error);
-        expect(function() { clamscan.scan_dir(); },             'nothing provided').to.throw(Error);
-        expect(function() { clamscan.scan_dir(undefined); },    'nothing provided').to.throw(Error);
-        expect(function() { clamscan.scan_dir(null); },         'null provided').to.throw(Error);
-        expect(function() { clamscan.scan_dir(''); },           'empty string provided').to.throw(Error);
-        expect(function() { clamscan.scan_dir(false); },        'false provided').to.throw(Error);
-        expect(function() { clamscan.scan_dir(true); },         'true provided').to.throw(Error);
-        expect(function() { clamscan.scan_dir(5); },            'integer provided').to.throw(Error);
-        expect(function() { clamscan.scan_dir(5.4); },          'float provided').to.throw(Error);
-        expect(function() { clamscan.scan_dir(Infinity); },     'Infinity provided').to.throw(Error);
-        expect(function() { clamscan.scan_dir(/^\/path/); },    'RegEx provided').to.throw(Error);
-        expect(function() { clamscan.scan_dir(['foo']); },      'Array provided').to.throw(Error);
-        expect(function() { clamscan.scan_dir({}); },           'Object provided').to.throw(Error);
-        expect(function() { clamscan.scan_dir(NaN); },          'NaN provided').to.throw(Error);
-        expect(function() { clamscan.scan_dir(function() { return '/path/to/string'; }); }, 'Function provided').to.throw(Error);
-        expect(function() { clamscan.scan_dir(new String('/foo/bar')); },'String object provided').to.throw(Error);
+        var cb = function(err, good_files, bad_files) { };
+        expect(function() { clamscan.scan_dir(good_scan_dir, cb); },'good string provided').to.not.throw(Error);
+        expect(function() { clamscan.scan_dir(undefined, cb); },    'nothing provided').to.throw(Error);
+        expect(function() { clamscan.scan_dir(null, cb); },         'null provided').to.throw(Error);
+        expect(function() { clamscan.scan_dir('', cb); },           'empty string provided').to.throw(Error);
+        expect(function() { clamscan.scan_dir(false, cb); },        'false provided').to.throw(Error);
+        expect(function() { clamscan.scan_dir(true, cb); },         'true provided').to.throw(Error);
+        expect(function() { clamscan.scan_dir(5, cb); },            'integer provided').to.throw(Error);
+        expect(function() { clamscan.scan_dir(5.4, cb); },          'float provided').to.throw(Error);
+        expect(function() { clamscan.scan_dir(Infinity, cb); },     'Infinity provided').to.throw(Error);
+        expect(function() { clamscan.scan_dir(/^\/path/, cb); },    'RegEx provided').to.throw(Error);
+        expect(function() { clamscan.scan_dir(['foo'], cb); },      'Array provided').to.throw(Error);
+        expect(function() { clamscan.scan_dir({}, cb); },           'Object provided').to.throw(Error);
+        expect(function() { clamscan.scan_dir(NaN, cb); },          'NaN provided').to.throw(Error);
+        expect(function() { clamscan.scan_dir(function() { return '/path/to/string'; }, cb); }, 'Function provided').to.throw(Error);
+        expect(function() { clamscan.scan_dir(new String('/foo/bar'), cb); },'String object provided').to.throw(Error);
     });
 
-    it('should require the second parameter to be a callback function (if truthy value provided)', function() {
-        expect(function() { clamscan.scan_dir(good_scan_dir); },                'nothing provided').to.not.throw(Error);
-        expect(function() { clamscan.scan_dir(good_scan_dir, function(err, file, is_infected) {}); }, 'good function provided').to.not.throw(Error);
-        expect(function() { clamscan.scan_dir(good_scan_dir, undefined); },     'undefined provided').to.not.throw(Error);
-        expect(function() { clamscan.scan_dir(good_scan_dir, null); },          'null provided').to.not.throw(Error);
-        expect(function() { clamscan.scan_dir(good_scan_dir, ''); },            'empty string provided').to.not.throw(Error);
-        expect(function() { clamscan.scan_dir(good_scan_dir, false); },         'false provided').to.not.throw(Error);
-        expect(function() { clamscan.scan_dir(good_scan_dir, NaN); },           'NaN provided').to.not.throw(Error);
+    it('should require the second parameter to be a callback function', function() {
+        var cb = function(err, good_files, bad_files) { };
+        expect(function() { clamscan.scan_dir(good_scan_dir, cb); },            'good function provided').to.not.throw(Error);
+        expect(function() { clamscan.scan_dir(good_scan_dir); },                'nothing provided').to.throw(Error);
+        expect(function() { clamscan.scan_dir(good_scan_dir, undefined); },     'undefined provided').to.throw(Error);
+        expect(function() { clamscan.scan_dir(good_scan_dir, null); },          'null provided').to.throw(Error);
+        expect(function() { clamscan.scan_dir(good_scan_dir, ''); },            'empty string provided').to.throw(Error);
+        expect(function() { clamscan.scan_dir(good_scan_dir, false); },         'false provided').to.throw(Error);
+        expect(function() { clamscan.scan_dir(good_scan_dir, NaN); },           'NaN provided').to.throw(Error);
         expect(function() { clamscan.scan_dir(good_scan_dir, true); },          'true provided').to.throw(Error);
         expect(function() { clamscan.scan_dir(good_scan_dir, 5); },             'integer provided').to.throw(Error);
         expect(function() { clamscan.scan_dir(good_scan_dir, 5.4); },           'float provided').to.throw(Error);
@@ -628,7 +655,7 @@ describe('scan_dir', function() {
         });
     });
 
-    it('should suppliy good_files array with scanned path when directory has no infected files', function(done) {
+    it('should supply good_files array with scanned path when directory has no infected files', function(done) {
         var scan_dir = good_scan_dir;
         clamscan.scan_dir(scan_dir, function(err, good_files, bad_files) {
             check(done, function() {
@@ -671,5 +698,16 @@ describe('scan_dir', function() {
                 console.error(error);
             }
         });
+    });
+});
+
+describe('scan_stream', function() {
+    reset_clam();
+
+    it('should exist', function() {
+        should.exist(clamscan.scan_stream);
+    });
+    it('should be a function', function() {
+        clamscan.scan_stream.should.be.a('function');
     });
 });
