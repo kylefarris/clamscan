@@ -1,6 +1,6 @@
 /*!
  * Node - Clam
- * Copyright(c) 2013 Kyle Farris <kyle@chomponllc.com>
+ * Copyright(c) 2013-2015 Kyle Farris <kyle@chomponllc.com>
  * MIT Licensed
  */
 
@@ -12,6 +12,7 @@ var execSync = require('child_process').execSync;
 var execFile = require('child_process').execFile;
 var spawn = require('child_process').spawn;
 var os = require('os');
+var node_path = require('path');
 var net = require('net');
 var node_path = require('path');
 var recursive = require('recursive-readdir');
@@ -880,12 +881,20 @@ NodeClam.prototype.scan_dir = function(path, end_cb, file_cb) {
             (function get_file_stats() {
                 if (files.length > 0) {
                     var file = files.pop();
+                    file = node_path.join(path, file);
                     fs.stat(file, function(err, info) {
-                        if (info.isFile()) good_files.push(file);
+                        if (!err) {
+                            if (info.isFile()) {
+                                good_files.push(file);
+                            }
+                        } else {
+                            if (self.settings.debug_mode)
+                                console.log("node-clam: Error scanning file in directory: ", err);
+                        }
                         get_file_stats();
                     });
                 } else {
-                    self.scan_files(good_files, end_file, file_cb);
+                    self.scan_files(good_files, end_cb, file_cb);
                 }
             })();
         });
