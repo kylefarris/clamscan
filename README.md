@@ -128,9 +128,9 @@ var clam = require('clamscan')({
 
 #### A note about using this module via sockets or TCP
 
-As of version 0.9, this module supports communication with a local or remote ClamAV daemon through Unix Domain sockets or a TCP port. If you supply both in your configuration object, the UNIX Domain option will be used. The module will not fallback to using the alternative Host/Port method. If you wish to connect via Host/Port and not a Socket, please either omit the `socket` property in the config object or use `socket: null`.
+As of version 0.9, this module supports communication with a local or remote ClamAV daemon through Unix Domain sockets or a TCP host/port combo. If you supply both in your configuration object, the UNIX Domain socket option will be used. The module *not* not fallback to using the alternative Host/Port method. If you wish to connect via Host/Port and not a Socket, please either omit the `socket` property in the config object or use `socket: null`.
 
-If you specify a valid clamscan/clamdscan binary in your config and you set `clamdscan.local_fallback: true` in your config, this module will fallback to the traditional way this module has worked&mdash;using a binary directly.
+If you specify a valid clamscan/clamdscan binary in your config and you set `clamdscan.local_fallback: true` in your config, this module *will* fallback to the traditional way this module has worked&mdash;using a binary directly/locally.
 
 Also, there are some caveats to using the socket/tcp based approach:
 

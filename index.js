@@ -146,7 +146,7 @@ function NodeClam(options) {
             if (err) {
                 throw err;
             } else {
-                if (self.settings.debug_mode) console.log("node-clam: Established connection to clamscan server fot testing!");
+                if (self.settings.debug_mode) console.log("node-clam: Established connection to clamscan server for testing!");
                 client.write('PING');
                 client.on('data', function(data) {
                     if (data.toString().trim() === 'PONG') {
@@ -1018,7 +1018,8 @@ module.exports = function(options) {
 // ****************************************************************************
 function is_readable_stream(obj) {
     var stream = require('stream');
-    return typeof (obj.pipe === 'function') && typeof (obj._readableState === 'object');
+    if (typeof obj !== 'object' || __.isEmpty(obj)) return false;
+    return typeof obj.pipe === 'function' && typeof obj._readableState === 'object';
 }
 
 // ****************************************************************************

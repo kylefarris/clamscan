@@ -704,10 +704,103 @@ describe('scan_dir', function() {
 describe('scan_stream', function() {
     reset_clam();
 
+    var get_good_stream = function() {
+        var Readable = require('stream').Readable;
+        var rs = Readable();
+        rs.push('foooooo');
+        rs.push('barrrrr');
+        rs.push(null);
+        return rs;
+    }
+
+    var get_infected_stream = function() {
+        var Readable = require('stream').Readable;
+        var rs = Readable();
+        rs.push('X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*');
+        rs.push(null);
+        return rs;
+    }
+
     it('should exist', function() {
         should.exist(clamscan.scan_stream);
     });
     it('should be a function', function() {
         clamscan.scan_stream.should.be.a('function');
+    });
+    it('should throw an error if a stream is not provided to first parameter and no callback is supplied.', function() {
+        var Readable = require('stream').Readable;
+        var rs = Readable();
+
+        expect(function() { clamscan.scan_stream(rs); },        'stream provided').to.not.throw(Error);
+        expect(function() { clamscan.scan_stream(); },          'nothing provided').to.throw(Error);
+        expect(function() { clamscan.scan_stream(undefined); }, 'undefined provided').to.throw(Error);
+        expect(function() { clamscan.scan_stream(null); },      'null provided').to.throw(Error);
+        expect(function() { clamscan.scan_stream(''); },        'empty string provided').to.throw(Error);
+        expect(function() { clamscan.scan_stream(false); },     'false provided').to.throw(Error);
+        expect(function() { clamscan.scan_stream(NaN); },       'NaN provided').to.throw(Error);
+        expect(function() { clamscan.scan_stream(true); },      'true provided').to.throw(Error);
+        expect(function() { clamscan.scan_stream(42); },        'integer provided').to.throw(Error);
+        expect(function() { clamscan.scan_stream(13.37); },     'float provided').to.throw(Error);
+        expect(function() { clamscan.scan_stream(Infinity); },  'Infinity provided').to.throw(Error);
+        expect(function() { clamscan.scan_stream(/foo/); },     'RegEx provided').to.throw(Error);
+        expect(function() { clamscan.scan_stream([]); },        'Array provided').to.throw(Error);
+        expect(function() { clamscan.scan_stream({}); },        'Object provided').to.throw(Error);
+    });
+    it('should return an error to the first param of the callback, if supplied, when first parameter is not a stream.', function(done) {
+        clamscan.scan_stream(null, function(err, is_infected) {
+            check(done, function() {
+                expect(err).to.be.instanceof(Error);
+            });
+        });
+    });
+    it('should NOT return an error to the first param of the callback, if supplied, when first parameter IS a stream.', function(done) {
+        var rs = get_good_stream();
+        clamscan.scan_stream(rs, function(err, is_infected) {
+            check(done, function() {
+                expect(err).to.not.be.instanceof(Error);
+            });
+        });
+    });
+
+    it('should throw an error if either socket or host/port combo are invalid when callback is not supplied.', function(done) {
+        var rs = get_good_stream();
+
+        var clamdscan_options = __.extend({},config.clamdscan, {active: true, socket: false, host: false, port: false});
+        var options = __.extend({}, config, {clamdscan: clamdscan_options});
+        reset_clam(options);
+
+        check(done, function() {
+            expect(function() { clamscan.scan_stream(rs); }).to.throw(Error);
+        });
+    });
+
+    it('should supply FALSE to is_infected callback parameter if stream is not infected.', function(done) {
+        var rs = get_good_stream();
+
+        reset_clam();
+
+        clamscan.scan_stream(rs, function(err, is_infected) {
+            check(done, function() {
+                expect(err).to.not.be.instanceof(Error);
+                expect(is_infected).to.be.a('boolean');
+                expect(is_infected).to.eql(false);
+            });
+        });
+    });
+
+    it('should supply TRUE to is_infected callback parameter if stream is infected.', function(done) {
+        reset_clam();
+
+        var PassThrough = require('stream').PassThrough;
+        var pts = new PassThrough();
+        request.get('https://secure.eicar.org/eicar_com.txt').pipe(pts);
+
+        clamscan.scan_stream(pts, function(err, is_infected) {
+            check(done, function() {
+                expect(err).to.not.be.instanceof(Error);
+                expect(is_infected).to.be.a('boolean');
+                expect(is_infected).to.eql(true);
+            });
+        });
     });
 });
