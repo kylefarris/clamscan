@@ -545,7 +545,7 @@ NodeClam.prototype.scan_dir = function(path, end_cb, file_cb) {
                         get_file_stats();
 					});
                 } else {
-                    self.scan_files(good_files, end_file, file_cb);
+                    self.scan_files(good_files, end_cb, file_cb);
                 }
             })();
         });
