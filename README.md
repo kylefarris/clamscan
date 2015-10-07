@@ -101,7 +101,7 @@ Here is a _non-default values example_ (to help you get an idea of what the prop
 var clam = require('clamscan')({
     remove_infected: true, // Removes files if they are infected
     quarantine_infected: '~/infected/', // Move file here. remove_infected must be FALSE, though.
-    scan_recursively: true, // Choosing false here will save some CPU cycles
+    scan_recursively: false, // Choosing false here will save some CPU cycles
     scan_log: '/var/log/node-clam', // You're a detail-oriented security professional.
     debug_mode: true // This will put some debug info in your js console
     file_list: '/home/webuser/scan_files.txt', // path to file containing list of files to scan
