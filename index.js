@@ -586,7 +586,7 @@ NodeClam.prototype.scan_dir = function (path, end_cb, file_cb) {
                                 });
 
                             if (self.settings.debug_mode)
-                                console.log("node-clam: finished directory scan and found something in " + bad_files.length + " of " + good_files.length + " files.");
+                                console.log("node-clam: finished directory scan and found something in " + bad_files.length + " of " + (bad_files.length + good_files.length) + " files.");
                             end_cb(null, good_files, bad_files);
                         } else {
                             end_cb(null, [], [path]);
