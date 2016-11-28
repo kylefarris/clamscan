@@ -58,6 +58,7 @@ var clam = require('clamscan')({
 	debug_mode: false // Whether or not to log info/debug/error msgs to the console
 	file_list: null, // path to file containing list of files to scan (for scan_files method)
 	scan_recursively: true, // If true, deep scan folders recursively
+    list_recursively: false, // If true, return a list of recursively scanned files not just the root directory
 	clamscan: {
 		path: '/usr/bin/clamscan', // Path to clamscan binary on your server
 		db: null, // Path to a custom virus definition database
@@ -268,6 +269,14 @@ clam.is_infected('/some/file.txt');
 ```
 
 Just keep in mind that some of the nice validation that happens on instantiation won't happen if it's done this way. Of course, you could also just create a new instance with different a different initial configuration.
+
+## Tests
+
+If you have problems running the tests on your system, try to update the clamdscan configuration file path with the environment variable `CLAMD_PATH`:
+
+```javascript
+CLAMD_PATH=/etc/clamav/clamd.conf make test
+```
 
 ## Contribute
 

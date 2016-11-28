@@ -107,6 +107,7 @@ describe('Module', function() {
         expect(clamscan.settings.debug_mode).to.eql(true);
         expect(clamscan.settings.file_list).to.eql( __dirname + '/files_list.txt');
         expect(clamscan.settings.scan_recursively).to.eql(true);
+        expect(clamscan.settings.list_recursively).to.eql(false);
         expect(clamscan.settings.preference).to.eql('clamscan');
 
         // clamscan
@@ -611,6 +612,37 @@ describe('scan_dir', function() {
                         /* if (fs.existsSync(scan_file)) {
                             fs.unlinkSync(scan_file);
                         } */
+                    });
+                });
+            } else {
+                console.log("Could not download test virus file!");
+                console.error(error);
+            }
+        });
+    });
+
+    it('should supply bad_files array with list of actually scanned files when list_recursively is enabled', function(done) {
+        var scan_dir = __dirname + '/bad_scan_dir';
+        var scan_file_1 = __dirname + '/bad_scan_dir/bad_file_1.txt';
+        var scan_file_2 = __dirname + '/bad_scan_dir/bad_file_2.txt';
+
+        request('https://secure.eicar.org/eicar_com.txt', function (error, response, body) {
+            if (!error && response.statusCode == 200) {
+                fs.writeFileSync(scan_file_1, body);
+                fs.writeFileSync(scan_file_2, body);
+
+                clamscan.settings.list_recursively = true;
+
+                clamscan.scan_dir(scan_dir, function(err, good_files, bad_files) {
+                    check(done, function() {
+                        expect(err).to.not.be.instanceof(Error);
+                        expect(bad_files).to.be.an('array');
+                        expect(bad_files).to.have.length(2);
+                        expect(bad_files).to.include(scan_file_1);
+                        expect(bad_files).to.include(scan_file_2);
+
+                        expect(good_files).to.be.an('array');
+                        expect(good_files).to.be.empty;
                     });
                 });
             } else {
