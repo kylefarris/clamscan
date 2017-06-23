@@ -415,7 +415,7 @@ NodeClam.prototype.scan_files = function(files, end_cb, file_cb) {
                         }
                     }
 
-                    return parse_stdout(err, stdout);
+                    return parse_stdout(stderr, stdout);
                 });
             };
 
