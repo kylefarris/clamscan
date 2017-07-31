@@ -77,3 +77,7 @@ __NOTE:__ There are some breaking changes on this release. Since this is still a
 
 * Updated to `execFile` instead of `exec`
 * Improved test suite
+
+### 0.8.5 (2017-07-31)
+
+* Added `get_clam_version` method

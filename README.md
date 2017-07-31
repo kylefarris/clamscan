@@ -227,6 +227,27 @@ clam.scan_files(files, function(err, good_files, bad_files) {
 });
 ```
 
+### .get_clam_version(end_callback)
+
+Retrieves the version info from the clam binary.
+
+#### Parameters
+
+* `end_callback` (function) Will be called when the version string is retrieved. This callback takes 2 parameters:
+    * `err` (object) A standard javascript Error object (null if no error)
+    * `version_result` (string) String containing version result of the clam binary.
+
+#### Example
+```javascript
+clam.get_clam_version( function(err, version_result) {
+    if(!err) {
+        res.send({"clam_version": version_result});
+    } else {
+        // Do some error handling
+    }
+});
+```
+
 #### Scanning files listed in file list
 
 If this modules is configured with a valid path to a file containing a newline-delimited list of files, it will use the list in that file when scanning if the first paramter passed is falsy.
