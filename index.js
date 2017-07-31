@@ -532,9 +532,9 @@ NodeClam.prototype.scan_dir = function(path, end_cb, file_cb) {
             (function get_file_stats() {
                 if (files.length > 0) {
                     var file = files.pop();
-					file = node_path.join(path, file);
+                    file = node_path.join(path, file);
                     fs.stat(file, function(err, info) {
-                    	if (!err) {
+                        if (!err) {
                             if (info.isFile()) {
                                 good_files.push(file);
                             }
@@ -543,7 +543,7 @@ NodeClam.prototype.scan_dir = function(path, end_cb, file_cb) {
                                 console.log("node-clam: Error scanning file in directory: ", err);
                         }
                         get_file_stats();
-					});
+                    });
                 } else {
                     self.scan_files(good_files, end_cb, file_cb);
                 }
@@ -680,4 +680,63 @@ function build_clam_flags(scanner, settings) {
 
     // Build the String
     return flags_array;
+}
+
+// ****************************************************************************
+// Get the version of the current clamav binary.
+// -----
+// @param    Function    callback    (optional) What to do after the version get
+// ****************************************************************************
+NodeClam.prototype.get_clam_version = function(callback) {
+    // Verify param, if supplied, is a function
+    if (callback && typeof callback !== 'function') {
+        throw new Error("Invalid callback provided. Second paramter, if provided, must be a function!");
+    }
+
+    var self = this;
+
+    if(this.settings.debug_mode) {
+        console.log("node-clam: Get version");
+        console.log('node-clam: Configured clam command: ' + this.settings[this.scanner].path + ' ' + this.build_clam_args('-V').join(' '));
+    }
+
+    // Execute the clam binary with the proper flags
+    execFile(this.settings[this.scanner].path, this.build_clam_args('-V'), function(err, stdout, stderr) {
+        if (err || stderr) {
+            if (err) {
+                if(err.hasOwnProperty('code') && err.code === 1) {
+                    callback(null, file, true);
+                } else {
+                    if(self.settings.debug_mode)
+                        console.log("node-clam: " + err);
+                    callback(new Error(err), file, null);
+                }
+            } else {
+                console.error("node-clam: " + stderr);
+                callback(err, file, null);
+            }
+        } else {
+            var result = stdout.trim();
+
+            if(self.settings.debug_mode) {
+                console.log('node-clam: version', result);
+            }
+
+            if(result) {
+                if(self.settings.debug_mode)
+                    console.log("node-clam: result!!!", result);
+
+                var version_detail = result.split('/');
+                var final_result = { "version": version_detail[0], "virusdb_version": version_detail[1], "last_update": version_detail[2] };
+                if(self.settings.debug_mode)
+                    console.log("node-clam: final_result", final_result);
+
+                callback(null, final_result);
+            } else {
+                if(self.settings.debug_mode)
+                    console.log("node-clam: missing result");
+                callback(null, false);
+            }
+        }
+    });
 }
