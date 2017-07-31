@@ -705,15 +705,15 @@ NodeClam.prototype.get_clam_version = function(callback) {
         if (err || stderr) {
             if (err) {
                 if(err.hasOwnProperty('code') && err.code === 1) {
-                    callback(null, file, true);
+                    callback(null, true);
                 } else {
                     if(self.settings.debug_mode)
                         console.log("node-clam: " + err);
-                    callback(new Error(err), file, null);
+                    callback(new Error(err), null);
                 }
             } else {
                 console.error("node-clam: " + stderr);
-                callback(err, file, null);
+                callback(err, null);
             }
         } else {
             var result = stdout.trim();
@@ -724,14 +724,8 @@ NodeClam.prototype.get_clam_version = function(callback) {
 
             if(result) {
                 if(self.settings.debug_mode)
-                    console.log("node-clam: result!!!", result);
-
-                var version_detail = result.split('/');
-                var final_result = { "version": version_detail[0], "virusdb_version": version_detail[1], "last_update": version_detail[2] };
-                if(self.settings.debug_mode)
-                    console.log("node-clam: final_result", final_result);
-
-                callback(null, final_result);
+                    console.log("node-clam: result:", result);
+                callback(null, result);
             } else {
                 if(self.settings.debug_mode)
                     console.log("node-clam: missing result");
