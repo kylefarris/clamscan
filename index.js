@@ -5,18 +5,23 @@
  */
 
 // Module dependencies.
-const fs = require('fs');
-const exec = require('child_process').exec;
-const execSync = require('child_process').execSync;
-const execFile = require('child_process').execFile;
-const spawn = require('child_process').spawn;
+const {stat, access, readFile, constants} = require('fs');
+const {exec, execSync, execFile} = require('child_process');
+const {spawn} = require('child_process');
 const os = require('os');
 const node_path = require('path');
 const net = require('net');
+const {promisify} = require('util');
 const recursive = require('recursive-readdir');
 const ClamAVChannel = require('./ClamAVChannel.js');
 
-const counter = 0;
+// Convert some stuff to promises
+const fs_stat = promisify(stat);
+const fs_access = promisify(access);
+const fs_readfile = promisify(readFile);
+const cp_exec = promisify(exec);
+
+let counter = 0;
 
 // ****************************************************************************
 // NodeClam class definition
@@ -27,6 +32,7 @@ class NodeClam {
     constructor(options={}) {
         this.debug_label = 'node-clam';
         this.default_scanner = 'clamdscan';
+        this.initialized = false;
 
         // Configuration Settings
         this.defaults = Object.freeze({
@@ -58,7 +64,14 @@ class NodeClam {
         });
 
         this.settings = Object.assign({}, this.defaults);
+    }
 
+    // ****************************************************************************
+    // Initialize Method
+    // -----
+    //
+    // ****************************************************************************
+    async init(options={}, cb) {
         // Override defaults with user preferences
         if (options.hasOwnProperty('clamscan') && Object.keys(options.clamscan).length > 0) {
             this.settings.clamscan = Object.assign({}, this.settings.clamscan, options.clamscan);
@@ -90,76 +103,152 @@ class NodeClam {
         }
 
         // Check to make sure preferred scanner exists and actually is a clamscan binary
-        if (!this.is_clamav_binary_sync(this.scanner)) {
-            // Fall back to other option:
-            if (this.scanner == 'clamdscan' && this.settings.clamscan.active === true && this.is_clamav_binary_sync('clamscan')) {
-                this.scanner == 'clamscan';
-            } else if (this.scanner == 'clamscan' && this.settings.clamdscan.active === true && this.is_clamav_binary_sync('clamdscan')) {
-                this.scanner == 'clamdscan';
-            } else {
-                // Disable local fallback of socket connection if preferred scanner is not a valid binary
-                if (this.settings.clamdscan.socket || this.settings.clamdscan.host) {
-                    this.settings.clamdscan.local_fallback = false;
+        try {
+            if (!await this._is_clamav_binary(this.scanner)) {
+                // Fall back to other option:
+                if (this.scanner == 'clamdscan' && this.settings.clamscan.active === true && await this._is_clamav_binary('clamscan')) {
+                    this.scanner == 'clamscan';
+                } else if (this.scanner == 'clamscan' && this.settings.clamdscan.active === true && await this._is_clamav_binary('clamdscan')) {
+                    this.scanner == 'clamdscan';
                 } else {
-                    throw new Error("No valid & active virus scanning binaries are active and available!");
+                    // Disable local fallback of socket connection if preferred scanner is not a valid binary
+                    if (this.settings.clamdscan.socket || this.settings.clamdscan.host) {
+                        this.settings.clamdscan.local_fallback = false;
+                    } else {
+                        throw new Error("No valid & active virus scanning binaries are active and available!");
+                    }
                 }
             }
+        } catch (err) {
+            throw err;
         }
 
         // Make sure quarantine_infected path exists at specified location
-        if ((!this.settings.clamdscan.socket && !this.settings.clamdscan.host && ((this.settings.clamdscan.active === true && this.settings.clamdscan.local_fallback === true) || (this.settings.clamscan.active === true))) && this.settings.quarantine_infected && !fs.existsSync(this.settings.quarantine_infected)) {
-            const err_msg = "Quarantine infected path (" + this.settings.quarantine_infected + ") is invalid.";
-            this.settings.quarantine_infected = false;
-            throw new Error(err_msg);
-
-            if (this.settings.debug_mode) console.log(`${this.debug_label} error: `, err_msg);
+        try {
+            if ((!this.settings.clamdscan.socket && !this.settings.clamdscan.host && ((this.settings.clamdscan.active === true && this.settings.clamdscan.local_fallback === true) || (this.settings.clamscan.active === true))) && this.settings.quarantine_infected) {
+                await fs_access(this.settings.quarantine_infected, fs.constants.R_OK;
+            }
+        } catch (err) {
+            if (this.settings.debug_mode) console.log(`${this.debug_label} error:`, err);
+            throw new Error(`Quarantine infected path (${this.settings.quarantine_infected}) is invalid.`);
         }
 
         // Make sure scan_log exists at specified location
-        if (
-            ((!this.settings.clamdscan.socket && !this.settings.clamdscan.host) ||
-            ((this.settings.clamdscan.socket || this.settings.clamdscan.host) && this.settings.clamdscan.local_fallback === true && this.settings.clamdscan.active === true) || (this.settings.clamdscan.active === false && this.settings.clamscan.active === true) || (this.preference)) &&
-            this.settings.scan_log &&
-            !fs.existsSync(this.settings.scan_log)
-        ) {
-            const err_msg = `Scan Log path (${this.settings.scan_log}) is invalid.`;
-            this.settings.scan_log = null;
-            if (this.settings.debug_mode) console.log(`${this.debug_label} error: `, err_msg);
+        try {
+            if (
+                ((!this.settings.clamdscan.socket && !this.settings.clamdscan.host) ||
+                ((this.settings.clamdscan.socket || this.settings.clamdscan.host) && this.settings.clamdscan.local_fallback === true && this.settings.clamdscan.active === true) || (this.settings.clamdscan.active === false && this.settings.clamscan.active === true) || (this.preference)) &&
+                this.settings.scan_log
+            ) {
+                await fs_access(this.settings.scan_log, fs.constants.R_OK);
+            }
+        } catch (err) {
+            if (this.settings.debug_mode) console.log(`${this.debug_label} error:`, err);
+            throw new Error(`Scan Log path (${this.settings.scan_log}) is invalid.`);
         }
 
         // If using clamscan, make sure definition db exists at specified location
-        if (!this.settings.clamdscan.socket && !this.settings.clamdscan.host && this.scanner === 'clamscan') {
-            if (this.settings.clamscan.db && !fs.existsSync(this.settings.clamscan.db)) {
-                const err_msg = `Definitions DB path (${this.settings.clamscan.db}) is invalid.`;
-                this.settings.clamscan.db = null;
-                if (this.settings.debug_mode) console.log(`${this.debug_label} error: `, err_msg);
+        try {
+            if (!this.settings.clamdscan.socket && !this.settings.clamdscan.host && this.scanner === 'clamscan' && this.settings.clamscan.db) {
+                await fs_access(this.settings.clamscan.db, fs.constants.R_OK);
             }
+        } catch (err) {
+            if (this.settings.debug_mode) console.log(`${this.debug_label} error:`, err);
+            throw new Error(`Definitions DB path (${this.settings.clamscan.db}) is invalid.`);
         }
 
         // Check the availability of the clamd service if socket or host/port are provided
-        if (this.settings.clamdscan.socket || this.settings.clamdscan.host || this.settings.clamdscan.port) {
-            if (this.settings.debug_mode)
-                console.log(`${this.debug_label}: Initially testing socket/tcp connection to clamscan server.`);
+        try {
+            if (this.settings.clamdscan.socket || this.settings.clamdscan.host || this.settings.clamdscan.port) {
+                if (this.settings.debug_mode)
+                    console.log(`${this.debug_label}: Initially testing socket/tcp connection to clamscan server.`);
 
-            this.init_socket('test_availability', (err, client) => {
-                if (err) throw err;
+                const init_socket = util.promisify(this.init_socket);
+                const client = await init_socket('test_availability');
+                const client_on = util.promisify(this.on);
 
                 if (this.settings.debug_mode) console.log(`${this.debug_label}: Established connection to clamscan server for testing!`);
 
+
                 client.write('PING');
-                client.on('data', data => {
-                    if (data.toString().trim() === 'PONG') {
-                        if (this.settings.debug_mode) console.log(`${this.debug_label}: PING-PONG!`);
-                    } else {
-                        // I'm not even sure this case is possible, but...
-                        throw new Error("Could not establish connection to the remote clamscan server. Response: " + data.toString());
-                    }
+                const data = await client_on('data');
+
+                if (data.toString().trim() === 'PONG') {
+                    if (this.settings.debug_mode) console.log(`${this.debug_label}: PING-PONG!`);
+                } else {
+                    // I'm not even sure this case is possible, but...
+                    throw new Error("Could not establish connection to the remote clamscan server. Response: " + data.toString());
+                }
                 });
-            });
+            }
+        } catch (err) {
+            throw err;
         }
 
         // Build clam flags
         this.clam_flags = this._build_clam_flags(this.scanner, this.settings);
+
+        this.initialized = true;
+    }
+
+    // ****************************************************************************
+    // Checks to see if a particular path contains a clamav binary
+    // -----
+    // NOTE: Not currently being used (maybe for future implementations)
+    // SEE: in_clamav_binary_sync()
+    // -----
+    // @param   String      scanner     Scanner (clamscan or clamdscan) to check
+    // @return  Promise
+    // ****************************************************************************
+    async _is_clamav_binary(scanner) {
+        const path = this.settings[scanner].path || null;
+        if (!path) {
+            if (this.settings.debug_mode) console.log(`${this.debug_label}: Could not determine path for clamav binary.`);
+            return false;
+        }
+
+        const version_cmds = {
+            clamdscan: `${path} -c ${this.settings.clamdscan.config_file} --version`,
+            clamscan: `${path} --version`,
+        };
+
+        try {
+            await fs_access(path, constants.R_OK);
+
+            const {stdout, stderr} = await cp_exec(version_cmds[scanner]);
+            if (stdout.toString().match(/ClamAV/) === null) {
+                if (this.settings.debug_mode) console.log(`${this.debug_label}: Could not verify the ${scanner} binary.`);
+                return false;
+            }
+            return true;
+        } catch (err) {
+            if (this.settings.debug_mode) console.log(`${this.debug_label}: Could not verify the ${scanner} binary.`);
+            return false;
+        }
+    }
+
+    // ****************************************************************************
+    // Checks to see if a particular path contains a clamav binary
+    // -----
+    // @param   String  scanner     Scanner (clamscan or clamdscan) to check
+    // @return  Boolean             TRUE: Is binary; FALSE: Not binary
+    // ****************************************************************************
+    _is_clamav_binary_sync(scanner) {
+        const  path = this.settings[scanner].path || null;
+        if (!path) {
+            if (this.settings.testing_mode) console.log(`${this.debug_label}: Could not determine path for clamav binary.`);
+            return false;
+        }
+
+        /*
+         * Saving this line for version 1.0 release--the one that requires Node 0> .12
+         * if (!fs.existsSync(path) || execSync(version_cmds[scanner]).toString().match(/ClamAV/) === null) {
+         */
+        if (!fs.existsSync(path)) {
+            if (this.settings.testing_mode) console.log(`${this.debug_label}: Could not verify the ${scanner} binary.`);
+            return false;
+        }
+        return true;
     }
 
     // ****************************************************************************
@@ -416,74 +505,12 @@ class NodeClam {
     }
 
     // ****************************************************************************
-    // Checks to see if a particular path contains a clamav binary
-    // -----
-    // NOTE: Not currently being used (maybe for future implementations)
-    // SEE: in_clamav_binary_sync()
-    // -----
-    // @param   String      scanner     Scanner (clamscan or clamdscan) to check
-    // @param   Function    cb          Callback function to call after check
-    // @return  VOID
-    // ****************************************************************************
-    is_clamav_binary(scanner, cb) {
-        const path = this.settings[scanner].path || null;
-        if (!path) {
-            if (this.settings.debug_mode) console.log(`${this.debug_label}: Could not determine path for clamav binary.`);
-            return cb(false);
-        }
-
-        const version_cmds = {
-            clamdscan: `${path} -c ${this.settings.clamdscan.config_file} --version`,
-            clamscan: `${path} --version`,
-        };
-
-        fs.exists(path, exists => {
-            if (exists === false) {
-                if (this.settings.debug_mode) console.log(`${this.debug_label}: Could not verify the ${scanner} binary.`);
-                return cb(false);
-            }
-            exec(version_cmds[scanner], (err, stdout, stderr) => {
-                if (stdout.toString().match(/ClamAV/) === null) {
-                    if (this.settings.debug_mode) console.log(`${this.debug_label}: Could not verify the ${scanner} binary.`);
-                    return cb(false);
-                }
-                return cb(true);
-            })
-        });
-    }
-
-    // ****************************************************************************
-    // Checks to see if a particular path contains a clamav binary
-    // -----
-    // @param   String  scanner     Scanner (clamscan or clamdscan) to check
-    // @return  Boolean             TRUE: Is binary; FALSE: Not binary
-    // ****************************************************************************
-    is_clamav_binary_sync(scanner) {
-        const  path = this.settings[scanner].path || null;
-        if (!path) {
-            if (this.settings.testing_mode) console.log(`${this.debug_label}: Could not determine path for clamav binary.`);
-            return false;
-        }
-
-        /*
-         * Saving this line for version 1.0 release--the one that requires Node 0> .12
-         * if (!fs.existsSync(path) || execSync(version_cmds[scanner]).toString().match(/ClamAV/) === null) {
-         */
-        if (!fs.existsSync(path)) {
-            if (this.settings.testing_mode) console.log(`${this.debug_label}: Could not verify the ${scanner} binary.`);
-            return false;
-        }
-
-        return true;
-    }
-
-    // ****************************************************************************
     // Checks if a particular file is infected.
     // -----
     // @param   String      file    Path to the file to check
     // @param   Function    cb      (optional) What to do after the scan
     // ****************************************************************************
-    is_infected(file='', cb) {
+    async is_infected(file='', cb) {
         const self = this;
 
         // Verify second param, if supplied, is a function
@@ -536,7 +563,9 @@ class NodeClam {
         };
 
         // Verify file exists...
-        if (!fs.existsSync(file)) {
+        try {
+            await fs_access(file, constants.R_OK);
+        } catch (err) {
             //if (self.settings.debug_mode === true)
             //console.log(`${this.debug_label}: Could not find file to scan: ${file}`);
             return cb(new Error(`Could not find file to scan! (${file})`), file, true);
@@ -603,7 +632,7 @@ class NodeClam {
     // @param   Function    end_cb      What to do after the scan
     // @param   Function    file_cb     What to do after each file has been scanned
     // ****************************************************************************
-    scan_files(files=[], end_cb=null, file_cb=null) {
+    async scan_files(files=[], end_cb=null, file_cb=null) {
         const self = this;
         let bad_files = [];
         let good_files = [];
@@ -882,17 +911,15 @@ class NodeClam {
             if (!('file_list' in this.settings) || !this.settings.file_list) {
                 return end_cb(new Error("No files provided to scan and no file list provided!"), [], []);
             }
-            // If the file list is specified, make sure it exists...
-            fs.exists(this.settings.file_list, exists => {
-                if (exists === false)
-                    return end_cb(new Error(`No files provided and file list was provided (${this.settings.file_list}) but could not be found!`), [], []);
 
-                fs.readFile(this.settings.file_list, (err, data) => {
-                    if (err) return end_cb(err, [], []);
-                    data = data.toString().split(os.EOL);
-                    return do_scan(data);
-                });
-            });
+            // If the file list is specified, read it in and scan listed files...
+            try {
+                const data = await fs_readfile(this.settings.file_list);
+                data = data.toString().split(os.EOL);
+                return do_scan(data);
+            } catch (err) {
+                return end_cb(new Error(`No files provided and file list was provided (${this.settings.file_list}) but could not be found!`), [], []);
+            }
         } else {
             return do_scan(files);
         }
@@ -911,7 +938,7 @@ class NodeClam {
     // @param   Function    end_cb      What to do when all files have been scanned
     // @param   Function    file_cb     What to do after each file has been scanned
     // ****************************************************************************
-    scan_dir(path='', end_cb=null, file_cb=null) {
+    async scan_dir(path='', end_cb=null, file_cb=null) {
         const self = this;
 
         // Verify second param, if supplied, is a function
@@ -928,7 +955,9 @@ class NodeClam {
         path = node_path.normalize(path).replace(/\/$/, '');
 
         // Make sure path exists...
-        if (!fs.existsSync(path)) {
+        try {
+            await fs_access(path, constants.R_OK);
+        } catch (err) {
             return end_cb(new Error("Invalid path specified to scan!"), [], []);
         }
 

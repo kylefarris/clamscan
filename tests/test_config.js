@@ -1,25 +1,20 @@
-var fs = require('fs');
-var p = require('path');
+const fs = require('fs');
+const p = require('path');
 
 // walk $PATH to find bin
-var which = function (bin) {
-    var i, file;
-    var path = process.env.PATH.split(p.delimiter);
-    for (i in path) {
-        file = path[i] + p.sep + bin;
-        if (fs.existsSync(file)) {
-            return file;
-        }
+const which = function (bin) {
+    const path = process.env.PATH.split(p.delimiter);
+    for (let i in path) {
+        const file = path[i] + p.sep + bin;
+        if (fs.existsSync(file)) return file;
     }
     return '';
 };
 
 // return either $CLAMD_PATH or something like /usr/local/etc/clamav/clamd.conf
-var findClamdConf = function () {
-    if (process.env.CLAMD_PATH) {
-        return process.env.CLAMD_PATH;
-    }
-    var clamdscan = which('clamdscan');
+const findClamdConf = () => {
+    if (process.env.CLAMD_PATH) return process.env.CLAMD_PATH;
+    let clamdscan = which('clamdscan');
     clamdscan = clamdscan.split(p.sep);
     clamdscan.splice(-2, 2);
     return clamdscan.join(p.sep) + p.sep + 'etc/clamav/clamd.conf';

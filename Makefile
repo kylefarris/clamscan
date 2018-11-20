@@ -1,5 +1,5 @@
 .PHONY: all
-TESTS = tests/*.js
+TESTS = tests/index.js
 
 all:
 	@npm install

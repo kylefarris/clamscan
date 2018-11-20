@@ -21,7 +21,7 @@ const check = (done, f) => {
 
 const reset_clam = overrides => {
     overrides = overrides || {};
-    clamscan = clam(Object.assign({}, config, overrides));
+    clamscan = clam.init(Object.assign({}, config, overrides));
 }
 
 describe('Module', () => {
@@ -97,8 +97,8 @@ describe('Module', () => {
                 socket: config.clamdscan.socket,
                 host: config.clamdscan.host,
                 port: config.clamdscan.port,
-                local_fallback: false,
                 path: config.clamdscan.path,
+                local_fallback: false,
                 config_file: config.clamdscan.config_file,
                 multiscan: false,
                 reload_db: true,
@@ -173,16 +173,15 @@ describe('Module', () => {
     });
 
     it('should set definition database (clamscan) to null if specified db is not found', () => {
-        const clamdscan_options = Object.assign({},config.clamdscan, {active: false, local_fallback: true, socket: false, host: false});
-        const options = Object.assign({}, config, {clamdscan: clamdscan_options, scan_log: __dirname + '/should/not/exist'});
+        const clamscan_options = Object.assign({}, config.clamscan, {db: '/usr/bin/better_clam_db'});
+        const options = Object.assign({}, config, {clamscan: clamscan_options});
 
         reset_clam(options);
         expect(clamscan.settings.clamscan.db).to.be.null;
     });
 
     it('should set scan_log to null if specified scan_log is not found', () => {
-        const clamdscan_options = Object.assign({},config.clamdscan, {active: false, local_fallback: true, socket: false, host: false});
-        const options = Object.assign({}, config, {clamdscan: clamdscan_options, scan_log: __dirname + '/should/not/exist'});
+        const options = Object.assign({}, config, {scan_log: __dirname + '/should/not/exist'});
 
         reset_clam(options);
         expect(clamscan.settings.scan_log).to.be.null;

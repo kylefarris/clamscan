@@ -3,37 +3,34 @@
  * https://github.com/yongtang/clamav.js
  */
 
-const util = require('util');
-const Transform = require('stream').Transform;
-util.inherits(ClamAVChannel, Transform);
+const { Transform } = require('stream');
 
-class ClamAVChannel {
+class ClamAVChannel extends Transform {
     constructor(options) {
-        Transform.call(this, options);
+        super(options);
         this._inBody = false;
     }
 
-    _transform(chunk, encoding, callback) {
+    _transform(chunk, encoding, cb) {
         if (!this._inBody) {
             this.push("nINSTREAM\n");
             this._inBody = true;
         }
 
-        const size = new Buffer(4);
+        const size = Buffer.from(new Array(4));
         size.writeInt32BE(chunk.length, 0);
         this.push(size);
         this.push(chunk);
 
-        callback();
+        cb();
     }
 
-    _flush(callback) {
-        const size = new Buffer(4);
-        size = new Buffer(4);
+    _flush(cb) {
+        const size = Buffer.from(new Array(4));
         size.writeInt32BE(0, 0);
         this.push(size);
 
-        callback();
+        cb();
     }
 }
 
