@@ -5,14 +5,19 @@
  */
 
 // Module dependencies.
-const {stat, access, readFile, constants} = require('fs');
-const {exec, execSync, execFile} = require('child_process');
-const {spawn} = require('child_process');
 const os = require('os');
-const node_path = require('path');
+const util = require('util');
 const net = require('net');
-const {promisify} = require('util');
+const fs = require('fs');
+const node_path = require('path');
+const child_process = require('child_process');
+
+const {stat, access, readFile, constants} = fs;
+const {exec, execSync, execFile, spawn} = child_process;
+const {promisify} = util;
+
 const recursive = require('recursive-readdir');
+const PromiseSocket = require('promise-socket');
 const ClamAVChannel = require('./ClamAVChannel.js');
 
 // Convert some stuff to promises
@@ -29,10 +34,11 @@ let counter = 0;
 // @param   Object  options     Key => Value pairs to override default settings
 // ****************************************************************************
 class NodeClam {
-    constructor(options={}) {
+    constructor() {
+        this.initialized = false;
         this.debug_label = 'node-clam';
         this.default_scanner = 'clamdscan';
-        this.initialized = false;
+
 
         // Configuration Settings
         this.defaults = Object.freeze({
@@ -72,6 +78,16 @@ class NodeClam {
     //
     // ****************************************************************************
     async init(options={}, cb) {
+        let found_scan_log = true;
+
+        if (this.initialized === true) {
+            if (cb && typeof cb === 'function') {
+                return cb(null, this);
+            } else {
+                return this;
+            }
+        }
+
         // Override defaults with user preferences
         if (options.hasOwnProperty('clamscan') && Object.keys(options.clamscan).length > 0) {
             this.settings.clamscan = Object.assign({}, this.settings.clamscan, options.clamscan);
@@ -92,6 +108,7 @@ class NodeClam {
         this.scanner = this.default_scanner;
         if (('preference' in this.settings && typeof this.settings.preference !== 'string') || !['clamscan','clamdscan'].includes(this.settings.preference)) {
             // Disable local fallback of socket connection if no valid scanner is found.
+            //console.log("Scanner Pref: ", this.settings.clamdscan);
             if (this.settings.clamdscan.socket || this.settings.clamdscan.host) {
                 this.settings.clamdscan.local_fallback = false;
             } else {
@@ -124,181 +141,125 @@ class NodeClam {
         }
 
         // Make sure quarantine_infected path exists at specified location
-        try {
-            if ((!this.settings.clamdscan.socket && !this.settings.clamdscan.host && ((this.settings.clamdscan.active === true && this.settings.clamdscan.local_fallback === true) || (this.settings.clamscan.active === true))) && this.settings.quarantine_infected) {
-                await fs_access(this.settings.quarantine_infected, fs.constants.R_OK;
+        if ((!this.settings.clamdscan.socket && !this.settings.clamdscan.host && ((this.settings.clamdscan.active === true && this.settings.clamdscan.local_fallback === true) || (this.settings.clamscan.active === true))) && this.settings.quarantine_infected) {
+            try {
+                await fs_access(this.settings.quarantine_infected, fs.constants.R_OK);
+            } catch (err) {
+                if (this.settings.debug_mode) console.log(`${this.debug_label} error:`, err);
+                throw new Error(`Quarantine infected path (${this.settings.quarantine_infected}) is invalid.`);
             }
-        } catch (err) {
-            if (this.settings.debug_mode) console.log(`${this.debug_label} error:`, err);
-            throw new Error(`Quarantine infected path (${this.settings.quarantine_infected}) is invalid.`);
-        }
-
-        // Make sure scan_log exists at specified location
-        try {
-            if (
-                ((!this.settings.clamdscan.socket && !this.settings.clamdscan.host) ||
-                ((this.settings.clamdscan.socket || this.settings.clamdscan.host) && this.settings.clamdscan.local_fallback === true && this.settings.clamdscan.active === true) || (this.settings.clamdscan.active === false && this.settings.clamscan.active === true) || (this.preference)) &&
-                this.settings.scan_log
-            ) {
-                await fs_access(this.settings.scan_log, fs.constants.R_OK);
-            }
-        } catch (err) {
-            if (this.settings.debug_mode) console.log(`${this.debug_label} error:`, err);
-            throw new Error(`Scan Log path (${this.settings.scan_log}) is invalid.`);
         }
 
         // If using clamscan, make sure definition db exists at specified location
-        try {
-            if (!this.settings.clamdscan.socket && !this.settings.clamdscan.host && this.scanner === 'clamscan' && this.settings.clamscan.db) {
+        if (!this.settings.clamdscan.socket && !this.settings.clamdscan.host && this.scanner === 'clamscan' && this.settings.clamscan.db) {
+            try {
                 await fs_access(this.settings.clamscan.db, fs.constants.R_OK);
+            } catch (err) {
+                if (this.settings.debug_mode) console.log(`${this.debug_label} error:`, err);
+                //throw new Error(`Definitions DB path (${this.settings.clamscan.db}) is invalid.`);
+                this.settings.clamscan.db = null;
             }
-        } catch (err) {
-            if (this.settings.debug_mode) console.log(`${this.debug_label} error:`, err);
-            throw new Error(`Definitions DB path (${this.settings.clamscan.db}) is invalid.`);
+        }
+
+        // Make sure scan_log exists at specified location
+        if (
+            (
+                (!this.settings.clamdscan.socket && !this.settings.clamdscan.host) ||
+                (
+                    (this.settings.clamdscan.socket || this.settings.clamdscan.host) &&
+                    this.settings.clamdscan.local_fallback === true &&
+                    this.settings.clamdscan.active === true
+                ) ||
+                (this.settings.clamdscan.active === false && this.settings.clamscan.active === true) ||
+                (this.preference)
+            ) &&
+            this.settings.scan_log
+        ) {
+            try {
+                await fs_access(this.settings.scan_log, fs.constants.R_OK);
+            } catch (err) {
+                //console.log("DID NOT Find scan log!");
+                //found_scan_log = false;
+                if (this.settings.debug_mode) console.log(`${this.debug_label} error:`, err);
+                //throw new Error(`Scan Log path (${this.settings.scan_log}) is invalid.` + err);
+                this.settings.scan_log = null;
+            }
         }
 
         // Check the availability of the clamd service if socket or host/port are provided
-        try {
-            if (this.settings.clamdscan.socket || this.settings.clamdscan.host || this.settings.clamdscan.port) {
-                if (this.settings.debug_mode)
-                    console.log(`${this.debug_label}: Initially testing socket/tcp connection to clamscan server.`);
-
-                const init_socket = util.promisify(this.init_socket);
-                const client = await init_socket('test_availability');
-                const client_on = util.promisify(this.on);
+        if (this.settings.clamdscan.socket || this.settings.clamdscan.host || this.settings.clamdscan.port) {
+            if (this.settings.debug_mode)
+                console.log(`${this.debug_label}: Initially testing socket/tcp connection to clamscan server.`);
+            try {
+                const client = await this._init_socket('test_availability');
+                //console.log("Client: ", client);
 
                 if (this.settings.debug_mode) console.log(`${this.debug_label}: Established connection to clamscan server for testing!`);
 
-
                 client.write('PING');
-                const data = await client_on('data');
-
-                if (data.toString().trim() === 'PONG') {
-                    if (this.settings.debug_mode) console.log(`${this.debug_label}: PING-PONG!`);
-                } else {
-                    // I'm not even sure this case is possible, but...
-                    throw new Error("Could not establish connection to the remote clamscan server. Response: " + data.toString());
-                }
+                client.on('data', data => {
+                    if (data.toString().trim() === 'PONG') {
+                        if (this.settings.debug_mode) console.log(`${this.debug_label}: PING-PONG!`);
+                    } else {
+                        // I'm not even sure this case is possible, but...
+                        throw new Error("Could not establish connection to the remote clamscan server. Response: " + data.toString());
+                    }
                 });
+            } catch (err) {
+                throw err;
             }
-        } catch (err) {
-            throw err;
         }
+
+        //if (found_scan_log === false) console.log("No Scan Log: ", this.settings);
 
         // Build clam flags
         this.clam_flags = this._build_clam_flags(this.scanner, this.settings);
 
+        //if (found_scan_log === false) console.log("No Scan Log: ", this.settings);
+
+        // This ClamScan instance is now initialized
         this.initialized = true;
+
+
+        // Return instance based on type of expected response (callback vs promise)
+        if (cb && typeof cb === 'function') {
+            return cb(null, this);
+        } else {
+            return this;
+        }
     }
 
     // ****************************************************************************
-    // Checks to see if a particular path contains a clamav binary
+    // Allows one to create a new instances of clamscan with new options
     // -----
-    // NOTE: Not currently being used (maybe for future implementations)
-    // SEE: in_clamav_binary_sync()
-    // -----
-    // @param   String      scanner     Scanner (clamscan or clamdscan) to check
-    // @return  Promise
+    //
     // ****************************************************************************
-    async _is_clamav_binary(scanner) {
-        const path = this.settings[scanner].path || null;
-        if (!path) {
-            if (this.settings.debug_mode) console.log(`${this.debug_label}: Could not determine path for clamav binary.`);
-            return false;
-        }
+    async reset(options={}) {
+        this.initialized = false;
 
-        const version_cmds = {
-            clamdscan: `${path} -c ${this.settings.clamdscan.config_file} --version`,
-            clamscan: `${path} --version`,
-        };
+        this.settings = Object.assign({}, this.defaults);
 
         try {
-            await fs_access(path, constants.R_OK);
-
-            const {stdout, stderr} = await cp_exec(version_cmds[scanner]);
-            if (stdout.toString().match(/ClamAV/) === null) {
-                if (this.settings.debug_mode) console.log(`${this.debug_label}: Could not verify the ${scanner} binary.`);
-                return false;
-            }
-            return true;
+            await this.init(options);
+            return this;
         } catch (err) {
-            if (this.settings.debug_mode) console.log(`${this.debug_label}: Could not verify the ${scanner} binary.`);
-            return false;
+            throw err;
         }
     }
 
-    // ****************************************************************************
-    // Checks to see if a particular path contains a clamav binary
+    // *****************************************************************************
+    // Builds out the args to pass to execFile
     // -----
-    // @param   String  scanner     Scanner (clamscan or clamdscan) to check
-    // @return  Boolean             TRUE: Is binary; FALSE: Not binary
-    // ****************************************************************************
-    _is_clamav_binary_sync(scanner) {
-        const  path = this.settings[scanner].path || null;
-        if (!path) {
-            if (this.settings.testing_mode) console.log(`${this.debug_label}: Could not determine path for clamav binary.`);
-            return false;
-        }
+    // @param    String|Array    item        The file(s) / directory(ies) to append to the args
+    // @api        Private
+    // *****************************************************************************
+    _build_clam_args(item) {
+        let args = this.clam_flags.slice();
 
-        /*
-         * Saving this line for version 1.0 release--the one that requires Node 0> .12
-         * if (!fs.existsSync(path) || execSync(version_cmds[scanner]).toString().match(/ClamAV/) === null) {
-         */
-        if (!fs.existsSync(path)) {
-            if (this.settings.testing_mode) console.log(`${this.debug_label}: Could not verify the ${scanner} binary.`);
-            return false;
-        }
-        return true;
-    }
+        if (typeof item === 'string') args.push(item);
+        if (Array.isArray(item)) args = args.concat(item);
 
-    // ****************************************************************************
-    // Test to see if ab object is a readable stream.
-    // -----
-    // @access  Private
-    // @param   Object  obj     Object to test "streaminess"
-    // @return  Boolean         TRUE: Is stream; FALSE: is not stream.
-    // ****************************************************************************
-    _is_readable_stream(obj) {
-        const stream = require('stream');
-        if (!obj || typeof obj !== 'object') return false;
-        return typeof obj.pipe === 'function' && typeof obj._readableState === 'object';
-    }
-
-    // ****************************************************************************
-    // This is what actually processes the response from clamav
-    // -----
-    // @access  Private
-    // @param   String      result      The ClamAV result to process and interpret
-    // @param   Boolean     debug_mode  TRUE: print logs; FALSE: dont'.
-    // @param   Function    cb          The callback to execute when processing is done
-    // @return  VOID
-    // ****************************************************************************
-    _process_result(result, cb) {
-        if (typeof result !== 'string') {
-            if (this.settings.debug_mode === true) console.log(`${this.debug_label}: Invalid stdout from scanner (not a string): `, result);
-            return cb(new Error("Invalid result to process (not a string)"), true);
-        }
-
-        result = result.trim();
-
-        if (result.match(/OK$/)) {
-            if (this.settings.debug_mode === true) console.log(`${this.debug_label}: File is OK!`);
-            return cb(null, false);
-        }
-
-        if (/FOUND$/.test(result)) {
-            if (this.settings.debug_mode === true) {
-                console.log(`${this.debug_label}: Scan Response: `, result);
-                console.log(`${this.debug_label}: File is INFECTED!`);
-            }
-            return cb(null, true);
-        }
-
-        if (this.settings.debug_mode === true) {
-            console.log(`${this.debug_label}: Error Response: `, result);
-            console.log(`${this.debug_label}: File may be INFECTED!`);
-        }
-        return cb(null, null);
+        return args;
     }
 
     // *****************************************************************************
@@ -381,23 +342,204 @@ class NodeClam {
     }
 
     // ****************************************************************************
+    // Create socket connection to a remote (or local) clamav daemon.
+    // -----
+    // @param   String      label   A label for the socket--used for debugging purposes.
+    // @param   Fucntion    cb      (optional) What to do when socket is established
+    // @return  Promise
+    // ****************************************************************************
+    _init_socket(label='clamscan_socket', cb) {
+        return new Promise((resolve, reject) => {
+            const client = new net.Socket();
+
+            if (this.settings.clamdscan.socket) {
+                client.connect(this.settings.clamdscan.socket);
+            } else if (this.settings.clamdscan.port) {
+                if (this.settings.clamdscan.host) {
+                    client.connect(this.settings.clamdscan.port, this.settings.clamdscan.host);
+                } else {
+                    client.connect(this.settings.clamdscan.port);
+                }
+
+                client.on('lookup', (err, address, family) => {
+                    if (err && this.settings.clamdscan.local_fallback !== true) {
+                        if (cb && typeof cb === 'function') return cb(err);
+                        return reject(err);
+                    }
+
+                    if (this.settings.debug_mode)
+                        console.log(`${this.debug_label}: Establishing connection to: ${address} (${(family ? `IPv ${family}` : 'Unknown IP Type')}) - ${label}`);
+                });
+            } else {
+                throw new Error("Unable not establish connection to clamd service: No socket or host/port combo provided!");
+            }
+
+            client.on('error', err => {
+                client.destroy();
+                if (this.settings.clamdscan.local_fallback !== true) throw err;
+                if (cb && typeof cb === 'function') return cb(err, client);
+                return reject(err);
+            });
+
+            client.on('timeout', () => {
+                if (this.settings.debug_mode) console.log(`${++counter}: ${this.debug_label}: Socket connection timed out: ${label}`);
+                client.close();
+            });
+
+            client.on('close', () => {
+                if (this.settings.debug_mode) console.log(`${++counter}: ${this.debug_label}: Socket connection closed: ${label}`);
+            });
+
+            client.on('connect', () => {
+                if (this.settings.debug_mode) console.log(`${++counter}: ${this.debug_label}: Socket connection created: ${label}`);
+
+                // Determine information about what server the client is connected to
+                if (client.remotePort && client.remotePort.toString() === this.settings.clamdscan.port.toString()) {
+                    if (this.settings.debug_mode) console.log(`${this.debug_label}: using remote server: ${client.remoteAddress}:${client.remotePort}`);
+                } else if (this.settings.clamdscan.socket) {
+                    if (this.settings.debug_mode) console.log(`${this.debug_label}: using local unix domain socket: ${this.settings.clamdscan.socket}`);
+                } else {
+                    if (this.settings.debug_mode) {
+                        const meta = client.address();
+                        console.log(`${this.debug_label}: meta port value: ${meta.port} vs ${client.remotePort}`);
+                        console.log(`${this.debug_label}: meta address value: ${meta.address} vs ${client.remoteAddress}`);
+                        console.log(`${this.debug_label}: something is not working...`);
+                    }
+                }
+                if (cb && typeof cb === 'function') return cb(null, client);
+                return resolve(client);
+            });
+        });
+    }
+
+    // ****************************************************************************
+    // Checks to see if a particular path contains a clamav binary
+    // -----
+    // NOTE: Not currently being used (maybe for future implementations)
+    // SEE: in_clamav_binary_sync()
+    // -----
+    // @param   String      scanner     Scanner (clamscan or clamdscan) to check
+    // @return  Promise
+    // ****************************************************************************
+    async _is_clamav_binary(scanner) {
+        const path = this.settings[scanner].path || null;
+        if (!path) {
+            if (this.settings.debug_mode) console.log(`${this.debug_label}: Could not determine path for clamav binary.`);
+            return false;
+        }
+
+        const version_cmds = {
+            clamdscan: `${path} -c ${this.settings.clamdscan.config_file} --version`,
+            clamscan: `${path} --version`,
+        };
+
+        try {
+            await fs_access(path, constants.R_OK);
+
+            const {stdout, stderr} = await cp_exec(version_cmds[scanner]);
+            if (stdout.toString().match(/ClamAV/) === null) {
+                if (this.settings.debug_mode) console.log(`${this.debug_label}: Could not verify the ${scanner} binary.`);
+                return false;
+            }
+            return true;
+        } catch (err) {
+            if (this.settings.debug_mode) console.log(`${this.debug_label}: Could not verify the ${scanner} binary.`);
+            return false;
+        }
+    }
+
+    // ****************************************************************************
+    // Checks to see if a particular path contains a clamav binary
+    // -----
+    // @param   String  scanner     Scanner (clamscan or clamdscan) to check
+    // @return  Boolean             TRUE: Is binary; FALSE: Not binary
+    // ****************************************************************************
+    _is_clamav_binary_sync(scanner) {
+        const  path = this.settings[scanner].path || null;
+        if (!path) {
+            if (this.settings.testing_mode) console.log(`${this.debug_label}: Could not determine path for clamav binary.`);
+            return false;
+        }
+
+        /*
+         * Saving this line for version 1.0 release--the one that requires Node 0> .12
+         * if (!fs.existsSync(path) || execSync(version_cmds[scanner]).toString().match(/ClamAV/) === null) {
+         */
+        if (!fs.existsSync(path)) {
+            if (this.settings.testing_mode) console.log(`${this.debug_label}: Could not verify the ${scanner} binary.`);
+            return false;
+        }
+        return true;
+    }
+
+    // ****************************************************************************
+    // Test to see if ab object is a readable stream.
+    // -----
+    // @access  Private
+    // @param   Object  obj     Object to test "streaminess"
+    // @return  Boolean         TRUE: Is stream; FALSE: is not stream.
+    // ****************************************************************************
+    _is_readable_stream(obj) {
+        const stream = require('stream');
+        if (!obj || typeof obj !== 'object') return false;
+        return typeof obj.pipe === 'function' && typeof obj._readableState === 'object';
+    }
+
+    // ****************************************************************************
+    // This is what actually processes the response from clamav
+    // -----
+    // @access  Private
+    // -----
+    // @param   String      result      The ClamAV result to process and interpret
+    // @return  Boolean
+    // ****************************************************************************
+    async _process_result(result) {
+        if (typeof result !== 'string') {
+            if (this.settings.debug_mode) console.log(`${this.debug_label}: Invalid stdout from scanner (not a string): `, result);
+            throw new Error("Invalid result to process (not a string)");
+        }
+
+        result = result.trim();
+
+        if (/OK$/.test(result)) {
+            if (this.settings.debug_mode) console.log(`${this.debug_label}: File is OK!`);
+            return false;
+        }
+
+        if (/FOUND$/.test(result)) {
+            if (this.settings.debug_mode) {
+                if (this.settings.debug_mode) console.log(`${this.debug_label}: Scan Response: `, result);
+                if (this.settings.debug_mode) console.log(`${this.debug_label}: File is INFECTED!`);
+            }
+            return true;
+        }
+
+        if (this.settings.debug_mode) {
+            if (this.settings.debug_mode) console.log(`${this.debug_label}: Error Response: `, result);
+            if (this.settings.debug_mode) console.log(`${this.debug_label}: File may be INFECTED!`);
+        }
+
+        return null;
+    }
+
+    // ****************************************************************************
     // Establish the clamav version of a local or remote clamav daemon
     // -----
     // @param   Function    cb  What to do when version is established
     // @return  VOID
     // ****************************************************************************
-    get_version(cb) {
+    async get_version(cb) {
         const self = this;
 
         const local_call = () => {
             const command = self.settings[self.scanner].path + self.clam_flags + '--version';
 
-            if (self.settings.debug_mode === true) {
-                console.log(`${this.debug_label}: Configured clam command: ${self.settings[self.scanner].path} ${self.build_clam_args(file).join(' ')}`);
+            if (self.settings.debug_mode) {
+                console.log(`${this.debug_label}: Configured clam command: ${self.settings[self.scanner].path} ${self._build_clam_args(file).join(' ')}`);
             }
 
             // Execute the clam binary with the proper flags
-            execFile(self.settings[self.scanner].path, self.build_clam_args(file), (err, stdout, stderr) => {
+            execFile(self.settings[self.scanner].path, self._build_clam_args(file), (err, stdout, stderr) => {
                 if (cmd_err) {
                     if (err.hasOwnProperty('code') && err.code === 1) return cb(null, stdout);
 
@@ -414,94 +556,26 @@ class NodeClam {
 
         // If user wants to connect via socket or TCP...
         if (this.settings.clamdscan.socket || this.settings.clamdscan.host) {
-            if (this.settings.debug_mode === true) console.log(`${this.debug_label}: Getting socket client for version fetch.`);
+            if (this.settings.debug_mode) console.log(`${this.debug_label}: Getting socket client for version fetch.`);
 
-            this.init_socket('version_fetch', (err, client) => {
+            try {
+                const client = await this._init_socket('version_fetch');
                 if (this.settings.debug_mode) console.log(`${this.debug_label}: Version fetch socket initialized.`);
-
-                if (err) {
-                    if (this.settings.clamdscan.local_fallback === true) {
-                        return local_call();
-                    } else {
-                        return cb(err, null);
-                    }
-                }
                 client.write('VERSION');
                 client.on('data', data => {
-                    if (this.settings.debug_mode === true) console.log(`${this.debug_label}: Version ascertained: ${data.toString()}`);
+                    if (this.settings.debug_mode) console.log(`${this.debug_label}: Version ascertained: ${data.toString()}`);
                     cb(null, data.toString());
                 });
-            });
+            } catch (err) {
+                if (this.settings.clamdscan.local_fallback === true) {
+                    return local_call();
+                } else {
+                    throw err;
+                }
+            }
         } else {
             return local_call();
         }
-    }
-
-    // ****************************************************************************
-    // Create socket connection to a remote (or local) clamav daemon.
-    // -----
-    // @param   Function    cb  What to do when socket client is established
-    // @return  VOID
-    // ****************************************************************************
-    init_socket(label, cb) {
-        if (typeof cb !== 'function') {
-            throw new Error("Invalid value provided to socket init method's callback parameter. Value must be a function!");
-        }
-
-        const client = new net.Socket();
-
-        if (this.settings.clamdscan.socket) {
-            client.connect(this.settings.clamdscan.socket);
-        } else if (this.settings.clamdscan.port) {
-            if (this.settings.clamdscan.host) {
-                client.connect(this.settings.clamdscan.port, this.settings.clamdscan.host);
-            } else {
-                client.connect(this.settings.clamdscan.port);
-            }
-            client.on('lookup', (err, address, family) => {
-                if (err && this.settings.clamdscan.local_fallback !== true) throw err;
-
-                if (this.settings.debug_mode)
-                    console.log(`${this.debug_label}: Establishing connection to: ${address} (${(family ? `IPv ${family}` : 'Unknown IP Type')}) - ${label}`);
-            });
-        } else {
-            return cb(new Error("Unable not establish connection to clamd service: No socket or host/port combo provided!"), null);
-        }
-
-        client.on('connect', () => {
-            if (this.settings.debug_mode) console.log(`${++counter}: ${this.debug_label}: Socket connection created: ${label}`);
-
-            // Determine information about what server the client is connected to
-            if (client.remotePort && client.remotePort.toString() === this.settings.clamdscan.port.toString()) {
-                if (this.settings.debug_mode) console.log(`${this.debug_label}: using remote server: ${client.remoteAddress}:${client.remotePort}`);
-            } else if (this.settings.clamdscan.socket) {
-                if (this.settings.debug_mode) console.log(`${this.debug_label}: using local unix domain socket: ${this.settings.clamdscan.socket}`);
-            } else {
-                if (this.settings.debug_mode) {
-                    const meta = client.address();
-                    console.log(`${this.debug_label}: meta port value: ${meta.port} vs ${client.remotePort}`);
-                    console.log(`${this.debug_label}: meta address value: ${meta.address} vs ${client.remoteAddress}`);
-                    console.log(`${this.debug_label}: something is not working...`);
-                }
-            }
-
-            cb(null, client);
-        });
-
-        client.on('error', err => {
-            client.destroy();
-            if (this.settings.clamdscan.local_fallback !== true) throw err;
-            cb(err, client);
-        });
-
-        client.on('timeout', () => {
-            if (this.settings.debug_mode) console.log(`${++counter}: ${this.debug_label}: Socket connection timed out: ${label}`);
-            client.close();
-        });
-
-        client.on('close', () => {
-            if (this.settings.debug_mode) console.log(`${++counter}: ${this.debug_label}: Socket connection closed: ${label}`);
-        });
     }
 
     // ****************************************************************************
@@ -537,11 +611,11 @@ class NodeClam {
 
             // Build the actual command to run
             const command = self.settings[self.scanner].path + self.clam_flags + file;
-            if (self.settings.debug_mode === true)
-                console.log(`${this.debug_label}: Configured clam command: ${self.settings[self.scanner].path} ${self.build_clam_args(items).join(' ')}`);
+            if (self.settings.debug_mode)
+                console.log(`${this.debug_label}: Configured clam command: ${self.settings[self.scanner].path} ${self._build_clam_args(items).join(' ')}`);
 
             // Execute the clam binary with the proper flags
-            execFile(self.settings[self.scanner].path, self.build_clam_args(file), (err, stdout, stderr) => {
+            execFile(self.settings[self.scanner].path, self._build_clam_args(file), async (err, stdout, stderr) => {
                 if (err || stderr) {
                     if (err) {
                         if (err.hasOwnProperty('code') && err.code === 1) {
@@ -555,9 +629,12 @@ class NodeClam {
                         cb(err, file, null);
                     }
                 } else {
-                    self._process_result(stdout, self.settings.debug_mode, (err, is_infected) => {
-                        cb(err, file, is_infected)
-                    });
+                    try {
+                        const is_infected = await self._process_result(stdout, self.settings.debug_mode);
+                        cb(null, file, is_infected);
+                    } catch (err) {
+                        cb(err, file, null);
+                    }
                 }
             });
         };
@@ -566,7 +643,7 @@ class NodeClam {
         try {
             await fs_access(file, constants.R_OK);
         } catch (err) {
-            //if (self.settings.debug_mode === true)
+            //if (self.settings.debug_mode)
             //console.log(`${this.debug_label}: Could not find file to scan: ${file}`);
             return cb(new Error(`Could not find file to scan! (${file})`), file, true);
         }
@@ -575,7 +652,8 @@ class NodeClam {
         if (this.settings.clamdscan.socket || this.settings.clamdscan.host) {
             // Scan using local unix domain socket (much simpler/faster process--especially with MULTISCAN enabled)
             if (this.settings.clamdscan.socket) {
-                this.init_socket('is_infected', (err, client) => {
+                try {
+                    const client = await this._init_socket('is_infected');
                     if (this.settings.debug_mode) console.log(`${this.debug_label}: scanning with local domain socket now.`);
 
                     if (this.settings.clamdscan.multiscan === true) {
@@ -585,13 +663,30 @@ class NodeClam {
                         // Use single or default # of threads (potentially slower)
                         client.write(`SCAN ${file}`);
                     }
-                    client.on('data', data => {
+                    client.on('data', async data => {
                         if (this.settings.debug_mode) console.log(`${this.debug_label}: Received response from remote clamd service.`);
-                        this._process_result(data.toString(), this.settings.debug_mode, (err, is_infected) => {
-                            cb(err, file, is_infected);
-                        });
+                        try {
+                            const is_infected = await self._process_result(data.toString(), this.settings.debug_mode);
+                            if (cb && typeof cb === 'function') {
+                                cb(null, file, is_infected);
+                            } else {
+                                return {file, is_infected};
+                            }
+                        } catch (err) {
+                            if (cb && typeof cb === 'function') {
+                                cb(err, file, null);
+                            } else {
+                                throw err;
+                            }
+                        }
                     });
-                });
+                } catch (err) {
+                    if (cb && typeof cb === 'function') {
+                        cb(err, file, null);
+                    } else {
+                        throw err;
+                    }
+                }
             }
 
             // Scan using remote host/port and TCP protocol (must stream the file)
@@ -667,12 +762,12 @@ class NodeClam {
                     }
 
                     if (/OK$/.test(result)) {
-                        if (self.settings.debug_mode === true){
+                        if (self.settings.debug_mode){
                             console.log(`${this.debug_label}: ${path} is OK!`);
                         }
                         good_files.push(path);
                     } else {
-                        if (self.settings.debug_mode === true){
+                        if (self.settings.debug_mode){
                             console.log(`${this.debug_label}: ${path} is INFECTED!`);
                         }
                         bad_files.push(path);
@@ -691,15 +786,15 @@ class NodeClam {
 
             // Build the actual command to run
             const command = self.settings[self.scanner].path + self.clam_flags + items;
-            if (self.settings.debug_mode === true)
-                console.log(`${this.debug_label}: Configured clam command: ${self.settings[self.scanner].path} ${self.build_clam_args(items).join(' ')}`);
+            if (self.settings.debug_mode)
+                console.log(`${this.debug_label}: Configured clam command: ${self.settings[self.scanner].path} ${self._build_clam_args(items).join(' ')}`);
 
             // Execute the clam binary with the proper flags
-            execFile(self.settings[self.scanner].path, self.build_clam_args(items), (err, stdout, stderr) => {
-                if (self.settings.debug_mode === true) console.log(`${this.debug_label}: stdout:`, stdout);
+            execFile(self.settings[self.scanner].path, self._build_clam_args(items), (err, stdout, stderr) => {
+                if (self.settings.debug_mode) console.log(`${this.debug_label}: stdout:`, stdout);
 
                 if (err && stderr) {
-                    if (self.settings.debug_mode === true){
+                    if (self.settings.debug_mode){
                         console.log(`${this.debug_label}: An error occurred.`);
                         console.error(err);
                         console.log(`${this.debug_label}: ${stderr}`);
@@ -724,7 +819,7 @@ class NodeClam {
         const do_scan = files => {
             const num_files = files.length;
 
-            if (self.settings.debug_mode === true) console.log(`${this.debug_label}: Scanning a list of ${num_files} passed files.`);
+            if (self.settings.debug_mode) console.log(`${this.debug_label}: Scanning a list of ${num_files} passed files.`);
 
             // Slower but more verbose/informative way...
             if (typeof file_cb === 'function') {
@@ -962,8 +1057,8 @@ class NodeClam {
         }
 
         // Execute the clam binary with the proper flags
-        const local_scan = () => {
-            execFile(self.settings[self.scanner].path, self.build_clam_args(path), (err, stdout, stderr) => {
+        const local_scan = async () => {
+            execFile(self.settings[self.scanner].path, self._build_clam_args(path), async (err, stdout, stderr) => {
                 if (self.settings.debug_mode) console.log(`${this.debug_label}: Scanning directory using local binary: ${path}`);
                 if (err || stderr) {
                     if (err) {
@@ -979,10 +1074,13 @@ class NodeClam {
                         end_cb(err, [], [path]);
                     }
                 } else {
-                    self._process_result(stdout, self.settings.debug_mode, (err, is_infected) => {
-                        if (is_infected) return end_cb(err, [], [path]);
-                        return end_cb(err, [path], []);
-                    });
+                    try {
+                        const is_infected = await self._process_result(stdout);
+                        if (is_infected) return end_cb(null, [], [path]);
+                        return end_cb(null, [path], []);
+                    } catch (err) {
+                        cb(err, file, null);
+                    }
                 }
             });
         }
@@ -991,7 +1089,7 @@ class NodeClam {
         if (this.settings.scan_recursively && typeof file_cb === 'function') {
             execFile('find', [path], (err, stdout, stderr) => {
                 if (err || stderr) {
-                    if (this.settings.debug_mode === true) console.log(stderr);
+                    if (this.settings.debug_mode) console.log(stderr);
                     return end_cb(err, path, null);
                 } else {
                     const files = stdout.split("\n").map(path => path.replace(/ /g,'\\ '));
@@ -1027,14 +1125,15 @@ class NodeClam {
         // If you don't care about individual file progress (which is very slow for clamscan but fine for clamdscan...)
         else if (typeof file_cb !== 'function') {
             const  command = this.settings[this.scanner].path + this.clam_flags + path;
-            if (this.settings.debug_mode === true)
-                console.log(`${this.debug_label}: Configured clam command: ${this.settings[this.scanner].path} ${this.build_clam_args(path).join(' ')}`);
+            if (this.settings.debug_mode)
+                console.log(`${this.debug_label}: Configured clam command: ${this.settings[this.scanner].path} ${this._build_clam_args(path).join(' ')}`);
 
             if (this.settings.clamdscan.socket || this.settings.clamdscan.host) {
 
                 // Scan using local unix domain socket (much simpler/faster process--potentially even more with MULTISCAN enabled)
                 if (this.settings.clamdscan.socket) {
-                    this.init_socket('is_infected', (err, client) => {
+                    try {
+                        const client = await this._init_socket('is_infected');
                         if (this.settings.debug_mode) console.log(`${this.debug_label}: scanning with local domain socket now.`);
 
                         if (this.settings.clamdscan.multiscan === true) {
@@ -1044,14 +1143,19 @@ class NodeClam {
                             // Use single or default # of threads (potentially slower)
                             client.write(`SCAN ' + ${path}`);
                         }
-                        client.on('data', data => {
+                        client.on('data', async data => {
                             if (this.settings.debug_mode) console.log(`${this.debug_label}: Received response from remote clamd service.`);
-                            this._process_result(data.toString(), this.settings.debug_mode, (err, is_infected) => {
-                                if (is_infected) return end_cb(err, [], [path]);
-                                return end_cb(err, [path], []);
-                            });
+                            try {
+                                const is_infected = await this._process_result(data.toString());
+                                if (is_infected) return end_cb(null, [], [path]);
+                                return end_cb(null, [path], []);
+                            } catch (err) {
+                                end_cb(err, file, null);
+                            }
                         });
-                    });
+                    } catch (err) {
+
+                    }
                 }
 
                 // Scan using remote host/port and TCP protocol (must stream the file)
@@ -1084,9 +1188,9 @@ class NodeClam {
     // Scans a node Stream object
     // -----
     // @param   Stream      stream      The stream to scan
-    // @param   Function    callback    What to do when the socket responds with results
+    // @param   Function    callback    (optional) What to do when the socket responds with results
     // ****************************************************************************
-    scan_stream(stream, cb) {
+    async scan_stream(stream, cb) {
         // Verify second param, if supplied, is a function
         if (cb && typeof cb !== 'function')
             throw new Error("Invalid cb provided to scan_stream. Second paramter must be a function!");
@@ -1109,25 +1213,39 @@ class NodeClam {
         let response_buffer = '';
 
         // Get a socket client
-        this.init_socket('scan_stream', (err, client) => {
-            client.on('data', data => {
+        try {
+            const client = await this._init_socket('scan_stream');
+            client.on('data', async data => {
                 response_buffer += data;
 
                 if (/\\n/.test(data.toString())) {
                     client.destroy();
                     response_buffer = response_buffer.substring(0, response_buffer.indexOf("\n"));
-                    return this._process_result(response_buffer, this.settings.debug_mode, cb);
+                    try {
+                        const result = await this._process_result(response_buffer);
+                        if (cb && typeof cb === 'function') return cb(null, result);
+                        return result;
+                    } catch (err) {
+                        if (cb && typeof cb === 'function') return cb(err, null);
+                        throw err;
+                    }
                 }
             });
+        } catch (err) {
+            if (cb && typeof cb === 'function') return cb(err, null);
+            throw err;
+        }
 
-            // Pipe stream over ClamAV INSTREAM channel
-            const stream_channel = new ClamAVChannel();
-            stream.pipe(stream_channel).pipe(client).on('error', err => {
-                cb(err, null);
-            });
-        });
+        // Pipe stream over ClamAV INSTREAM channel
+        const stream_channel = new ClamAVChannel();
+        try {
+            await stream.pipe(stream_channel).pipe(client).once('error');
+        } catch (err) {
+            if (cb && typeof cb === 'function') return cb(err, null);
+            throw err;
+        }
     };
 }
 
 
-module.exports = options => new NodeClam(options);
+module.exports = new NodeClam();

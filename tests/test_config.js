@@ -17,7 +17,7 @@ const findClamdConf = () => {
     let clamdscan = which('clamdscan');
     clamdscan = clamdscan.split(p.sep);
     clamdscan.splice(-2, 2);
-    return clamdscan.join(p.sep) + p.sep + 'etc/clamav/clamd.conf';
+    return p.sep + clamdscan.join(p.sep) + p.sep + 'etc/clamav/clamd.conf';
 };
 
 module.exports = {
@@ -32,7 +32,7 @@ module.exports = {
         host: '127.0.0.1',                          // required for testing (change for your system) - can be set to null
         port: 3310,                                 // required for testing (change for your system) - can be set to null
         path: which('clamdscan'),                   // required for testing
-        config_file: findClamdConf() || '/etc/clamd.d/daemon.conf'      // required for testing
+        config_file: '/etc/clamd.d/daemon.conf'      // required for testing
     },
     debug_mode: false
 };
