@@ -13,7 +13,7 @@ const bad_file_list = __dirname + '/bad_files_list.txt';
 // Chai plugins
 chai.use(chaiAsPromised);
 
-let clamscan = require('../index.js');
+const NodeClam = require('../index.js');
 
 const check = (done, f) => {
     try {
@@ -27,7 +27,7 @@ const check = (done, f) => {
 const reset_clam = async (overrides = {}) => {
     overrides = overrides || {};
     try {
-        clamscan = await clamscan.reset(Object.assign({}, config, overrides));
+        return await NodeClam.reset(Object.assign({}, config, overrides));
     } catch (err) {
         throw err;
         //console.log("");
@@ -35,15 +35,21 @@ const reset_clam = async (overrides = {}) => {
     }
 }
 
-describe('Module', () => {
+describe('NodeClam Module', () => {
     it('should return an object', () => {
-        clamscan.should.be.an('object');
-        should.exist(clamscan.initialized);
-        expect(clamscan.initialized).to.eql(false);
+        NodeClam.should.be.an('object');
     });
 
+    it('should not be initialized immediately', () => {
+        should.exist(NodeClam.initialized);
+        expect(NodeClam.initialized).to.eql(false);
+    });
+});
+
+describe('Initialized NodeClam module', () => {
     it('should have certain config properties defined', async () => {
-        await reset_clam();
+        const clamscan = await reset_clam();
+
         expect(clamscan.defaults.remove_infected, 'remove_infected').to.not.be.undefined;
         expect(clamscan.defaults.quarantine_infected, 'quarantine_infected').to.not.be.undefined;
         expect(clamscan.defaults.scan_log, 'scan_log').to.not.be.undefined;
@@ -56,7 +62,7 @@ describe('Module', () => {
     });
 
     it('should have the proper global default values set', async () => {
-        await reset_clam();
+        const clamscan = await reset_clam();
         expect(clamscan.defaults.remove_infected).to.eql(false);
         expect(clamscan.defaults.quarantine_infected).to.eql(false);
         expect(clamscan.defaults.scan_log).to.eql(null);
@@ -67,7 +73,7 @@ describe('Module', () => {
     });
 
     it('should have the proper clamscan default values set', async () => {
-        await reset_clam();
+        const clamscan = await reset_clam();
         expect(clamscan.defaults.clamscan.path).to.eql('/usr/bin/clamscan');
         expect(clamscan.defaults.clamscan.db).to.eql(null);
         expect(clamscan.defaults.clamscan.scan_archives).to.be.eql(true);
@@ -75,7 +81,7 @@ describe('Module', () => {
     });
 
     it('should have the proper clamdscan default values set', async () => {
-        await reset_clam();
+        const clamscan = await reset_clam();
         expect(clamscan.defaults.clamdscan.socket).to.eql(false);
         expect(clamscan.defaults.clamdscan.host).to.eql(false);
         expect(clamscan.defaults.clamdscan.port).to.eql(false);
@@ -88,7 +94,7 @@ describe('Module', () => {
     });
 
     it('should accept an options array and merge them with the object defaults', async () => {
-        await reset_clam({
+        const clamscan = await reset_clam({
             remove_infected: true,
             quarantine_infected: config.quarantine_infected,
             scan_log: config.scan_log,
@@ -143,17 +149,17 @@ describe('Module', () => {
     });
 
     it('should failover to alternate scanner if preferred scanner is not found', async () => {
-        await reset_clam();
+        const clamscan = await reset_clam();
     });
 
     it('should try and fallback to local daemon if socket connection can not be established (if specified by local_fallback option)', async () => {
-        await reset_clam();
+        const clamscan = await reset_clam();
     });
 
     it('should fail if an invalid scanner preference is supplied when socket or host is not specified and local_fallback is not false', () => {
-        expect(reset_clam({preference: 'clamscan'})).to.not.be.rejectedWith(Error);
-        expect(reset_clam({preference: 'badscanner'})).to.not.be.rejectedWith(Error);
-        expect(reset_clam({clamdscan: { local_fallback: true, socket: false, host: false }, preference: 'badscanner'})).to.be.rejectedWith(Error);
+        expect(reset_clam({preference: 'clamscan'}), 'valid scanner').to.not.be.rejectedWith(Error);
+        expect(reset_clam({preference: 'badscanner'}), 'invalid scanner').to.not.be.rejectedWith(Error);
+        expect(reset_clam({clamdscan: { local_fallback: true, socket: false, host: false }, preference: 'badscanner'}), 'invalid scanner - no socket or host for local fallback').to.be.rejectedWith(Error);
     });
 
     it('should fail to load if no active & valid scanner is found and socket is not available', () => {
@@ -166,39 +172,40 @@ describe('Module', () => {
         expect(reset_clam(options)).to.be.rejectedWith(Error);
     });
 
-    // it('should fail to load if quarantine path (if specified) does not exist or is not writable and socket is not available', () => {
-    //     const clamdscan_options = Object.assign({}, config.clamdscan, {active: true, local_fallback: true, socket: false, host: false});
-    //     const clamscan_options = Object.assign({}, config.clamscan, {active: true});
-    //     const options = Object.assign({}, config, {clamdscan: clamdscan_options, clamscan: clamscan_options});
-    //
-    //     options.quarantine_infected = __dirname + '/should/not/exist';
-    //     expect(reset_clam(options)).to.be.rejectedWith(Error);
-    //
-    //     options.quarantine_infected = __dirname + '/infected';
-    //     expect(reset_clam(options)).to.not.be.rejectedWith(Error);
-    // });
+    it('should fail to load if quarantine path (if specified) does not exist or is not writable and socket is not available', () => {
+        const clamdscan_options = Object.assign({}, config.clamdscan, {active: true, local_fallback: true, socket: false, host: false});
+        const clamscan_options = Object.assign({}, config.clamscan, {active: true});
+        const options = Object.assign({}, config, {clamdscan: clamdscan_options, clamscan: clamscan_options});
 
-    // it('should set definition database (clamscan) to null if specified db is not found', async () => {
-    //     const clamdscan_options = Object.assign({}, config.clamdscan, {socket: false, host: false});
-    //     const clamscan_options = Object.assign({}, config.clamscan, {db: '/usr/bin/better_clam_db', active: true});
-    //
-    //     const options = Object.assign({}, config, {clamdscan: clamdscan_options, clamscan: clamscan_options, preference: 'clamscan'});
-    //
-    //     await reset_clam(options);
-    //     expect(clamscan.settings.clamscan.db).to.be.null;
-    // });
-    //
-    // it('should set scan_log to null if specified scan_log is not found', async () => {
-    //     const options = Object.assign({}, config, {scan_log: __dirname + '/should/not/exist'});
-    //
-    //     await reset_clam(options);
-    //     expect(clamscan.settings.scan_log).to.be.null;
-    // });
-    //
+        options.quarantine_infected = __dirname + '/should/not/exist';
+        expect(reset_clam(options)).to.be.rejectedWith(Error);
+
+        options.quarantine_infected = __dirname + '/infected';
+        expect(reset_clam(options)).to.not.be.rejectedWith(Error);
+    });
+
+    it('should set definition database (clamscan) to null if specified db is not found', async () => {
+        const clamdscan_options = Object.assign({}, config.clamdscan, {socket: false, host: false});
+        const clamscan_options = Object.assign({}, config.clamscan, {db: '/usr/bin/better_clam_db', active: true});
+
+        const options = Object.assign({}, config, {clamdscan: clamdscan_options, clamscan: clamscan_options, preference: 'clamscan'});
+
+        const clamscan = await reset_clam(options);
+        expect(clamscan.settings.clamscan.db).to.be.null;
+    });
+
+    it('should set scan_log to null if specified scan_log is not found', async () => {
+        const options = Object.assign({}, config, {scan_log: __dirname + '/should/not/exist'});
+
+        const clamscan = await reset_clam(options);
+        expect(clamscan.settings.scan_log).to.be.null;
+    });
+
     it('should be able have configuration settings changed after instantiation', async () => {
         expect(reset_clam({scan_log: null})).to.not.be.rejectedWith(Error);
 
-        //try { await reset_clam({scan_log: null}); } catch (err) { }
+        const clamscan = await reset_clam({scan_log: null});
+
         expect(clamscan.settings.scan_log).to.be.null;
 
         clamscan.settings.scan_log = config.scan_log;
@@ -206,158 +213,176 @@ describe('Module', () => {
     });
 });
 
-// describe('build_clam_flags', () => {
-//     // Can't call this function directly as it's outside the scope of the exported module
-//     // But, we can test what is built by checking the clam_flags property after instantiation
-//
-//     it('should build an array', () => {
-//         reset_clam();
-//         expect(clamscan.clam_flags).to.not.be.undefined;
-//         expect(clamscan.clam_flags).to.be.an('array');
-//     });
-//
-//     it('should build a series of flags', () => {
-//         if (clamscan.settings.preference === 'clamdscan') {
-//             clamscan.clam_flags.should.be.eql([
-//               '--no-summary',
-//               '--fdpass',
-//               '--config-file=' + config.clamdscan.config_file,
-//               '--multiscan',
-//               '--move=' + config.quarantine_infected,
-//               '--log=' + config.scan_log
-//             ]);
-//         } else {
-//             clamscan.clam_flags.should.be.eql([
-//               '--no-summary',
-//               '--log=' + config.scan_log
-//             ]);
-//         }
-//     });
-// });
-//
-// describe('get_version', () => {
-//     reset_clam();
-//
-//     it('should exist', () => {
-//         should.exist(clamscan.get_version);
-//     });
-//     it('should be a function', () => {
-//         clamscan.get_version.should.be.a('function');
-//     });
-// });
-//
-// describe('init_socket', () => {
-//     reset_clam();
-//
-//     it('should exist', () => {
-//         should.exist(clamscan.init_socket);
-//     });
-//     it('should be a function', () => {
-//         clamscan.get_version.should.be.a('function');
-//     });
-// });
-//
-// describe('is_infected', () => {
-//     reset_clam();
-//
-//     it('should exist', () => {
-//         should.exist(clamscan.is_infected);
-//     });
-//     it('should be a function', () => {
-//         clamscan.is_infected.should.be.a('function');
-//     });
-//
-//     it('should require a string representing the path to a file to be scanned', () => {
-//         expect(() => { clamscan.is_infected(good_scan_file); },    'good string provided').to.not.throw(Error);
-//         expect(() => { clamscan.is_infected(); },                  'nothing provided').to.throw(Error);
-//         expect(() => { clamscan.is_infected(undefined); },         'nothing provided').to.throw(Error);
-//         expect(() => { clamscan.is_infected(null); },              'null provided').to.throw(Error);
-//         expect(() => { clamscan.is_infected(''); },                'empty string provided').to.throw(Error);
-//         expect(() => { clamscan.is_infected(false); },             'false provided').to.throw(Error);
-//         expect(() => { clamscan.is_infected(true); },              'true provided').to.throw(Error);
-//         expect(() => { clamscan.is_infected(5); },                 'integer provided').to.throw(Error);
-//         expect(() => { clamscan.is_infected(5.4); },               'float provided').to.throw(Error);
-//         expect(() => { clamscan.is_infected(Infinity); },          'Infinity provided').to.throw(Error);
-//         expect(() => { clamscan.is_infected(/^\/path/); },         'RegEx provided').to.throw(Error);
-//         expect(() => { clamscan.is_infected(['foo']); },           'Array provided').to.throw(Error);
-//         expect(() => { clamscan.is_infected({}); },                'Object provided').to.throw(Error);
-//         expect(() => { clamscan.is_infected(NaN); },               'NaN provided').to.throw(Error);
-//         expect(() => { clamscan.is_infected(() => { return '/path/to/string'; }); }, 'Function provided').to.throw(Error);
-//         expect(() => { clamscan.is_infected(new String('/foo/bar')); },'String object provided').to.throw(Error);
-//     });
-//
-//     it('should require second parameter to be a callback function (if truthy value provided)', () => {
-//         expect(() => { clamscan.is_infected(good_scan_file); },                'nothing provided').to.not.throw(Error);
-//         expect(() => { clamscan.is_infected(good_scan_file, (err, file, is_infected) => {}) }, 'good function provided').to.not.throw(Error);
-//         expect(() => { clamscan.is_infected(good_scan_file, undefined); },     'undefined provided').to.not.throw(Error);
-//         expect(() => { clamscan.is_infected(good_scan_file, null); },          'null provided').to.not.throw(Error);
-//         expect(() => { clamscan.is_infected(good_scan_file, ''); },            'empty string provided').to.not.throw(Error);
-//         expect(() => { clamscan.is_infected(good_scan_file, false); },         'false provided').to.not.throw(Error);
-//         expect(() => { clamscan.is_infected(good_scan_file, NaN); },           'NaN provided').to.not.throw(Error);
-//         expect(() => { clamscan.is_infected(good_scan_file, true); },          'true provided').to.throw(Error);
-//         expect(() => { clamscan.is_infected(good_scan_file, 5); },             'integer provided').to.throw(Error);
-//         expect(() => { clamscan.is_infected(good_scan_file, 5.4); },           'float provided').to.throw(Error);
-//         expect(() => { clamscan.is_infected(good_scan_file, Infinity); },      'Infinity provided').to.throw(Error);
-//         expect(() => { clamscan.is_infected(good_scan_file, /^\/path/); },     'RegEx provided').to.throw(Error);
-//         expect(() => { clamscan.is_infected(good_scan_file, ['foo']); },       'Array provided').to.throw(Error);
-//         expect(() => { clamscan.is_infected(good_scan_file, {}); },            'Object provided').to.throw(Error);
-//     });
-//
-//     it('should return error if file not found', done => {
-//         clamscan.is_infected(__dirname + '/missing_file.txt', (err, file, is_infected) => {
-//             check(done, () => {
-//                 expect(err).to.be.instanceof(Error);
-//             });
-//         });
-//     });
-//
-//     it('should supply filename with path back after the file is scanned', done => {
-//         const scan_file = good_scan_file;
-//         clamscan.is_infected(scan_file, (err, file, is_infected) => {
-//             check(done, () => {
-//                 expect(err).to.not.be.instanceof(Error);
-//                 expect(file).to.not.be.empty;
-//                 file.should.be.a('string');
-//                 file.should.eql(scan_file);
-//             });
-//         });
-//     });
-//
-//     it('should respond with FALSE when file is not infected', done => {
-//         const scan_file = good_scan_file;
-//         clamscan.is_infected(scan_file, (err, file, is_infected) => {
-//             check(done, () => {
-//                 expect(err).to.not.be.instanceof(Error);
-//                 expect(is_infected).to.be.a('boolean');
-//                 expect(is_infected).to.eql(false);
-//             });
-//         });
-//     });
-//
-//     it('should respond with TRUE when non-archive file is infected', done => {
-//         const scan_file = __dirname + '/bad_scan_dir/bad_file_1.txt';
-//         request('https://secure.eicar.org/eicar_com.txt', (error, response, body) => {
-//             if (!error && response.statusCode == 200) {
-//                 fs.writeFileSync(scan_file, body);
-//
-//                 clamscan.is_infected(scan_file, (err, file, is_infected) => {
-//                     check(done, () => {
-//                         expect(err).to.not.be.instanceof(Error);
-//                         expect(is_infected).to.be.a('boolean');
-//                         expect(is_infected).to.eql(true);
-//
-//                         if (fs.existsSync(scan_file)) {
-//                             fs.unlinkSync(scan_file);
-//                         }
-//                     });
-//                 });
-//             } else {
-//                 console.log("Could not download test virus file!");
-//                 console.error(error);
-//             }
-//         });
-//     });
-// });
+describe('build_clam_flags', () => {
+    let clamscan;
+    beforeEach(async () => {
+        clamscan = await reset_clam();
+    });
+
+    it('should build an array', () => {
+        expect(clamscan.clam_flags).to.not.be.undefined;
+        expect(clamscan.clam_flags).to.be.an('array');
+    });
+
+    it('should build a series of flags', () => {
+        if (clamscan.settings.preference === 'clamdscan') {
+            clamscan.clam_flags.should.be.eql([
+              '--no-summary',
+              '--fdpass',
+              '--config-file=' + config.clamdscan.config_file,
+              '--multiscan',
+              '--move=' + config.quarantine_infected,
+              '--log=' + config.scan_log,
+            ]);
+        } else {
+            clamscan.clam_flags.should.be.eql([
+              '--no-summary',
+              '--log=' + config.scan_log,
+            ]);
+        }
+    });
+});
+
+describe('get_version', () => {
+    let clamscan;
+    beforeEach(async () => {
+        clamscan = await reset_clam();
+    });
+
+    it('should exist', () => {
+        should.exist(clamscan.get_version);
+    });
+    it('should be a function', () => {
+        clamscan.get_version.should.be.a('function');
+    });
+});
+
+describe('_init_socket', () => {
+    let clamscan;
+    beforeEach(async () => {
+        clamscan = await reset_clam();
+    });
+
+    it('should exist', () => {
+        should.exist(clamscan._init_socket);
+    });
+    it('should be a function', () => {
+        clamscan._init_socket.should.be.a('function');
+    });
+});
+
+describe('is_infected', () => {
+    let clamscan;
+    beforeEach(async () => {
+        clamscan = await reset_clam();
+    });
+
+    it('should exist', () => {
+        should.exist(clamscan.is_infected);
+    });
+    it('should be a function', () => {
+        clamscan.is_infected.should.be.a('function');
+    });
+
+    it('should require a string representing the path to a file to be scanned', () => {
+        // expect(() => clamscan.is_infected(good_scan_file),          'good string provided').to.not.be.rejectedWith(Error);
+        expect(async () => await clamscan.is_infected(good_scan_file),          'good string provided').to.not.be.rejectedWith(Error);
+        // expect(() => clamscan.is_infected(),                        'nothing provided').to.throw(Error);
+        // expect(() => clamscan.is_infected(undefined),               'nothing provided').to.throw(Error);
+        expect(async () => await clamscan.is_infected(null),                    'null provided').to.be.rejectedWith(Error);
+        expect(async () => await clamscan.is_infected(''),                      'empty string provided').to.be.rejectedWith(Error);
+        expect(async () => await clamscan.is_infected(false),                   'false provided').to.be.rejectedWith(Error);
+        expect(async () => await clamscan.is_infected(true),                    'true provided').to.be.rejectedWith(Error);
+        expect(async () => await clamscan.is_infected(5),                       'integer provided').to.be.rejectedWith(Error);
+        expect(async () => await clamscan.is_infected(5.4),                     'float provided').to.be.rejectedWith(Error);
+        expect(async () => await clamscan.is_infected(Infinity),                'Infinity provided').to.be.rejectedWith(Error);
+        expect(async () => await clamscan.is_infected(/^\/path/),               'RegEx provided').to.be.rejectedWith(Error);
+        expect(async () => await clamscan.is_infected(['foo']),                 'Array provided').to.be.rejectedWith(Error);
+        expect(async () => await clamscan.is_infected({}),                      'Object provided').to.be.rejectedWith(Error);
+        expect(async () => await clamscan.is_infected(NaN),                     'NaN provided').to.be.rejectedWith(Error);
+        expect(async () => await clamscan.is_infected(() => '/path/to/string'), 'Function provided').to.be.rejectedWith(Error);
+        expect(async () => await clamscan.is_infected(new String('/foo/bar')),  'String object provided').to.be.rejectedWith(Error);
+    });
+
+    it('should require second parameter to be a callback function (if truthy value provided)', () => {
+        expect(() => clamscan.is_infected(good_scan_file),                'nothing provided').to.not.throw(Error);
+        expect(() => clamscan.is_infected(good_scan_file, (err, file, is_infected) => {}), 'good function provided').to.not.throw(Error);
+        expect(() => clamscan.is_infected(good_scan_file, undefined),     'undefined provided').to.not.throw(Error);
+        expect(() => clamscan.is_infected(good_scan_file, null),          'null provided').to.not.throw(Error);
+        expect(() => clamscan.is_infected(good_scan_file, ''),            'empty string provided').to.not.throw(Error);
+        expect(() => clamscan.is_infected(good_scan_file, false),         'false provided').to.not.throw(Error);
+        expect(() => clamscan.is_infected(good_scan_file, NaN),           'NaN provided').to.not.throw(Error);
+        expect(() => clamscan.is_infected(good_scan_file, true),          'true provided').to.throw(Error);
+        expect(() => clamscan.is_infected(good_scan_file, 5),             'integer provided').to.throw(Error);
+        expect(() => clamscan.is_infected(good_scan_file, 5.4),           'float provided').to.throw(Error);
+        expect(() => clamscan.is_infected(good_scan_file, Infinity),      'Infinity provided').to.throw(Error);
+        expect(() => clamscan.is_infected(good_scan_file, /^\/path/),     'RegEx provided').to.throw(Error);
+        expect(() => clamscan.is_infected(good_scan_file, ['foo']),       'Array provided').to.throw(Error);
+        expect(() => clamscan.is_infected(good_scan_file, {}),            'Object provided').to.throw(Error);
+    });
+
+    describe('callback-style', () => {
+        let clamscan;
+        beforeEach(async () => {
+            clamscan = await reset_clam();
+        });
+
+        it('should return error if file not found', done => {
+            clamscan.is_infected(__dirname + '/missing_file.txt', (err, file, is_infected) => {
+                check(done, () => {
+                    expect(err).to.be.instanceof(Error);
+                });
+            });
+        });
+
+        it('should supply filename with path back after the file is scanned', done => {
+            const scan_file = good_scan_file;
+            clamscan.is_infected(scan_file, (err, file, is_infected) => {
+                check(done, () => {
+                    expect(err).to.not.be.instanceof(Error);
+                    expect(file).to.not.be.empty;
+                    file.should.be.a('string');
+                    file.should.eql(scan_file);
+                });
+            });
+        });
+
+        it('should respond with FALSE when file is not infected', done => {
+            const scan_file = good_scan_file;
+            clamscan.is_infected(scan_file, (err, file, is_infected) => {
+                check(done, () => {
+                    expect(err).to.not.be.instanceof(Error);
+                    expect(is_infected).to.be.a('boolean');
+                    expect(is_infected).to.eql(false);
+                });
+            });
+        });
+
+        it('should respond with TRUE when non-archive file is infected', done => {
+            const scan_file = __dirname + '/bad_scan_dir/bad_file_1.txt';
+            request('https://secure.eicar.org/eicar_com.txt', (error, response, body) => {
+                if (!error && response.statusCode == 200) {
+                    fs.writeFileSync(scan_file, body);
+
+                    clamscan.is_infected(scan_file, (err, file, is_infected) => {
+                        check(done, () => {
+                            expect(err).to.not.be.instanceof(Error);
+                            expect(is_infected).to.be.a('boolean');
+                            expect(is_infected).to.eql(true);
+
+                            if (fs.existsSync(scan_file)) {
+                                fs.unlinkSync(scan_file);
+                            }
+                        });
+                    });
+                } else {
+                    console.log("Could not download test virus file!");
+                    console.error(error);
+                }
+            });
+        });
+    });
+});
 //
 // // This is just an alias to 'is_infected', so, no need to test much more.
 // describe('scan_file', () => {
