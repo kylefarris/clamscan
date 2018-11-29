@@ -633,8 +633,6 @@ class NodeClam {
                 return (has_cb ? cb(err, file, null) : reject(err));
             }
 
-            console.log("valid File name: ", file);
-
             // Trim filename
             file = file.trim();
 
@@ -657,7 +655,7 @@ class NodeClam {
                         cb(new NodeClamError({stderr}, "The file was scanned but the ClamAV responded with an unexpected response."), file, null);
                     } else {
                         try {
-                            const is_infected = await self._process_result(stdout, self.settings.debug_mode);
+                            const is_infected = self._process_result(stdout);
                             return (has_cb ? cb(null, file, {is_infected}) : resolve({file, is_infected}));
                         } catch (e) {
                             const err = new NodeClamError({file, err: e}, "There was an error processing the results from ClamAV");
@@ -676,6 +674,11 @@ class NodeClam {
             };
 
             // See if we can find/read the file
+            // -----
+            // NOTE: Is it even necessary to do this since, in theory, the
+            // file's existance or permission could change between this check
+            // and the actual scan (even if it's highly unlikely)?
+            //-----
             try {
                 await fs_access(file, fs.constants.R_OK);
             } catch (e) {
@@ -701,7 +704,7 @@ class NodeClam {
                         client.on('data', async data => {
                             if (this.settings.debug_mode) console.log(`${this.debug_label}: Received response from remote clamd service.`);
                             try {
-                                const is_infected = await self._process_result(data.toString(), this.settings.debug_mode);
+                                const is_infected = this._process_result(data.toString());
                                 return (has_cb ? cb(null, file, is_infected) : resolve({file, is_infected}));
                             } catch (err) {
                                 return (has_cb ? cb(err, file, null) : reject(err));

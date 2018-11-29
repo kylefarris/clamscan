@@ -78,11 +78,18 @@ __NOTE:__ There are some breaking changes on this release. Since this is still a
 * Updated to `execFile` instead of `exec`
 * Improved test suite
 
-### 0.9.0 (2015-07-01)
+### 0.9.0-beta (2015-07-01) - Never Released
 
 * Added support for TCP/UNIX Domain socket communication to local or remote clamav services.
 * Added a `get_version` method.
-* NULL is now returned to the third paramter of the `is_infected` 
+* NULL is now returned to the third paramter of the `is_infected` when file is neither infected or clean (i.e. on unexpected response)
 * Created alias: `scan_file` for `is_infected`.
 * Created a `scan_stream` method.
 * Minor code clean-up
+
+### 1.0.0
+
+* Now requires at least Node v10.0.0
+* Code re-written in ES2018 code
+* Now supports a hybrid Promise/Callback API (supports async/await)
+* Now properly supports TCP/UNIX Domain socket communication to local or remote clamav services (with optional fallback to local binary via child process)
