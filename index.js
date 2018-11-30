@@ -19,7 +19,7 @@ const {exec, execSync, execFile, spawn} = child_process;
 const {promisify} = util;
 
 const recursive = require('recursive-readdir');
-const ClamAVChannel = require('./ClamAVChannel.js');
+const NodeClamTransform = require('./NodeClamTransform.js');
 
 // Convert some stuff to promises
 // const fs_stat = promisify(stat);
@@ -88,6 +88,7 @@ class NodeClam {
                 socket: false,
                 host: false,
                 port: false,
+                timeout: 60000, // 60 seconds
                 local_fallback: true,
                 path: '/usr/bin/clamdscan',
                 config_file: '/etc/clamd.conf',
@@ -262,16 +263,27 @@ class NodeClam {
     // -----
     //
     // ****************************************************************************
-    async reset(options={}) {
+    reset(options={}, cb) {
+        let has_cb = false;
+
+        // Verify second param, if supplied, is a function
+        if (cb && typeof cb !== 'function') {
+            throw new NodeClamError("Invalid cb provided to `reset`. Second paramter, if provided, must be a function!");
+        } else if (cb && typeof cb === 'function') {
+            has_cb = true;
+        }
+
         this.initialized = false;
         this.settings = Object.assign({}, this.defaults);
 
-        try {
-            await this.init(options);
-            return this;
-        } catch (err) {
-            throw err;
-        }
+        return new Promise(async (resolve, reject) => {
+            try {
+                await this.init(options);
+                return (has_cb ? cb(null, this) : resolve(this));
+            } catch (err) {
+                return (has_cb ? cb(err, null) : reject(err));
+            }
+        });
     }
 
     // *****************************************************************************
@@ -375,68 +387,66 @@ class NodeClam {
     // @param   Fucntion    cb      (optional) What to do when socket is established
     // @return  Promise
     // ****************************************************************************
-    _init_socket(label='clamscan_socket', cb) {
+    _init_socket() {
         return new Promise((resolve, reject) => {
-            const client = new net.Socket();
-            client.id = ++counter;
+            // Create a new Socket connection to Unix socket or remote server (in that order)
+            let client;
 
-            if (this.settings.clamdscan.socket) {
-                client.connect(this.settings.clamdscan.socket);
-            } else if (this.settings.clamdscan.port) {
+            // The fastest option is a local Unix socket
+            if (this.settings.clamdscan.socket)
+                client = net.createConnection({path: this.settings.clamdscan.socket});
+
+            // If a port is specified, we're going to be connecting via TCP
+            else if (this.settings.clamdscan.port) {
+                // If a host is specified (usually for a remote host)
                 if (this.settings.clamdscan.host) {
-                    client.connect(this.settings.clamdscan.port, this.settings.clamdscan.host);
-                } else {
-                    client.connect(this.settings.clamdscan.port);
+                    client = net.createConnection({host: this.settings.clamdscan.host, port: this.settings.clamdscan.port});
                 }
-
-                client.on('lookup', (err, address, family) => {
-                    if (err && this.settings.clamdscan.local_fallback !== true) {
-                        if (cb && typeof cb === 'function') return cb(err);
-                        return reject(err);
-                    }
-
-                    if (this.settings.debug_mode)
-                        console.log(`${this.debug_label}: Establishing connection to: ${address} (${(family ? `IPv ${family}` : 'Unknown IP Type')}) - ${label}`);
-                });
-            } else {
-                throw new NodeClamError("Unable not establish connection to clamd service: No socket or host/port combo provided!");
+                // Host can be ignored since the default is `localhost`
+                else {
+                    client = net.createConnection({port: this.settings.clamdscan.port});
+                }
             }
 
-            client.on('error', err => {
-                client.destroy();
-                if (this.settings.clamdscan.local_fallback !== true) throw err;
-                if (cb && typeof cb === 'function') return cb(err, client);
-                return reject(err);
-            });
+            // No valid option to connection can be determined
+            else throw new NodeClamError("Unable not establish connection to clamd service: No socket or host/port combo provided!");
 
-            client.on('timeout', () => {
-                if (this.settings.debug_mode) console.log(`${client.id}: ${this.debug_label}: Socket connection timed out: ${label}`);
-                client.close();
-            });
+            // Set the socket timeout if specified
+            if (this.settings.clamdscan.timeout) client.setTimeout(this.settings.clamdscan.timeout);
 
-            client.on('close', () => {
-                if (this.settings.debug_mode) console.log(`${client.id}: ${this.debug_label}: Socket connection closed: ${label}`);
-            });
+            // This is sort of a quasi-buffer thing for storing the replies from the socket
+            const chunks = [];
 
-            client.on('connect', () => {
-                if (this.settings.debug_mode) console.log(`${client.id}: ${this.debug_label}: Socket connection created: ${label}`);
-
-                // Determine information about what server the client is connected to
-                if (client.remotePort && client.remotePort.toString() === this.settings.clamdscan.port.toString()) {
-                    if (this.settings.debug_mode) console.log(`${this.debug_label}: using remote server: ${client.remoteAddress}:${client.remotePort}`);
-                } else if (this.settings.clamdscan.socket) {
-                    if (this.settings.debug_mode) console.log(`${this.debug_label}: using local unix domain socket: ${this.settings.clamdscan.socket}`);
-                } else {
-                    if (this.settings.debug_mode) {
-                        const meta = client.address();
-                        console.log(`${this.debug_label}: meta port value: ${meta.port} vs ${client.remotePort}`);
-                        console.log(`${this.debug_label}: meta address value: ${meta.address} vs ${client.remoteAddress}`);
-                        console.log(`${this.debug_label}: something is not working...`);
+            // Setup socket client listeners
+            client
+                .on('connect', () => {
+                    // Some basic debugging stuff...
+                    // Determine information about what server the client is connected to
+                    if (client.remotePort && client.remotePort.toString() === this.settings.clamdscan.port.toString()) {
+                        if (this.settings.debug_mode) console.log(`${this.debug_label}: using remote server: ${client.remoteAddress}:${client.remotePort}`);
+                    } else if (this.settings.clamdscan.socket) {
+                        if (this.settings.debug_mode) console.log(`${this.debug_label}: using local unix domain socket: ${this.settings.clamdscan.socket}`);
+                    } else {
+                        if (this.settings.debug_mode) {
+                            const meta = client.address();
+                            console.log(`${this.debug_label}: meta port value: ${meta.port} vs ${client.remotePort}`);
+                            console.log(`${this.debug_label}: meta address value: ${meta.address} vs ${client.remoteAddress}`);
+                            console.log(`${this.debug_label}: something is not working...`);
+                        }
                     }
-                }
-                if (cb && typeof cb === 'function') return cb(null, client);
-                return resolve(client);
-            });
+
+                    return resolve(client);
+                })
+                .on('timeout', () => {
+                    if (this.settings.debug_mode) console.log(`${client.id}: ${this.debug_label}: Socket connection timed out: ${label}`);
+                    client.close();
+                })
+                .on('close', () => {
+                    if (this.settings.debug_mode) console.log(`${client.id}: ${this.debug_label}: Socket connection closed: ${label}`);
+                })
+                // .on('data', chunk => chunks.push(chunk))
+                //.on('end', () => resolve(Buffer.concat(chunks)))
+                .on('error', reject);
         });
     }
 
@@ -1235,6 +1245,8 @@ class NodeClam {
         if (cb && typeof cb === 'function') has_cb = true;
 
         return new Promise(async (resolve, reject) => {
+            let finished = false;
+
             // Verify stream is passed to the first parameter
             if (!this._is_readable_stream(stream)) {
                 const err = new NodeClamError({stream}, "Invalid stream provided to scan.");
@@ -1247,35 +1259,58 @@ class NodeClam {
                 return (has_cb ? cb(err, null) : reject(err));
             }
 
-            // Where to buffer string response (not a real "Buffer", per se...)
-            let response_buffer = '';
-
             // Get a socket client
             try {
-                const client = await this._init_socket('scan_stream');
-                client.on('data', async data => {
-                    response_buffer += data;
+                // Get an instance of our stream tranform that coddles
+                // the chunks from the incoming stream to what ClamAV wants
+                const transform = new NodeClamTransform();
 
-                    if (/\\n/.test(data.toString())) {
-                        client.destroy();
-                        response_buffer = response_buffer.substring(0, response_buffer.indexOf("\n"));
-                        try {
-                            const result = await this._process_result(response_buffer);
-                            return (has_cb ? cb(null, result) : resolve(result));
-                        } catch (err) {
+                // Get a socket
+                const socket = await this._init_socket();
+
+                // Pipe the stream through our transform and into the ClamAV socket
+                stream.pipe(transform).pipe(socket);
+
+                // Setup the listeners for the stream
+                stream
+                    // The stream has dried up
+                    .on('end', () => {
+                        finished = true;
+                        stream.destroy();
+                    })
+                    // There was an error with the stream (ex. uploader closed browser)
+                    .on('error', err => {
+                        return (has_cb ? cb(err, null) : reject(err));
+                    });
+
+
+
+                // Where to buffer string response (not a real "Buffer", per se...)
+                const chunks = [];
+
+                // Read output of the ClamAV socket to see what it's saying and when
+                // it's done saying it (FIN)
+                socket
+                    // ClamAV is sending stuff to us
+                    .on('data', chunk => {
+                        if (!stream.isPaused()) stream.pause();
+                        chunks.push(chunk);
+                    })
+
+                    // ClamAV is done sending stuff to us
+                    .on('end', () => {
+                        const response = Buffer.concat(chunks);
+                        if (!finished) {
+                            const err = new NodeClamError('Scan aborted. Reply from server: ' + response.toString())
                             return (has_cb ? cb(err, null) : reject(err));
+                        } else {
+                            const result = this._process_result(response.toString());
+                            return (has_cb ? cb(null, result) : resolve(result));
                         }
-                    }
-                });
+                    })
             } catch (err) {
                 return (has_cb ? cb(err, null) : reject(err));
             }
-
-            // Pipe stream over ClamAV INSTREAM channel
-            const stream_channel = new ClamAVChannel();
-            stream.pipe(stream_channel).pipe(client).on('error', err => {
-                return (has_cb ? cb(err, null) : reject(err));
-            });
         })
     }
 }

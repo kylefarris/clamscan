@@ -5,7 +5,7 @@
 
 const { Transform } = require('stream');
 
-class ClamAVChannel extends Transform {
+class NodeClamTransform extends Transform {
     constructor(options) {
         super(options);
         this._inBody = false;
@@ -17,21 +17,19 @@ class ClamAVChannel extends Transform {
             this._inBody = true;
         }
 
-        const size = Buffer.from(new Array(4));
+        const size = Buffer.alloc(4);
         size.writeInt32BE(chunk.length, 0);
         this.push(size);
         this.push(chunk);
-
         cb();
     }
 
     _flush(cb) {
-        const size = Buffer.from(new Array(4));
+        const size = Buffer.alloc(4);
         size.writeInt32BE(0, 0);
         this.push(size);
-
         cb();
     }
 }
 
-module.exports = options => new ClamAVChannel(options);
+module.exports = NodeClamTransform;
