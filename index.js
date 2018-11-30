@@ -10,11 +10,13 @@ const util = require('util');
 const net = require('net');
 const fs = require('fs');
 const fsPromises = require('fs').promises;
-const node_path = require('path');
+const node_path = require('path'); // renamed to prevent conflicts in `scan_dir`
 const child_process = require('child_process');
 
 const fs_access = fsPromises.access;
-const fs_readfil = fsPromises.readFile;
+const fs_readfile = fsPromises.readFile;
+const fs_readdir = fsPromises.readdir;
+const fs_stat = fsPromises.stat;
 const {exec, execSync, execFile, spawn} = child_process;
 const {promisify} = util;
 
@@ -22,9 +24,6 @@ const recursive = require('recursive-readdir');
 const NodeClamTransform = require('./NodeClamTransform.js');
 
 // Convert some stuff to promises
-// const fs_stat = promisify(stat);
-// const fs_access = promisify(access);
-// const fs_readfile = promisify(readFile);
 const cp_exec = promisify(exec);
 const cp_execfile = promisify(execFile);
 
@@ -511,6 +510,17 @@ class NodeClam {
     }
 
     // ****************************************************************************
+    // Really basic method to check if the configured `host` is actually the localhost
+    // machine. It's not flawless but a decently acurate check for our purposes.
+    // -----
+    // @access  Private
+    // @return  Boolean         TRUE: Is localhost; FALSE: is not localhost.
+    // ****************************************************************************
+    _is_localhost() {
+        return ['127.0.0.1','localhost', os.hostname()].includes(this.settings.clamdscan.host);
+    }
+
+    // ****************************************************************************
     // Test to see if ab object is a readable stream.
     // -----
     // @access  Private
@@ -611,7 +621,7 @@ class NodeClam {
             // If user wants to connect via socket or TCP...
             if (this.settings.clamdscan.socket || this.settings.clamdscan.host) {
                 const chunks = [];
-                
+
                 try {
                     const client = await this._init_socket();
                     client.write('nVERSION\n');
@@ -788,7 +798,7 @@ class NodeClam {
     // @param   Function    end_cb      What to do after the scan
     // @param   Function    file_cb     What to do after each file has been scanned
     // ****************************************************************************
-    async scan_files(files=[], end_cb=null, file_cb=null) {
+    scan_files(files=[], end_cb=null, file_cb=null) {
         const self = this;
         let bad_files = [];
         let good_files = [];
@@ -1084,165 +1094,189 @@ class NodeClam {
     // ****************************************************************************
     // Scans an entire directory. Provides 3 params to end callback: Error, path
     // scanned, and whether its infected or not. To scan multiple directories, pass
-    // them as an array to the scan_files method.
+    // them as an array to the `scan_files` method.
     // -----
     // NOTE: While possible, it is NOT advisable to use the file_cb parameter when
     // using the clamscan binary. Doing so with clamdscan is okay, however. This
     // method also allows for non-recursive scanning with the clamdscan binary.
     // -----
     // @param   String      path        The directory to scan files of
-    // @param   Function    end_cb      What to do when all files have been scanned
-    // @param   Function    file_cb     What to do after each file has been scanned
+    // @param   Function    end_cb      (optional) What to do when all files have been scanned
+    // @param   Function    file_cb     (optional) What to do after each file has been scanned
+    // @return  Promise`
     // ****************************************************************************
-    async scan_dir(path='', end_cb=null, file_cb=null) {
+    scan_dir(path='', end_cb=null, file_cb=null) {
         const self = this;
+        let has_cb = false;
 
         // Verify second param, if supplied, is a function
-        if (!end_cb || (end_cb && typeof end_cb !== 'function')) {
+        if (end_cb && typeof end_cb !== 'function') {
             throw new NodeClamError("Invalid end-scan callback provided. Second paramter, if provided, must be a function!");
+        } else if (end_cb && typeof end_cb === 'function') {
+            has_cb = true;
         }
 
-        // Verify path provided is a string
-        if (!path || typeof path !== 'string' || path.length <= 0) {
-            throw new NodeClamError({path}, "Invalid path provided! Path must be a string!");
-        }
+        // At this point for the hybrid Promise/CB API to work, everything needs to be wrapped
+        // in a Promise that will be returned
+        return new Promise(async (resolve, reject) => {
+            // Verify `path` provided is a string
+            if (typeof file !== 'string' || (typeof file === 'string' && file.trim() === '')) {
+                const err = new NodeClamError({file}, "Invalid path provided! Path must be a string!");
+                return (has_cb ? end_cb(err, [], []) : reject(err));
+            }
 
-        // Normalize and then trim trailing slash
-        path = node_path.normalize(path).replace(/\/$/, '');
+            // Normalize and then trim trailing slash
+            path = node_path.normalize(path).replace(/\/$/, '');
 
-        // Make sure path exists...
-        try {
-            await fs_access(path, fs.constants.R_OK);
-        } catch (err) {
-            return end_cb(new NodeClamError({path}, "Invalid path specified to scan!"), [], []);
-        }
+            // Make sure path exists...
+            try {
+                await fs_access(path, fs.constants.R_OK);
+            } catch (e) {
+                const err = new NodeClamError({path, err:e}, "Invalid path specified to scan!")
+                return (has_cb ? end_cb(err, [], []) : reject(err));
+            }
 
-        // Execute the clam binary with the proper flags
-        const local_scan = async () => {
-            execFile(self.settings[self.scanner].path, self._build_clam_args(path), async (err, stdout, stderr) => {
-                if (self.settings.debug_mode) console.log(`${this.debug_label}: Scanning directory using local binary: ${path}`);
-                if (err || stderr) {
-                    if (err) {
-                        if (err.hasOwnProperty('code') && err.code === 1) {
-                            end_cb(null, [], [path]);
-                        } else {
-                            if (self.settings.debug_mode)
-                                console.log(`${this.debug_label} error: `, err);
-                            end_cb(new Error(err), [], [path]);
-                        }
+            // Execute the clam binary with the proper flags
+            const local_scan = async () => {
+                try {
+                    const {stdout, stderr} = await cp_execfile(self.settings[self.scanner].path, self._build_clam_args(path));
+
+                    if (stderr) {
+                        console.error(`${self.debug_label} error: `, stderr);
+                        return (has_cb ? end_cb(null, path, null) : resolve({stderr, path, is_infected: null}));
+                    }
+
+                    const is_infected = self._process_result(stdout);
+                    return (has_cb ? end_cb(null, path, is_infected) : resolve({path, is_infected}));
+                } catch (e) {
+                    if (e.hasOwnProperty('code') && e.code === 1) {
+                        end_cb(null, [], [path]);
                     } else {
-                        console.error(`${this.debug_label} error: `, stderr);
-                        end_cb(err, [], [path]);
+                        if (self.settings.debug_mode) console.log(`${self.debug_label} error: `, err);
+                        end_cb(new Error(err), [], [path]);
                     }
-                } else {
-                    try {
-                        const is_infected = await self._process_result(stdout);
-                        if (is_infected) return end_cb(null, [], [path]);
-                        return end_cb(null, [path], []);
-                    } catch (err) {
-                        cb(err, file, null);
-                    }
-                }
-            });
-        }
 
-        // Get all files recursively using scan_files if file_cb is supplied
-        if (this.settings.scan_recursively && typeof file_cb === 'function') {
-            execFile('find', [path], (err, stdout, stderr) => {
-                if (err || stderr) {
-                    if (this.settings.debug_mode) console.log(stderr);
-                    return end_cb(err, path, null);
-                } else {
+                    const err = new NodeClamError({path, err: e}, "Invalid path provided! Path must be a string!");
+                    return (has_cb ? end_cb(err, path, null) : reject(err));
+                }
+            }
+
+            // Get all files recursively using `scan_files`
+            if (this.settings.scan_recursively === true && (typeof file_cb === 'function' || !has_cb)) {
+                try {
+                    const {stdout, stderr} = await cp_execfile('find', [path]);
+
+                    if (stderr) {
+                        if (this.settings.debug_mode) console.log(stderr);
+                        return (has_cb ? end_cb(null, path, null) : resolve(null));
+                    }
+
                     const files = stdout.split("\n").map(path => path.replace(/ /g,'\\ '));
-                    this.scan_files(files, end_cb, file_cb);
+                    return this.scan_files(files, end_cb, file_cb);
+                } catch (e) {
+                    const err = new NodeClamError({path, err: e}, "Invalid path provided! Path must be a string!");
+                    return (has_cb ? end_cb(err, path, null) : reject(err));
                 }
-            });
-        }
+            }
 
-        // Clamdscan always does recursive, so, here's a way to avoid that if you want... will call scan_files method
-        else if (this.settings.scan_recursively === false && this.scanner === 'clamdscan') {
-            fs.readdir(path, (err, files) => {
-                const good_files = [];
-                ;(function get_file_stats() {
-                    if (files.length > 0) {
-                        let file = files.pop();
-                        file = node_path.join(path, file);
-                        fs.stat(file, (err, info) => {
-                            if (!err && info.isFile()) {
-                                good_files.push(file);
-                            } else {
-                                if (this.settings.debug_mode)
-                                    console.log(`${this.debug_label}: Error scanning file in directory: `, err);
-                            }
-                            get_file_stats();
-                        });
-                    } else {
-                        this.scan_files(good_files, end_cb, file_cb);
-                    }
-                })();
-            });
-        }
+            // Clamdscan always does recursive, so, here's a way to avoid that if you want... will call scan_files method
+            else if (this.settings.scan_recursively === false && this.scanner === 'clamdscan') {
+                try {
+                    const good_files = (await fs_readdir(path)).filter(async v => (await fs_stat(file)).isFile());
+                    return this.scan_files(good_files, end_cb, file_cb);
+                } catch (e) {
+                    const err = new NodeClamError({path, err: e}, "Could not read the file listing of the path provided.");
+                    return (has_cb ? end_cb(err, path, null) : reject(err));
+                }
+            }
 
-        // If you don't care about individual file progress (which is very slow for clamscan but fine for clamdscan...)
-        else if (typeof file_cb !== 'function') {
-            const  command = this.settings[this.scanner].path + this.clam_flags + path;
-            if (this.settings.debug_mode)
-                console.log(`${this.debug_label}: Configured clam command: ${this.settings[this.scanner].path} ${this._build_clam_args(path).join(' ')}`);
-
-            if (this.settings.clamdscan.socket || this.settings.clamdscan.host) {
-
-                // Scan using local unix domain socket (much simpler/faster process--potentially even more with MULTISCAN enabled)
-                if (this.settings.clamdscan.socket) {
+            // If you don't care about individual file progress (which is very slow for clamscan but fine for clamdscan...)
+            // NOTE: This section WILL scan recursively
+            else if (typeof file_cb !== 'function' || !has_cb) {
+                // Scan locally via socket (either TCP or Unix socket)
+                // This is much simpler/faster process--potentially even more with MULTISCAN enabled)
+                if (this.settings.clamdscan.socket || (this.settings.clamdscan.port && this._is_localhost())) {
                     try {
-                        const client = await this._init_socket('is_infected');
-                        if (this.settings.debug_mode) console.log(`${this.debug_label}: scanning with local domain socket now.`);
+                        const client = await this._init_socket();
+                        if (this.settings.debug_mode) console.log(`${this.debug_label}: scanning path with local domain socket now.`);
 
                         if (this.settings.clamdscan.multiscan === true) {
                             // Use Multiple threads (faster)
                             client.write(`MULTISCAN ${path}`);
                         } else {
                             // Use single or default # of threads (potentially slower)
-                            client.write(`SCAN ' + ${path}`);
+                            client.write(`SCAN ${path}`);
                         }
-                        client.on('data', async data => {
-                            if (this.settings.debug_mode) console.log(`${this.debug_label}: Received response from remote clamd service.`);
-                            try {
-                                const is_infected = await this._process_result(data.toString());
-                                if (is_infected) return end_cb(null, [], [path]);
-                                return end_cb(null, [path], []);
-                            } catch (err) {
-                                end_cb(err, file, null);
-                            }
-                        });
-                    } catch (err) {
 
+                        // Where to buffer string response (not a real "Buffer", per se...)
+                        const chunks = [];
+
+                        // Read output of the ClamAV socket to see what it's saying and when
+                        // it's done saying it (FIN)
+                        client
+                            // ClamAV is sending stuff to us
+                            .on('data', chunk => {
+                                chunks.push(chunk);
+                            })
+                            // ClamAV is done sending stuff to us
+                            .on('end', () => {
+                                if (this.settings.debug_mode) console.log(`${this.debug_label}: Received response from remote clamd service.`);
+                                const response = Buffer.concat(chunks);
+                                const result = this._process_result(response.toString());
+                                return (has_cb ? end_cb(null, path, result) : resolve({path, is_infected: result}));
+                            });
+                    } catch (e) {
+                        const err = new NodeClamError({path, err: e}, "There was an issue scanning the path provided.");
+                        return (has_cb ? end_cb(err, path, null) : reject(err));
                     }
                 }
 
-                // Scan using remote host/port and TCP protocol (must stream the file)
-                else {
-                    // Convert file to stream
-                    const stream = fs.createReadStream(file);
+                // Scan path recursively using remote host/port and TCP protocol (must stream every single file to it...)
+                // WARNING: This is going to be really slow
+                else if (this.settings.clamdscan.port && !this._is_localhost()) {
+                    // TODO: How??
+                    const results = [];
 
-                    // Attempt to scan the stream.
-                    this.scan_stream(stream, (err, is_infected) => {
+                    try {
+                        const {stdout, stderr} = await cp_execfile('find', [path]);
 
-                        // Kill file stream on response
-                        stream.destroy();
-
-                        // If there's an error (for any reason), try and fallback to binary scan
-                        if (err) {
-                            if (this.settings.clamdscan.local_fallback === true) return local_scan();
-
-                            if (is_infected) return end_cb(err, [], [path]);
-                            return end_cb(err, [path], []);
+                        if (stderr) {
+                            if (this.settings.debug_mode) console.log(stderr);
+                            return (has_cb ? end_cb(null, path, null) : resolve(null));
                         }
-                    });
+
+                        // Get the proper recursive list of files from the path
+                        const files = stdout.split("\n").map(path => path.replace(/ /g,'\\ '));
+
+                        // Send files to remove server in parallel chunks of 10
+                        const chunk_size = 10;
+                        while (files.length > 0) {
+                            let chunk = [];
+                            if (files.length > chunk_size) {
+                                chunk = files.splice(0, chunk_size);
+                            } else {
+                                chunk = files.splice(0);
+                            }
+
+                            // Scan 10 files then move to the next set...
+                            results.concat(await Promise.all(chunk.map(file => this.scan_stream(fs.createReadStream(file)))));
+                        }
+
+                        // If even a single file is infected, the whole directory is infected
+                        const is_infected = results.any(v => v === false);
+                        return (has_cb ? end_cb(null, path, is_infected) : resolve({path, is_infected}));
+                    } catch (e) {
+                        const err = new NodeClamError({path, err: e}, "Invalid path provided! Path must be a string!");
+                        return (has_cb ? end_cb(err, path, null) : reject(err));
+                    }
                 }
-            } else {
-                local_scan();
+
+                // Scan locally
+                else {
+                    local_scan();
+                }
             }
-        }
+        });
     }
 
     // ****************************************************************************

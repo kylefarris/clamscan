@@ -763,108 +763,111 @@ describe('scan_file', () => {
 //         });
 //     });
 // });
-//
-// describe('scan_dir', () => {
-//     reset_clam();
-//
-//     it('should exist', () => {
-//         should.exist(clamscan.scan_dir);
-//     });
-//     it('should be a function', () => {
-//         clamscan.scan_dir.should.be.a('function');
-//     });
-//
-//     it('should require a string representing the directory to be scanned', () => {
-//         const cb = (err, good_files, bad_files) => { };
-//         expect(() => { clamscan.scan_dir(good_scan_dir, cb); },'good string provided').to.not.throw(Error);
-//         expect(() => { clamscan.scan_dir(undefined, cb); },    'nothing provided').to.throw(Error);
-//         expect(() => { clamscan.scan_dir(null, cb); },         'null provided').to.throw(Error);
-//         expect(() => { clamscan.scan_dir('', cb); },           'empty string provided').to.throw(Error);
-//         expect(() => { clamscan.scan_dir(false, cb); },        'false provided').to.throw(Error);
-//         expect(() => { clamscan.scan_dir(true, cb); },         'true provided').to.throw(Error);
-//         expect(() => { clamscan.scan_dir(5, cb); },            'integer provided').to.throw(Error);
-//         expect(() => { clamscan.scan_dir(5.4, cb); },          'float provided').to.throw(Error);
-//         expect(() => { clamscan.scan_dir(Infinity, cb); },     'Infinity provided').to.throw(Error);
-//         expect(() => { clamscan.scan_dir(/^\/path/, cb); },    'RegEx provided').to.throw(Error);
-//         expect(() => { clamscan.scan_dir(['foo'], cb); },      'Array provided').to.throw(Error);
-//         expect(() => { clamscan.scan_dir({}, cb); },           'Object provided').to.throw(Error);
-//         expect(() => { clamscan.scan_dir(NaN, cb); },          'NaN provided').to.throw(Error);
-//         expect(() => { clamscan.scan_dir(() => { return '/path/to/string'; }, cb); }, 'Function provided').to.throw(Error);
-//         expect(() => { clamscan.scan_dir(new String('/foo/bar'), cb); },'String object provided').to.throw(Error);
-//     });
-//
-//     it('should require the second parameter to be a callback function', () => {
-//         const cb = (err, good_files, bad_files) => { };
-//         expect(() => { clamscan.scan_dir(good_scan_dir, cb); },            'good function provided').to.not.throw(Error);
-//         expect(() => { clamscan.scan_dir(good_scan_dir); },                'nothing provided').to.throw(Error);
-//         expect(() => { clamscan.scan_dir(good_scan_dir, undefined); },     'undefined provided').to.throw(Error);
-//         expect(() => { clamscan.scan_dir(good_scan_dir, null); },          'null provided').to.throw(Error);
-//         expect(() => { clamscan.scan_dir(good_scan_dir, ''); },            'empty string provided').to.throw(Error);
-//         expect(() => { clamscan.scan_dir(good_scan_dir, false); },         'false provided').to.throw(Error);
-//         expect(() => { clamscan.scan_dir(good_scan_dir, NaN); },           'NaN provided').to.throw(Error);
-//         expect(() => { clamscan.scan_dir(good_scan_dir, true); },          'true provided').to.throw(Error);
-//         expect(() => { clamscan.scan_dir(good_scan_dir, 5); },             'integer provided').to.throw(Error);
-//         expect(() => { clamscan.scan_dir(good_scan_dir, 5.4); },           'float provided').to.throw(Error);
-//         expect(() => { clamscan.scan_dir(good_scan_dir, Infinity); },      'Infinity provided').to.throw(Error);
-//         expect(() => { clamscan.scan_dir(good_scan_dir, /^\/path/); },     'RegEx provided').to.throw(Error);
-//         expect(() => { clamscan.scan_dir(good_scan_dir, ['foo']); },       'Array provided').to.throw(Error);
-//         expect(() => { clamscan.scan_dir(good_scan_dir, {}); },            'Object provided').to.throw(Error);
-//     });
-//
-//     it('should return error if directory not found', done => {
-//         clamscan.scan_dir(__dirname + '/missing_dir', (err, file, is_infected) => {
-//             check(done, () => {
-//                 expect(err).to.be.instanceof(Error);
-//             });
-//         });
-//     });
-//
-//     it('should supply good_files array with scanned path when directory has no infected files', done => {
-//         const scan_dir = good_scan_dir;
-//         clamscan.scan_dir(scan_dir, (err, good_files, bad_files) => {
-//             check(done, () => {
-//                 expect(err).to.not.be.instanceof(Error);
-//                 expect(good_files).to.be.an('array');
-//                 expect(good_files).to.have.length(1);
-//                 expect(good_files).to.include(scan_dir);
-//
-//                 expect(bad_files).to.be.an('array');
-//                 expect(bad_files).to.be.empty;
-//             });
-//         });
-//     });
-//
-//     it('should supply bad_files array with scanned path when directory has infected files', done => {
-//         const scan_dir = __dirname + '/bad_scan_dir';
-//         const scan_file = __dirname + '/bad_scan_dir/bad_file_1.txt';
-//
-//         request('https://secure.eicar.org/eicar_com.txt', (error, response, body) => {
-//             if (!error && response.statusCode == 200) {
-//                 fs.writeFileSync(scan_file, body);
-//
-//                 clamscan.scan_dir(scan_dir, (err, good_files, bad_files) => {
-//                     check(done, () => {
-//                         expect(err).to.not.be.instanceof(Error);
-//                         expect(bad_files).to.be.an('array');
-//                         expect(bad_files).to.have.length(1);
-//                         expect(bad_files).to.include(scan_dir);
-//
-//                         expect(good_files).to.be.an('array');
-//                         expect(good_files).to.be.empty;
-//
-//                         /* if (fs.existsSync(scan_file)) {
-//                             fs.unlinkSync(scan_file);
-//                         } */
-//                     });
-//                 });
-//             } else {
-//                 console.log("Could not download test virus file!");
-//                 console.error(error);
-//             }
-//         });
-//     });
-// });
-//
+
+describe('scan_dir', () => {
+    let clamscan;
+    before(async () => {
+        clamscan = await reset_clam();
+    });
+
+    it('should exist', () => {
+        should.exist(clamscan.scan_dir);
+    });
+    it('should be a function', () => {
+        clamscan.scan_dir.should.be.a('function');
+    });
+
+    it('should require a string representing the directory to be scanned', () => {
+        const cb = (err, good_files, bad_files) => { };
+        expect(() => { clamscan.scan_dir(good_scan_dir, cb); },'good string provided').to.not.throw(Error);
+        expect(() => { clamscan.scan_dir(undefined, cb); },    'nothing provided').to.throw(Error);
+        expect(() => { clamscan.scan_dir(null, cb); },         'null provided').to.throw(Error);
+        expect(() => { clamscan.scan_dir('', cb); },           'empty string provided').to.throw(Error);
+        expect(() => { clamscan.scan_dir(false, cb); },        'false provided').to.throw(Error);
+        expect(() => { clamscan.scan_dir(true, cb); },         'true provided').to.throw(Error);
+        expect(() => { clamscan.scan_dir(5, cb); },            'integer provided').to.throw(Error);
+        expect(() => { clamscan.scan_dir(5.4, cb); },          'float provided').to.throw(Error);
+        expect(() => { clamscan.scan_dir(Infinity, cb); },     'Infinity provided').to.throw(Error);
+        expect(() => { clamscan.scan_dir(/^\/path/, cb); },    'RegEx provided').to.throw(Error);
+        expect(() => { clamscan.scan_dir(['foo'], cb); },      'Array provided').to.throw(Error);
+        expect(() => { clamscan.scan_dir({}, cb); },           'Object provided').to.throw(Error);
+        expect(() => { clamscan.scan_dir(NaN, cb); },          'NaN provided').to.throw(Error);
+        expect(() => { clamscan.scan_dir(() => { return '/path/to/string'; }, cb); }, 'Function provided').to.throw(Error);
+        expect(() => { clamscan.scan_dir(new String('/foo/bar'), cb); },'String object provided').to.throw(Error);
+    });
+
+    it('should require the second parameter to be a callback function', () => {
+        const cb = (err, good_files, bad_files) => { };
+        expect(() => { clamscan.scan_dir(good_scan_dir, cb); },            'good function provided').to.not.throw(Error);
+        expect(() => { clamscan.scan_dir(good_scan_dir); },                'nothing provided').to.throw(Error);
+        expect(() => { clamscan.scan_dir(good_scan_dir, undefined); },     'undefined provided').to.throw(Error);
+        expect(() => { clamscan.scan_dir(good_scan_dir, null); },          'null provided').to.throw(Error);
+        expect(() => { clamscan.scan_dir(good_scan_dir, ''); },            'empty string provided').to.throw(Error);
+        expect(() => { clamscan.scan_dir(good_scan_dir, false); },         'false provided').to.throw(Error);
+        expect(() => { clamscan.scan_dir(good_scan_dir, NaN); },           'NaN provided').to.throw(Error);
+        expect(() => { clamscan.scan_dir(good_scan_dir, true); },          'true provided').to.throw(Error);
+        expect(() => { clamscan.scan_dir(good_scan_dir, 5); },             'integer provided').to.throw(Error);
+        expect(() => { clamscan.scan_dir(good_scan_dir, 5.4); },           'float provided').to.throw(Error);
+        expect(() => { clamscan.scan_dir(good_scan_dir, Infinity); },      'Infinity provided').to.throw(Error);
+        expect(() => { clamscan.scan_dir(good_scan_dir, /^\/path/); },     'RegEx provided').to.throw(Error);
+        expect(() => { clamscan.scan_dir(good_scan_dir, ['foo']); },       'Array provided').to.throw(Error);
+        expect(() => { clamscan.scan_dir(good_scan_dir, {}); },            'Object provided').to.throw(Error);
+    });
+
+    it('should return error if directory not found', done => {
+        clamscan.scan_dir(__dirname + '/missing_dir', (err, file, is_infected) => {
+            check(done, () => {
+                expect(err).to.be.instanceof(Error);
+            });
+        });
+    });
+
+    it('should supply good_files array with scanned path when directory has no infected files', done => {
+        const scan_dir = good_scan_dir;
+        clamscan.scan_dir(scan_dir, (err, good_files, bad_files) => {
+            check(done, () => {
+                expect(err).to.not.be.instanceof(Error);
+                expect(good_files).to.be.an('array');
+                expect(good_files).to.have.length(1);
+                expect(good_files).to.include(scan_dir);
+
+                expect(bad_files).to.be.an('array');
+                expect(bad_files).to.be.empty;
+            });
+        });
+    });
+
+    it('should supply bad_files array with scanned path when directory has infected files', done => {
+        const scan_dir = __dirname + '/bad_scan_dir';
+        const scan_file = __dirname + '/bad_scan_dir/bad_file_1.txt';
+
+        request('https://secure.eicar.org/eicar_com.txt', (error, response, body) => {
+            if (!error && response.statusCode == 200) {
+                fs.writeFileSync(scan_file, body);
+
+                clamscan.scan_dir(scan_dir, (err, good_files, bad_files) => {
+                    check(done, () => {
+                        expect(err).to.not.be.instanceof(Error);
+                        expect(bad_files).to.be.an('array');
+                        expect(bad_files).to.have.length(1);
+                        expect(bad_files).to.include(scan_dir);
+
+                        expect(good_files).to.be.an('array');
+                        expect(good_files).to.be.empty;
+
+                        /* if (fs.existsSync(scan_file)) {
+                            fs.unlinkSync(scan_file);
+                        } */
+                    });
+                });
+            } else {
+                console.log("Could not download test virus file!");
+                console.error(error);
+            }
+        });
+    });
+});
+
 describe('scan_stream', () => {
     let clamscan;
     before(async () => {
