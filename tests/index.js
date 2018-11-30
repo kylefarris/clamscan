@@ -1016,10 +1016,20 @@ describe('get_version', () => {
         clamscan.get_version.should.be.a('function');
     });
 
-    it('should respond with some version', async () => {
+    it('should respond with some version (Promise API)', async () => {
         const version = await clamscan.get_version();
         expect(version).to.be.a('string');
         // This may not always be the case... so, it cane be removed if necessary
         expect(version).to.match(/^ClamAV \d+\.\d+\.\d+\/\d+\//);
-    })
+    });
+
+    it('should respond with some version (Callback API)', done => {
+        clamscan.get_version((err, version) => {
+            check(done, () => {
+                expect(err).to.not.be.instanceof(Error);
+                expect(version).to.be.a('string');
+                expect(version).to.match(/^ClamAV \d+\.\d+\.\d+\/\d+\//);
+            });
+        });
+    });
 });
