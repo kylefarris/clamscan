@@ -1001,3 +1001,25 @@ describe('scan_stream', () => {
         });
     });
 });
+
+describe('get_version', () => {
+    let clamscan;
+    before(async () => {
+        clamscan = await reset_clam();
+    });
+
+    it('should exist', () => {
+        should.exist(clamscan.get_version);
+    });
+
+    it('should be a function', () => {
+        clamscan.get_version.should.be.a('function');
+    });
+
+    it('should respond with some version', async () => {
+        const version = await clamscan.get_version();
+        expect(version).to.be.a('string');
+        // This may not always be the case... so, it cane be removed if necessary
+        expect(version).to.match(/^ClamAV \d+\.\d+\.\d+\/\d+\//);
+    })
+});

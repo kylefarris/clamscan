@@ -563,58 +563,75 @@ class NodeClam {
     // ****************************************************************************
     // Establish the clamav version of a local or remote clamav daemon
     // -----
-    // @param   Function    cb  What to do when version is established
-    // @return  VOID
+    // @param   Function    cb  (optional) What to do when version is established
+    // @return  Promise
     // ****************************************************************************
-    async get_version(cb) {
+    get_version(cb) {
         const self = this;
+        let has_cb = false;
 
-        // Function for falling back to running a scan locally via a child process
-        const local_fallback = () => {
-            const command = self.settings[self.scanner].path + self.clam_flags + '--version';
+        // Verify second param, if supplied, is a function
+        if (cb && typeof cb !== 'function')
+            throw new NodeClamError("Invalid cb provided to scan_stream. Second paramter must be a function!");
 
-            if (self.settings.debug_mode) {
-                console.log(`${this.debug_label}: Configured clam command: ${self.settings[self.scanner].path} ${self._build_clam_args(file).join(' ')}`);
-            }
+        // Making things simpler
+        if (cb && typeof cb === 'function') has_cb = true;
 
-            // Execute the clam binary with the proper flags
-            execFile(self.settings[self.scanner].path, self._build_clam_args(file), (err, stdout, stderr) => {
-                if (cmd_err) {
-                    if (err.hasOwnProperty('code') && err.code === 1) return cb(null, stdout);
+        return new Promise(async (resolve, reject) => {
+            // Function for falling back to running a scan locally via a child process
+            const local_fallback = async () => {
+                const command = self.settings[self.scanner].path + self.clam_flags + '--version';
 
-                    if (self.settings.debug_mode) console.log(`${this.debug_label}: ${cmd_err}`);
-                    return cb(new Error(cmd_err), null);
-                } else {
-                    if (self.settings.debug_mode) console.log(`${this.debug_label}: ${stderr}`);
-                    return cb(cmd_err, null);
+                if (self.settings.debug_mode) {
+                    console.log(`${this.debug_label}: Configured clam command: ${self.settings[self.scanner].path} ${self._build_clam_args(file).join(' ')}`);
                 }
 
-                return cb(null, stdout);
-            });
-        };
+                // Execute the clam binary with the proper flags
+                try {
+                    const {stdout, stderr} = await execFile(self.settings[self.scanner].path, self._build_clam_args(file));
 
-        // If user wants to connect via socket or TCP...
-        if (this.settings.clamdscan.socket || this.settings.clamdscan.host) {
-            if (this.settings.debug_mode) console.log(`${this.debug_label}: Getting socket client for version fetch.`);
-
-            try {
-                const client = await this._init_socket('version_fetch');
-                if (this.settings.debug_mode) console.log(`${this.debug_label}: Version fetch socket initialized.`);
-                client.write('VERSION');
-                client.on('data', data => {
-                    if (this.settings.debug_mode) console.log(`${this.debug_label}: Version ascertained: ${data.toString()}`);
-                    cb(null, data.toString());
-                });
-            } catch (err) {
-                if (this.settings.clamdscan.local_fallback === true) {
-                    return local_fallback();
-                } else {
-                    throw err;
+                    if (stderr) {
+                        const err = new NodeClamError({stderr, file}, "ClamAV responded with an unexpected response when requesting version.");
+                        if (self.settings.debug_mode) console.log(`${this.debug_label}: `, err);
+                        return (has_cb ? cb(err, file, null) : reject(err));
+                    } else {
+                        return (has_cb ? cb(null, stdout) : resolve(stdout));
+                    }
+                } catch (e) {
+                    if (e.hasOwnProperty('code') && e.code === 1) {
+                        return (has_cb ? cb(null, null) : resolve(null, null));
+                    } else {
+                        const err = new NodeClamError({err: e}, "There was an error requestion ClamAV version.");
+                        if (self.settings.debug_mode) console.log(`${this.debug_label}: `, err);
+                        return (has_cb ? cb(err, null) : reject(err));
+                    }
                 }
+            };
+
+            // If user wants to connect via socket or TCP...
+            if (this.settings.clamdscan.socket || this.settings.clamdscan.host) {
+                const chunks = [];
+                
+                try {
+                    const client = await this._init_socket();
+                    client.write('nVERSION\n');
+                    // ClamAV is sending stuff to us
+                    client.on('data', chunk => chunks.push(chunk))
+                    client.on('end', () => {
+                        const response = Buffer.concat(chunks);
+                        return (has_cb ? cb(null, response.toString()) : resolve(response.toString()));
+                    });
+                } catch (err) {
+                    if (this.settings.clamdscan.local_fallback === true) {
+                        return local_fallback();
+                    } else {
+                        return (has_cb ? cb(err, null) : resolve(err));
+                    }
+                }
+            } else {
+                return local_fallback();
             }
-        } else {
-            return local_fallback();
-        }
+        });
     }
 
     // ****************************************************************************
@@ -661,8 +678,9 @@ class NodeClam {
                     const {stdout, stderr} = await execFile(self.settings[self.scanner].path, self._build_clam_args(file));
 
                     if (stderr) {
-                        if (self.settings.debug_mode) console.log(`${this.debug_label}: ${stderr}`);
-                        cb(new NodeClamError({stderr}, "The file was scanned but the ClamAV responded with an unexpected response."), file, null);
+                        const err = new NodeClamError({stderr, file}, "The file was scanned but the ClamAV responded with an unexpected response.");
+                        if (self.settings.debug_mode) console.log(`${this.debug_label}: `, err);
+                        return (has_cb ? cb(err, file, null) : reject(err));
                     } else {
                         try {
                             const is_infected = self._process_result(stdout);
