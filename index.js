@@ -798,7 +798,7 @@ class NodeClam {
     // @param   Function    end_cb      What to do after the scan
     // @param   Function    file_cb     What to do after each file has been scanned
     // ****************************************************************************
-    scan_files(files=[], end_cb=null, file_cb=null) {
+    async scan_files(files=[], end_cb=null, file_cb=null) {
         const self = this;
         let bad_files = [];
         let good_files = [];
@@ -1120,8 +1120,8 @@ class NodeClam {
         // in a Promise that will be returned
         return new Promise(async (resolve, reject) => {
             // Verify `path` provided is a string
-            if (typeof file !== 'string' || (typeof file === 'string' && file.trim() === '')) {
-                const err = new NodeClamError({file}, "Invalid path provided! Path must be a string!");
+            if (typeof path !== 'string' || (typeof path === 'string' && path.trim() === '')) {
+                const err = new NodeClamError({path}, "Invalid path provided! Path must be a string!");
                 return (has_cb ? end_cb(err, [], []) : reject(err));
             }
 
@@ -1140,24 +1140,23 @@ class NodeClam {
             const local_scan = async () => {
                 try {
                     const {stdout, stderr} = await cp_execfile(self.settings[self.scanner].path, self._build_clam_args(path));
+                    const is_infected = self._process_result(stdout);
 
                     if (stderr) {
                         console.error(`${self.debug_label} error: `, stderr);
-                        return (has_cb ? end_cb(null, path, null) : resolve({stderr, path, is_infected: null}));
+                        return (has_cb ? end_cb(null, [], []) : resolve({stderr, path, is_infected, good_files: [], bad_files: []}));
                     }
 
-                    const is_infected = self._process_result(stdout);
-                    return (has_cb ? end_cb(null, path, is_infected) : resolve({path, is_infected}));
+                    const good_files = (infected ? [] : [path]);
+                    const bad_files = (infected ? [path] : []);
+                    return (has_cb ? end_cb(null, good_files, bad_files) : resolve({path, is_infected, good_files, bad_files}));
                 } catch (e) {
                     if (e.hasOwnProperty('code') && e.code === 1) {
-                        end_cb(null, [], [path]);
+                        return (has_cb ? end_cb(null, [], [path]) : resolve({path, is_infected, bad_files: [], good_files: [path]}));
                     } else {
-                        if (self.settings.debug_mode) console.log(`${self.debug_label} error: `, err);
-                        end_cb(new Error(err), [], [path]);
+                        const err = new NodeClamError({path, err: e}, "There was an error scanning the path or processing the result.");
+                        return (has_cb ? end_cb(err, [], []) : reject(err));
                     }
-
-                    const err = new NodeClamError({path, err: e}, "Invalid path provided! Path must be a string!");
-                    return (has_cb ? end_cb(err, path, null) : reject(err));
                 }
             }
 
@@ -1167,26 +1166,26 @@ class NodeClam {
                     const {stdout, stderr} = await cp_execfile('find', [path]);
 
                     if (stderr) {
-                        if (this.settings.debug_mode) console.log(stderr);
-                        return (has_cb ? end_cb(null, path, null) : resolve(null));
+                        console.log(`${this.debug_label}: `, stderr);
+                        return (has_cb ? end_cb(null, [], []) : resolve({stderr, path, is_infected, good_files: [], bad_files: []}));
                     }
 
                     const files = stdout.split("\n").map(path => path.replace(/ /g,'\\ '));
                     return this.scan_files(files, end_cb, file_cb);
                 } catch (e) {
-                    const err = new NodeClamError({path, err: e}, "Invalid path provided! Path must be a string!");
-                    return (has_cb ? end_cb(err, path, null) : reject(err));
+                    const err = new NodeClamError({path, err: e}, "There was an issue scanning the path specified!");
+                    return (has_cb ? end_cb(err, [], []) : reject(err));
                 }
             }
 
-            // Clamdscan always does recursive, so, here's a way to avoid that if you want... will call scan_files method
+            // Clamdscan always does recursive, so, here's a way to avoid that if you want (will call `scan_files` method)
             else if (this.settings.scan_recursively === false && this.scanner === 'clamdscan') {
                 try {
-                    const good_files = (await fs_readdir(path)).filter(async v => (await fs_stat(file)).isFile());
-                    return this.scan_files(good_files, end_cb, file_cb);
+                    const all_files = (await fs_readdir(path)).filter(async v => (await fs_stat(file)).isFile());
+                    return this.scan_files(all_files, end_cb, file_cb);
                 } catch (e) {
                     const err = new NodeClamError({path, err: e}, "Could not read the file listing of the path provided.");
-                    return (has_cb ? end_cb(err, path, null) : reject(err));
+                    return (has_cb ? end_cb(err, [], []) : reject(err));
                 }
             }
 
@@ -1222,27 +1221,28 @@ class NodeClam {
                             .on('end', () => {
                                 if (this.settings.debug_mode) console.log(`${this.debug_label}: Received response from remote clamd service.`);
                                 const response = Buffer.concat(chunks);
-                                const result = this._process_result(response.toString());
-                                return (has_cb ? end_cb(null, path, result) : resolve({path, is_infected: result}));
+                                const is_infected = this._process_result(response.toString());
+                                const good_files = (is_infected ? [] : [path]);
+                                const bad_files = (is_infected ? [path] : []);
+                                return (has_cb ? end_cb(null, good_files, bad_files) : resolve({path, is_infected, good_files, bad_files}));
                             });
                     } catch (e) {
                         const err = new NodeClamError({path, err: e}, "There was an issue scanning the path provided.");
-                        return (has_cb ? end_cb(err, path, null) : reject(err));
+                        return (has_cb ? end_cb(err, [], []) : reject(err));
                     }
                 }
 
                 // Scan path recursively using remote host/port and TCP protocol (must stream every single file to it...)
                 // WARNING: This is going to be really slow
                 else if (this.settings.clamdscan.port && !this._is_localhost()) {
-                    // TODO: How??
                     const results = [];
 
                     try {
                         const {stdout, stderr} = await cp_execfile('find', [path]);
 
                         if (stderr) {
-                            if (this.settings.debug_mode) console.log(stderr);
-                            return (has_cb ? end_cb(null, path, null) : resolve(null));
+                            console.log(`${this.debug_label}: `, stderr);
+                            return (has_cb ? end_cb(null, [], []) : resolve({stderr, path, is_infected, good_files: [], bad_files: []}));
                         }
 
                         // Get the proper recursive list of files from the path
@@ -1264,10 +1264,12 @@ class NodeClam {
 
                         // If even a single file is infected, the whole directory is infected
                         const is_infected = results.any(v => v === false);
-                        return (has_cb ? end_cb(null, path, is_infected) : resolve({path, is_infected}));
+                        const good_files = (is_infected ? [] : [path]);
+                        const bad_files = (is_infected ? [path] : []);
+                        return (has_cb ? end_cb(null, good_files, bad_files) : resolve({path, is_infected, good_files, bad_files}));
                     } catch (e) {
                         const err = new NodeClamError({path, err: e}, "Invalid path provided! Path must be a string!");
-                        return (has_cb ? end_cb(err, path, null) : reject(err));
+                        return (has_cb ? end_cb(err, [], []) : reject(err));
                     }
                 }
 
