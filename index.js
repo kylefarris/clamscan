@@ -713,7 +713,7 @@ class NodeClam {
 
             // See if we can find/read the file
             // -----
-            // NOTE: Is it even necessary to do this since, in theory, the
+            // NOTE: Is it even valid to do this since, in theory, the
             // file's existance or permission could change between this check
             // and the actual scan (even if it's highly unlikely)?
             //-----
@@ -722,6 +722,26 @@ class NodeClam {
             } catch (e) {
                 const err = new NodeClamError({err: e, file}, `Could not find file to scan!`);
                 return (has_cb ? cb(err, file, true) : reject(err));
+            }
+
+            // Make sure the "file" being scanned is actually a file and not a directory (or something else)
+            try {
+                const stats = await fs_stat(file);
+                const is_directory = stats.isDirectory();
+                const is_file = stats.isFile();
+
+                // If it's not a file or a directory, fail now
+                if (!is_file && !is_directory) {
+                    throw Error(`${file} is not a valid file or directory.`);
+                }
+
+                // If it's a directory/path, scan it useing the `scan_dir` method instead
+                else if (!is_file && is_directory) {
+                    const {is_infected} = await this.scan_dir(file);
+                    return (has_cb ? cb(null, file, is_infected) : resolve({file, is_infected}));
+                }
+            } catch (err) {
+                return (has_cb ? cb(err, file, null) : reject(err));
             }
 
             // If user wants to scan via socket or TCP...
@@ -798,297 +818,302 @@ class NodeClam {
     // @param   Function    end_cb      What to do after the scan
     // @param   Function    file_cb     What to do after each file has been scanned
     // ****************************************************************************
-    async scan_files(files=[], end_cb=null, file_cb=null) {
+    scan_files(files=[], end_cb=null, file_cb=null) {
         const self = this;
-        let bad_files = [];
-        let good_files = [];
-        let completed_files = 0;
-        let last_err = null;
-        let file;
-        let file_list;
+        let has_cb = false;
+
+        // Verify third param, if supplied, is a function
+        if (file_cb && typeof file_cb !== 'function')
+            throw new NodeClamError("Invalid file callback provided to `scan_files`. Third paramter, if provided, must be a function!");
 
         // Verify second param, if supplied, is a function
         if (end_cb && typeof end_cb !== 'function') {
-            throw new NodeClamError("Invalid end-scan callback provided. Second paramter, if provided, must be a function!");
+            throw new NodeClamError("Invalid end-scan callback provided to `scan_files`. Second paramter, if provided, must be a function!");
+        } else if (end_cb && typeof end_cb === 'function') {
+            has_cb = true;
         }
 
-        // Verify third param, if supplied, is a function
-        if (file_cb && typeof file_cb !== 'function') {
-            throw new NodeClamError("Invalid per-file callback provided. Third paramter, if provided, must be a function!");
-        }
+        // We should probably have some reasonable limit on the number of files to scan
+        if (files && Array.isArray(files) && files.length > 1000000)
+            throw new NodeClamError({num_files: files.length}, `NodeClam has haulted because more than 1 million files were about to be scanned. We suggest taking a different approach.`);
 
-        // The function that parses the stdout from clamscan/clamdscan
-        const parse_stdout = (err, stdout) => {
-            stdout.trim()
-                .split(String.fromCharCode(10))
-                .forEach(result => {
-                    if (/^[\-]+$/.test(result)) return;
+        // At this point for a hybrid Promise/CB API to work, everything needs to be wrapped
+        // in a Promise that will be returned
+        return new Promise(async (resolve, reject) => {
+            const errors = {};
+            let bad_files = [];
+            let good_files = [];
+            let orig_num_files = 0;
 
-                    //console.log("PATH: " + result)
-                    const path = result.match(/^(.*): /);
-                    if (path && path.length > 0) {
-                        path = path[1];
-                    } else {
-                        path = '<Unknown File Path!>';
-                    }
+            // The function that parses the stdout from clamscan/clamdscan
+            const parse_stdout = (err, stdout) => {
+                stdout.trim()
+                    .split(String.fromCharCode(10))
+                    .forEach(result => {
+                        if (/^[\-]+$/.test(result)) return;
 
-                    if (/OK$/.test(result)) {
-                        if (self.settings.debug_mode){
-                            console.log(`${this.debug_label}: ${path} is OK!`);
-                        }
-                        good_files.push(path);
-                    } else {
-                        if (self.settings.debug_mode){
-                            console.log(`${this.debug_label}: ${path} is INFECTED!`);
-                        }
-                        bad_files.push(path);
-                    }
-                });
-
-            bad_files = Array.from(new Set(bad_files));
-            if (err) return end_cb(err, [], bad_files);
-            return end_cb(null, good_files, bad_files);
-        };
-
-        // Use this method when scanning using local binaries
-        const local_scan = () => {
-            // Get array of escaped file names
-            const items = files.map(file => file.replace(/ /g,'\\ '));
-
-            // Build the actual command to run
-            const command = self.settings[self.scanner].path + self.clam_flags + items;
-            if (self.settings.debug_mode)
-                console.log(`${this.debug_label}: Configured clam command: ${self.settings[self.scanner].path} ${self._build_clam_args(items).join(' ')}`);
-
-            // Execute the clam binary with the proper flags
-            execFile(self.settings[self.scanner].path, self._build_clam_args(items), (err, stdout, stderr) => {
-                if (self.settings.debug_mode) console.log(`${this.debug_label}: stdout:`, stdout);
-
-                if (err && stderr) {
-                    if (self.settings.debug_mode){
-                        console.log(`${this.debug_label}: An error occurred.`);
-                        console.error(err);
-                        console.log(`${this.debug_label}: ${stderr}`);
-                    }
-
-                    if (stderr.length > 0) {
-                        bad_files = stderr.split(os.EOL).map(err_line => {
-                            const match = err_line.match(/^ERROR: Can't access file (.*)+$/);
-                            if (match !== null && match.length > 1 && typeof match[1] === 'string') return match[1];
-                            return '';
-                        });
-
-                        bad_files = bad_files.filter(v => !!v);
-                    }
-                }
-
-                return parse_stdout(err, stdout);
-            });
-        };
-
-        // The function that actually scans the files
-        const do_scan = files => {
-            const num_files = files.length;
-
-            if (self.settings.debug_mode) console.log(`${this.debug_label}: Scanning a list of ${num_files} passed files.`);
-
-            // Slower but more verbose/informative way...
-            if (typeof file_cb === 'function') {
-                ;(function scan_file() {
-                    file = files.shift();
-                    self.is_infected(file, (err, file, infected) => {
-                        completed_files++;
-
-                        if (self.settings.debug_mode)
-                            console.log(`${this.debug_label}: ${completed_files}/${num_files} have been scanned!`);
-
-                        if (infected || err) {
-                            if (err) last_err = err;
-                            bad_files.push(file);
-                        } else if (!err && !infected) {
-                            good_files.push(file);
+                        //console.log("PATH: " + result)
+                        const path = result.match(/^(.*): /);
+                        if (path && path.length > 0) {
+                            path = path[1];
+                        } else {
+                            path = '<Unknown File Path!>';
                         }
 
-                        if (file_cb && typeof file_cb === 'function') file_cb(err, file, infected);
-
-                        if (completed_files >= num_files) {
-                            bad_files = Array.from(new Set(bad_files));
-                            if (self.settings.debug_mode) {
-                                console.log(`${this.debug_label}: Scan Complete!`);
-                                console.log(`${this.debug_label}: The Bad Files: `, bad_files);
-                                console.log(`${this.debug_label}: The Good Files: `, good_files);
-                            }
-                            if (end_cb && typeof end_cb === 'function') end_cb(last_err, good_files, bad_files);
-                        }
-                        // All files have not been scanned yet, scan next item.
-                        else {
-                            // Using setTimeout to avoid crazy stack trace madness.
-                            setTimeout(scan_file, 0);
+                        if (/OK$/.test(result)) {
+                            if (self.settings.debug_mode) console.log(`${this.debug_label}: ${path} is OK!`);
+                            good_files.push(path);
+                        } else {
+                            if (self.settings.debug_mode) console.log(`${this.debug_label}: ${path} is INFECTED!`);
+                            bad_files.push(path);
                         }
                     });
-                })();
+
+                bad_files = Array.from(new Set(bad_files));
+                good_files = Array.from(new Set(good_files));
+
+                return (has_cb ? end_cb(err, [], []) : reject(err));
+
+                if (err) return (has_cb ? end_cb(err, [], bad_files) : reject(new NodeClamError({bad_files}, err)));
+                return (has_cb ? end_cb(null, good_files, bad_files) : resolve({good_files, bad_files}));
+            };
+
+            // Use this method when scanning using local binaries
+            const local_scan = async () => {
+                // Get array of escaped file names
+                const items = files.map(file => file.replace(/ /g,'\\ '));
+
+                // Build the actual command to run
+                const command = self.settings[self.scanner].path + self.clam_flags + items.join(' ');
+                if (self.settings.debug_mode)
+                    if (self.settings.debug_mode) console.log(`${self.debug_label}: Configured clam command: ${self.settings[self.scanner].path} ${self._build_clam_args(items).join(' ')}`);
+
+                // Execute the clam binary with the proper flags
+                try {
+                    const {stdout, stderr} = await cp_execfile(self.settings[self.scanner].path, self._build_clam_args(items));
+                    if (self.settings.debug_mode) console.log(`${this.debug_label}: stdout:`, stdout);
+
+                    if (stderr) {
+                        if (self.settings.debug_mode) console.log(`${this.debug_label}: `, stderr);
+
+                        if (stderr.length > 0) {
+                            bad_files = stderr.split(os.EOL).map(err_line => {
+                                const match = err_line.match(/^ERROR: Can't access file (.*)+$/);
+                                if (match !== null && match.length > 1 && typeof match[1] === 'string') return match[1];
+                                return '';
+                            });
+
+                            bad_files = bad_files.filter(v => !!v);
+                        }
+                    }
+
+                    return parse_stdout(err, stdout);
+                } catch (e) {
+                    return parse_stdout(e, null);
+                }
+            };
+
+            // This is the function that actually scans the files
+            const do_scan = async files => {
+                const num_files = files.length;
+
+                if (self.settings.debug_mode) console.log(`${this.debug_label}: Scanning a list of ${num_files} passed files.`);
+
+                // Slower but more verbose/informative way...
+                if (file_cb && typeof file_cb === 'function') {
+                    // Scan files in parallel chunks of 10
+                    const chunk_size = 10;
+                    let results = [];
+                    while (files.length > 0) {
+                        let chunk = [];
+                        if (files.length > chunk_size) {
+                            chunk = files.splice(0, chunk_size);
+                        } else {
+                            chunk = files.splice(0);
+                        }
+
+                        // Scan 10 files then move to the next set...
+                        const chunk_results = await Promise.all(chunk.map(file => this.is_infected(file)));
+
+                        // Re-map results back to their filenames
+                        const chunk_results_mapped = chunk_results.map((v,i) => [chunk[i], v]);
+
+                        // Trigger file-callback for each file that was just scanned
+                        chunk_results_mapped.forEach(v => file_cb(err, v[0], v[1]));
+
+                        // Add mapped chunk results to overall scan results array
+                        results = results.concat(chunk_results_mapped);
+                    }
+
+                    // Build out the good and bad files arrays
+                    final_results.forEach(v => {
+                        if (v[1] === true) bad_files.push(v[0]);
+                        else good_files.push(v[0]);
+                    });
+
+                    // Make sure the number of results matches the original number of files to be scanned
+                    if (num_files !== results.length) {
+                        const err_msg = "The number of results did not match the number of files to scan!";
+                        return (has_cb ? end_cb(new NodeClamError(err_msg), good_files, bad_files) : resolve(new NodeClamError({good_files, bad_files}, err_msg)));
+                    }
+
+                    // Make sure the list of bad and good files is unique...(just for good measure)
+                    bad_files = Array.from(new Set(bad_files));
+                    good_files = Array.from(new Set(good_files));
+
+                    if (self.settings.debug_mode) {
+                        console.log(`${self.debug_label}: Scan Complete!`);
+                        console.log(`${self.debug_label}: Num Bad Files: `, bad_files.length);
+                        console.log(`${self.debug_label}: Num Good Files: `, good_files.length);
+                    }
+
+                    return (has_cb ? end_cb(null, good_files, bad_files) : resolve({good_files, bad_files}));
+                }
+
+                // The quicker but less-talkative way
+                else {
+                    let all_files = [];
+
+                    // This is where we scan the every file/path in the `all_files` array once it's been fully populated
+                    const finish_scan = async () => {
+                        // Make sure there are no dupes, falsy values, or non-strings... just because we can
+                        all_files = Array.from(new Set(all_files.filter(v => !!v))).filter(v => typeof v === 'string');
+
+                        // If file list is empty, return error
+                        if (all_files.length <= 0) {
+                            const err = new NodeClamError("No valid files provided to scan!");
+                            return (has_cb ? end_cb(err, [], []) : reject(err));
+                        }
+
+                        // If scanning via sockets, use that method, otherwise use `local_scan`
+                        if (self.settings.clamdscan.socket || self.settings.clamdscan.port) {
+
+                            const chunk_size = 10;
+                            let results = [];
+                            while (all_files.length > 0) {
+                                let chunk = [];
+                                if (all_files.length > chunk_size) {
+                                    chunk = all_files.splice(0, chunk_size);
+                                } else {
+                                    chunk = all_files.splice(0);
+                                }
+
+                                // Scan 10 files then move to the next set...
+                                const chunk_results = await Promise.all(chunk.map(file => self.is_infected(file).catch(e => e)));
+
+                                // Re-map results back to their filenames
+                                const chunk_results_mapped = chunk_results.map((v,i) => [chunk[i], v]);
+
+                                // Add mapped chunk results to overall scan results array
+                                results = results.concat(chunk_results_mapped);
+                            }
+
+                            // Build out the good and bad files arrays
+                            results.forEach(v => {
+                                if (v[1] === true) bad_files.push(v[0]);
+                                else if (v[1] === false) good_files.push(v[0]);
+                                else if (v[1] instanceof Error) {
+                                    errors[v[0]] = v[1];
+                                }
+                            });
+
+                            // Make sure the list of bad and good files is unique...(just for good measure)
+                            bad_files = Array.from(new Set(bad_files));
+                            good_files = Array.from(new Set(good_files));
+
+                            if (self.settings.debug_mode) {
+                                console.log(`${self.debug_label}: Scan Complete!`);
+                                console.log(`${self.debug_label}: Num Bad Files: `, bad_files.length);
+                                console.log(`${self.debug_label}: Num Good Files: `, good_files.length);
+                            }
+
+                            return (has_cb ? end_cb(null, good_files, bad_files) : resolve({good_files, bad_files}));
+                        } else {
+                            return local_scan();
+                        }
+                    };
+
+                    // If clamdscan is the preferred binary but we don't want to scan recursively
+                    // then we need to convert all path entries to a list of files found in the
+                    // first layer of that path
+                    if (this.scan_recursively === false && this.scanner === 'clamdscan') {
+                        const chunk_size = 10;
+                        while (files.length > 0) {
+                            let chunk = [];
+                            if (files.length > chunk_size) {
+                                chunk = files.splice(0, chunk_size);
+                            } else {
+                                chunk = files.splice(0);
+                            }
+
+                            // Scan 10 files then move to the next set...
+                            const chunk_results = await Promise.all(chunk.map(file => fs_stat(file)));
+
+                            // Add each file to `all_files` array
+                            chunk_results.forEach(async (v,i) => {
+                                // If the file
+                                if (v.isFile()) {
+                                    all_files.push(chunk[i]);
+                                } else if (v.isDirectory()) {
+                                    const rgx = new RegExp(`^(?!${v})(.+)$`);
+                                    const contents = (await fs_readdir(v, {withFileTypes: true})).filter(x => x.isFile()).map(x => x.name.replace(rgx, `${v}/${x.name}`));
+                                    all_files = all_files.concat(contents);
+                                }
+                            });
+
+                            // Scan the files in the all_files array
+                            return finish_scan();
+                        }
+                    } else {
+                        // Just scan all the files
+                        all_files = files;
+
+                        // Scan the files in the all_files array
+                        return finish_scan();
+                    }
+                }
+            };
+
+            // If string is provided in files param, forgive them... create a single element array
+            if (typeof files === 'string' && files.trim().length > 0) {
+                files = files.trim().split(',').map(v => v.trim());
             }
 
-            // The much quicker but less-talkative way
-            else {
-                let all_files = [];
+            // If the files array is actually an array, do some additional validation
+            if (Array.isArray(files)) {
+                // Keep track of the original number of files specified
+                orig_num_files = files.length;
 
-                const finish_scan = () => {
-                    // Make sure there are no dupes, falsy values, or non-strings... just cause we can
-                    all_files = Array.from(new Set(all_files.filter(v => !!v))).filter(v => typeof v === 'string');
+                // Remove any empty or non-string elements
+                files = files.filter(v => !!v).filter(v => typeof v === 'string');
 
-                    // If file list is empty, return error
-                    if (all_files.length <= 0) return end_cb(new NodeClamError("No valid files provided to scan!"), [], []);
-
-                    // If scanning via sockets, use that method, otherwise use local_scan
-                    if (self.settings.clamdscan.socket || self.settings.clamdscan.host) {
-                        if (self.settings.debug_mode) console.log(`${this.debug_label}: Scanning file array with sockets.`);
-                        all_files.forEach(f => {
-                            //console.log(`${this.debug_label}: Scanning file from list of files: `, f);
-                            self.is_infected(f, (err, file, is_infected) => {
-                                completed_files++;
-
-                                if (err) {
-                                    bad_files.push(file);
-                                    last_err = err;
-                                    if (self.settings.debug_mode) console.log(`${this.debug_label}: Error: `, err);
-                                }
-
-                                if (is_infected) {
-                                    bad_files.push(file);
-                                } else {
-                                    good_files.push(file);
-                                }
-
-                                // Call file_cb for each file scanned
-                                if (file_cb && typeof file_cb === 'function') file_cb(err, file, is_infected);
-
-                                if (completed_files >= num_files) {
-                                    bad_files = Array.from(new Set(bad_files));
-                                    if (self.settings.debug_mode) {
-                                        console.log(`${this.debug_label}: Scan Complete!`);
-                                        console.log(`${this.debug_label}: Bad Files: `, bad_files);
-                                        console.log(`${this.debug_label}: Good Files: `, good_files);
-                                    }
-                                    if (end_cb && typeof end_cb === 'function') return end_cb(last_err, good_files, bad_files);
-                                }
-                            });
-                        });
-                    } else {
-                        local_scan();
-                    }
-                };
-
-                // If clamdscan is the preferred binary but we don't want to scan recursively
-                // then convert all path entries to a list of files found in the first layer of that path
-                if (this.scan_recursively === false && this.scanner === 'clamdscan') {
-                    // Check each file in array and remove entries that are directories
-                    ;(function get_dir_files() {
-                        // If there are still files to be checked...
-                        if (files.length > 0) {
-                            // Get last file in list
-                            const file = files.pop();
-                            // Get file's info
-                            fs.stat(file, (err, file_stats) => {
-                                if (err) return end_cb(err, good_files, bad_files);
-
-                                // If file is a directory...
-                                if (file_stats.isDirectory()) {
-                                    // ... get a list of it's files
-                                    fs.readdir(file, (err, dir_files) => {
-                                        if (err) return end_cb(err, good_files, bad_files);
-
-                                        // Loop over directory listing to get only files (no directories)
-                                        ;(function remove_dirs() {
-                                            // If there are still directory files to be checked...
-                                            if (dir_files.length > 0) {
-                                                // Get directory file info
-                                                const dir_file = dir_files.pop();
-                                                fs.stat(dir_file, (err, dir_file_stats) => {
-                                                    if (err) return end_cb(err, good_files, bad_files);
-
-                                                    // If directoy file is a file (not a directory...)
-                                                    if (dir_file_stats.isFile()) {
-                                                        // Add file to all_files list
-                                                        all_files.push(file);
-                                                    }
-                                                    // Check next directory file
-                                                    setTimeout(remove_dirs, 0);
-                                                });
-                                            } else {
-                                                // Get next file from files array
-                                                setTimeout(get_dir_files, 0);
-                                            }
-                                        })();
-                                    });
-                                } else {
-                                    // Add file to all_files
-                                    all_files.push(file);
-                                }
-                                // Get next file from files array
-                                setTimeout(get_dir_files, 0);
-                            });
-                        } else {
-                            // Scan the files in the all_files array
-                            finish_scan();
-                        }
-                    })();
-                } else if (this.scan_recursively === true && typeof file_cb === 'function') {
-                    // In this case, we want to get a list of all files recursively within a
-                    // directory and scan them individually so that we can get a file-by-file
-                    // update of the scan (probably not a great idea)
-                    ;(function get_all_files() {
-                        if (files.length > 0) {
-                            const file = files.pop();
-                            fs.stat(file, (err, stats) => {
-                                if (err) return end_cb(err, good_files, bad_files);
-                                if (stats.isDirectory()) {
-                                    all_files = all_files.concat(recursive(file));
-                                } else {
-                                    all_files.push(file);
-                                }
-                                get_all_files();
-                            });
-                        } else {
-                            finish_scan();
-                        }
-                    })();
-                } else {
-                    // Just scan all the files
-                    all_files = files;
-                    // Scan the files in the all_files array
-                    finish_scan();
+                // If any items specified were not valid strings, fail...
+                if (files.length !== orig_num_files) {
+                    const err = new NodeClamError({files, settings: this.settings}, "You've specified at least one invalid item to the files list (first parameter) of the `scan_files` method.");
+                    return (has_cb ? end_cb(err, [], []) : reject(err));
                 }
             }
-        };
 
-        // If string is provided in files param, forgive them... create an array
-        if (typeof files === 'string' && files.trim().length > 0) {
-            files = files.trim().split(',').map(v => v.trim());
-        }
+            // Do some parameter validation
+            if (!Array.isArray(files) || files.length <= 0) {
+                // Before failing completely, check if there is a file list specified
+                if (!('file_list' in this.settings) || !this.settings.file_list) {
+                    const err = new NodeClamError({files, settings: this.settings}, "No files provided to scan and no file list provided!");
+                    return (has_cb ? end_cb(err, [], []) : reject(err));
+                }
 
-        // Remove any empty or non-string elements
-        if (Array.isArray(files))
-            files = files.filter(v => !!v).filter(v => typeof v === 'string');
-
-        // Do some parameter validation
-        if (!Array.isArray(files) || files.length <= 0) {
-            // Before failing completely, check if there is a file list specified
-            if (!('file_list' in this.settings) || !this.settings.file_list) {
-                return end_cb(new NodeClamError({files, settings: this.settings}, "No files provided to scan and no file list provided!"), [], []);
+                // If the file list is specified, read it in and scan listed files...
+                try {
+                    const data = (await fs_readfile(this.settings.file_list)).toString().split(os.EOL);
+                    return do_scan(data);
+                } catch (e) {
+                    const err = new NodeClamError({err: e, file_list: this.settings.file_list}, `No files provided and file list was provided but could not be found! ${e}`);
+                    return (has_cb ? end_cb(err, [], []) : reject(err));
+                }
+            } else {
+                return do_scan(files);
             }
-
-            // If the file list is specified, read it in and scan listed files...
-            try {
-                const data = await fs_readfile(this.settings.file_list);
-                data = data.toString().split(os.EOL);
-                return do_scan(data);
-            } catch (err) {
-                return end_cb(new NodeClamError({file_list: this.settings.file_list}, `No files provided and file list was provided but could not be found!`), [], []);
-            }
-        } else {
-            return do_scan(files);
-        }
+        });
     }
 
     // ****************************************************************************
@@ -1111,7 +1136,7 @@ class NodeClam {
 
         // Verify second param, if supplied, is a function
         if (end_cb && typeof end_cb !== 'function') {
-            throw new NodeClamError("Invalid end-scan callback provided. Second paramter, if provided, must be a function!");
+            throw new NodeClamError("Invalid end-scan callback provided to `scan_dir`. Second paramter, if provided, must be a function!");
         } else if (end_cb && typeof end_cb === 'function') {
             has_cb = true;
         }
@@ -1248,7 +1273,7 @@ class NodeClam {
                         // Get the proper recursive list of files from the path
                         const files = stdout.split("\n").map(path => path.replace(/ /g,'\\ '));
 
-                        // Send files to remove server in parallel chunks of 10
+                        // Send files to remote server in parallel chunks of 10
                         const chunk_size = 10;
                         while (files.length > 0) {
                             let chunk = [];
