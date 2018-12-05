@@ -33,25 +33,54 @@ const check = (done, f) => {
     }
 };
 
+// Fix good_files list to have full paths
+const good_file_list_contents = fs.readFileSync(good_file_list).toString();
+const modified_good_file_list = __dirname + '/good_files_list_tmp.txt'
+fs.writeFileSync(modified_good_file_list, good_file_list_contents.split("\n").map(v => v.replace(/^\./, __dirname)).join("\n"), 'utf8');
+
+
+// Help to find unhandled promise rejections
+process.on('unhandledRejection', (reason, p) => {
+  //console.log('Unhandled Rejection at: Promise', p, 'reason:', reason, 'stack:', reason.stack);
+  if (reason && typeof reason === 'object' && 'actual' in reason) {
+      console.log("Reason: ", reason.message, reason.actual);
+  }
+  if (reason === null) {
+      console.log("No reason... here's the promise: ", p);
+  }
+  console.log('Unhandled Rejection reason:', reason);
+});
+
 const reset_clam = async (overrides = {}) => {
     overrides = overrides || {};
     try {
-        return await NodeClam.reset(Object.assign({}, config, overrides));
+        const clamdscan = Object.assign({}, config.clamdscan, ('clamdscan' in overrides ? overrides.clamdscan : {}));
+        const clamscan = Object.assign({}, config.clamscan, ('clamscan' in overrides ? overrides.clamscan : {}));
+
+        delete overrides.clamdscan;
+        delete overrides.clamscan;
+
+        const new_config = Object.assign({}, config, overrides, {clamdscan, clamscan});
+
+        // if (new_config.clamdscan.path ===  __dirname + '/should/not/exist') {
+        //     console.log("New Config: ", new_config);
+        // }
+
+        return await new NodeClam().init(new_config);
     } catch (err) {
         throw err;
-        //console.log("");
-        //console.log("Error resetting clamscan instance: ", err);
     }
 }
 
 describe('NodeClam Module', () => {
     it('should return an object', () => {
-        NodeClam.should.be.an('object');
+        NodeClam.should.be.a('function');
     });
 
     it('should not be initialized immediately', () => {
-        should.exist(NodeClam.initialized);
-        expect(NodeClam.initialized).to.eql(false);
+        const clamscan = new NodeClam();
+        should.exist(clamscan.initialized);
+        expect(clamscan.initialized).to.eql(false);
     });
 });
 
@@ -174,23 +203,21 @@ describe('Initialized NodeClam module', () => {
     it('should fail to load if no active & valid scanner is found and socket is not available', () => {
         const clamdscan_options = Object.assign({}, config.clamdscan, {path: __dirname + '/should/not/exist', active: true, local_fallback: true, socket: false, host: false});
         const clamscan_options = Object.assign({}, config.clamscan, {path: __dirname + '/should/not/exist', active: true});
+        const options = Object.assign({}, config, {clamdscan: clamdscan_options, clamscan: clamscan_options});
 
-        let options = Object.assign({}, config, {clamdscan: clamdscan_options});
-        options = Object.assign({}, options, {clamscan: clamscan_options});
-
-        expect(reset_clam(options)).to.be.rejectedWith(Error);
+        expect(reset_clam(options), 'no active and valid scanner').to.be.rejectedWith(Error);
     });
 
     it('should fail to load if quarantine path (if specified) does not exist or is not writable and socket is not available', () => {
         const clamdscan_options = Object.assign({}, config.clamdscan, {active: true, local_fallback: true, socket: false, host: false});
         const clamscan_options = Object.assign({}, config.clamscan, {active: true});
-        const options = Object.assign({}, config, {clamdscan: clamdscan_options, clamscan: clamscan_options});
+        const options = Object.assign({}, config, {clamdscan: clamdscan_options, clamscan: clamscan_options, funky: true});
 
         options.quarantine_infected = __dirname + '/should/not/exist';
-        expect(reset_clam(options)).to.be.rejectedWith(Error);
+        expect(reset_clam(options), 'bad quarantine path').to.be.rejectedWith(Error);
 
         options.quarantine_infected = __dirname + '/infected';
-        expect(reset_clam(options)).to.not.be.rejectedWith(Error);
+        expect(reset_clam(options), 'good quarantine path').to.not.be.rejectedWith(Error);
     });
 
     it('should set definition database (clamscan) to null if specified db is not found', async () => {
@@ -530,7 +557,7 @@ describe('scan_file', () => {
 describe('scan_files', () => {
     let clamscan;
     beforeEach(async () => {
-        clamscan = await reset_clam();
+        clamscan = await reset_clam({scan_log: null});
     });
 
     it('should exist', () => {
@@ -672,6 +699,7 @@ describe('scan_files', () => {
             clamscan.scan_files([good_scan_file], (err, good_files, bad_files) => {
                 check(done, () => {
                     expect(err).to.not.be.instanceof(Error);
+                    expect(bad_files).to.be.empty;
                     expect(good_files).to.not.be.empty;
                     expect(good_files).to.eql([good_scan_file]);
                 });
@@ -682,6 +710,7 @@ describe('scan_files', () => {
             clamscan.scan_files(good_scan_file, (err, good_files, bad_files) => {
                 check(done, () => {
                     expect(err).to.not.be.instanceof(Error);
+                    expect(bad_files).to.be.empty;
                     expect(good_files).to.not.be.empty;
                     expect(good_files).to.eql([good_scan_file]);
                 });
@@ -689,7 +718,7 @@ describe('scan_files', () => {
         });
 
         it('should NOT return error to the "err" parameter of the "end_cb" callback if nothing is provided as first parameter but file_list is configured in settings', done => {
-            clamscan.settings.file_list = good_file_list;
+            clamscan.settings.file_list = modified_good_file_list;
             clamscan.scan_files(undefined, (err, good_files, bad_files) => {
                 check(done, () => {
                     expect(err).to.not.be.instanceof(Error);
@@ -702,18 +731,18 @@ describe('scan_files', () => {
 
         it('should return error to the "err" parameter of the "end_cb" callback if nothing is provided as first parameter and file_list is configured in settings but has inaccessible files', done => {
             clamscan.settings.file_list = bad_file_list;
-            clamscan.scan_files(undefined, (err, good_files, bad_files) => {
+            clamscan.scan_files(undefined, (err, good_files, bad_files, error_files) => {
                 check(done, () => {
-                    expect(err).to.be.instanceof(Error);
-                    expect(bad_files).to.not.be.empty;
-                    expect(bad_files).to.have.length(2);
+                    expect(err).to.not.be.instanceof(Error);
+                    expect(bad_files).to.be.empty;
                     expect(good_files).to.be.empty;
+                    expect(error_files).to.be.an('object').that.has.all.keys('wont_be_able_to_find_this_file.txt', 'wont_find_this_one_either.txt');
                 });
             });
         });
 
         it('should NOT return error to the "err" parameter of the "end_cb" callback if FALSE is provided as first parameter but file_list is configured in settings', done => {
-            clamscan.settings.file_list = good_file_list;
+            clamscan.settings.file_list = modified_good_file_list;
             clamscan.scan_files(false, (err, good_files, bad_files) => {
                 check(done, () => {
                     expect(err).to.not.be.instanceof(Error);
@@ -725,7 +754,7 @@ describe('scan_files', () => {
         });
 
         it('should NOT return error to the "err" parameter of the "end_cb" callback if NaN is provided as first parameter but file_list is configured in settings', done => {
-            clamscan.settings.file_list = good_file_list;
+            clamscan.settings.file_list = modified_good_file_list;
             clamscan.scan_files(NaN, (err, good_files, bad_files) => {
                 check(done, () => {
                     expect(err).to.not.be.instanceof(Error);
@@ -737,7 +766,7 @@ describe('scan_files', () => {
         });
 
         it('should NOT return error to the "err" parameter of the "end_cb" callback if NULL is provided as first parameter but file_list is configured in settings', done => {
-            clamscan.settings.file_list = good_file_list;
+            clamscan.settings.file_list = modified_good_file_list;
             clamscan.scan_files(null, (err, good_files, bad_files) => {
                 check(done, () => {
                     expect(err).to.not.be.instanceof(Error);
@@ -749,7 +778,7 @@ describe('scan_files', () => {
         });
 
         it('should NOT return error to the "err" parameter of the "end_cb" callback if an empty string is provided as first parameter but file_list is configured in settings', done => {
-            clamscan.settings.file_list = good_file_list;
+            clamscan.settings.file_list = modified_good_file_list;
             clamscan.scan_files('', (err, good_files, bad_files) => {
                 check(done, () => {
                     expect(err).to.not.be.instanceof(Error);
@@ -866,7 +895,7 @@ describe('scan_dir', () => {
 describe('scan_stream', () => {
     let clamscan;
     before(async () => {
-        clamscan = await reset_clam();
+        clamscan = await reset_clam({scan_log: null});
     });
 
     const get_good_stream = () => {
@@ -917,8 +946,12 @@ describe('scan_stream', () => {
             const clamdscan_options = Object.assign({}, config.clamdscan, {active: true, socket: false, host: false, port: false});
             const options = Object.assign({}, config, {clamdscan: clamdscan_options});
 
-            clamscan = await reset_clam(options);
-            clamscan.scan_stream(get_good_stream()).should.be.rejectedWith(Error);
+            try {
+                clamscan = await reset_clam(options);
+                clamscan.scan_stream(get_good_stream()).should.be.rejectedWith(Error);
+            } catch (e) {
+                console.error("Annoying error: ", e);
+            }
         });
 
         it('should set the `is_infected` reponse value to FALSE if stream is not infected.', async () => {

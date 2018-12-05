@@ -1,2 +1,2 @@
-./tests/good_scan_dir/good_file_1.txt
-./tests/good_scan_dir/good_file_2.txt
+./good_scan_dir/good_file_1.txt
+./good_scan_dir/good_file_2.txt

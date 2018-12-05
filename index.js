@@ -9,14 +9,21 @@ const os = require('os');
 const util = require('util');
 const net = require('net');
 const fs = require('fs');
-const fsPromises = require('fs').promises;
 const node_path = require('path'); // renamed to prevent conflicts in `scan_dir`
 const child_process = require('child_process');
 
-const fs_access = fsPromises.access;
-const fs_readfile = fsPromises.readFile;
-const fs_readdir = fsPromises.readdir;
-const fs_stat = fsPromises.stat;
+// Enable these once the FS.promises API is no longer experimental
+// const fsPromises = require('fs').promises;
+// const fs_access = fsPromises.access;
+// const fs_readfile = fsPromises.readFile;
+// const fs_readdir = fsPromises.readdir;
+// const fs_stat = fsPromises.stat;
+
+const fs_access = util.promisify(fs.access);
+const fs_readfile = util.promisify(fs.readFile);
+const fs_readdir = util.promisify(fs.readdir);
+const fs_stat = util.promisify(fs.stat);
+
 const {exec, execSync, execFile, spawn} = child_process;
 const {promisify} = util;
 
@@ -107,154 +114,162 @@ class NodeClam {
     //
     // ****************************************************************************
     async init(options={}, cb) {
-        let found_scan_log = true;
+        const self = this;
+        let has_cb = false;
 
-        if (this.initialized === true) {
-            if (cb && typeof cb === 'function') {
-                return cb(null, this);
-            } else {
-                return this;
+        // Verify second param, if supplied, is a function
+        if (cb && typeof cb !== 'function') {
+            throw new NodeClamError("Invalid cb provided to init method. Second paramter, if provided, must be a function!");
+        } else if (cb && typeof cb === 'function') {
+            has_cb = true;
+        }
+
+        return new Promise(async (resolve, reject) => {
+            let found_scan_log = true;
+
+            // No need to re-initialize
+            if (this.initialized === true) return (has_cb ? cb(null, this) : resolve(this));
+
+            // Override defaults with user preferences
+            let settings = {};
+            if (options.hasOwnProperty('clamscan') && Object.keys(options.clamscan).length > 0) {
+                settings.clamscan = Object.assign({}, this.defaults.clamscan, options.clamscan);
+                delete options.clamscan;
             }
-        }
-
-        // Override defaults with user preferences
-        if (options.hasOwnProperty('clamscan') && Object.keys(options.clamscan).length > 0) {
-            this.settings.clamscan = Object.assign({}, this.settings.clamscan, options.clamscan);
-            delete options.clamscan;
-        }
-        if (options.hasOwnProperty('clamdscan') && Object.keys(options.clamdscan).length > 0) {
-            this.settings.clamdscan = Object.assign({}, this.settings.clamdscan, options.clamdscan);
-            delete options.clamdscan;
-        }
-        this.settings = Object.assign({}, this.settings, options);
-
-        // Backwards compatibilty section
-        if ('quarantine_path' in this.settings && this.settings.quarantine_path) {
-            this.settings.quarantine_infected = this.settings.quarantine_path;
-        }
-
-        // Determine whether to use clamdscan or clamscan
-        this.scanner = this.default_scanner;
-        if (('preference' in this.settings && typeof this.settings.preference !== 'string') || !['clamscan','clamdscan'].includes(this.settings.preference)) {
-            // Disable local fallback of socket connection if no valid scanner is found.
-            //console.log("Scanner Pref: ", this.settings.clamdscan);
-            if (this.settings.clamdscan.socket || this.settings.clamdscan.host) {
-                this.settings.clamdscan.local_fallback = false;
-            } else {
-                throw new NodeClamError("Invalid virus scanner preference defined!");
+            if (options.hasOwnProperty('clamdscan') && Object.keys(options.clamdscan).length > 0) {
+                settings.clamdscan = Object.assign({}, this.defaults.clamdscan, options.clamdscan);
+                delete options.clamdscan;
             }
-        }
-        if ('preference' in this.settings && this.settings.preference === 'clamscan' && 'clamscan' in this.settings && 'active' in this.settings.clamscan && this.settings.clamscan.active === true) {
-            this.scanner = 'clamscan';
-        }
+            this.settings = Object.assign({}, this.defaults, settings, options);
 
-        // Check to make sure preferred scanner exists and actually is a clamscan binary
-        try {
-            if (!await this._is_clamav_binary(this.scanner)) {
-                // Fall back to other option:
-                if (this.scanner == 'clamdscan' && this.settings.clamscan.active === true && await this._is_clamav_binary('clamscan')) {
-                    this.scanner == 'clamscan';
-                } else if (this.scanner == 'clamscan' && this.settings.clamdscan.active === true && await this._is_clamav_binary('clamdscan')) {
-                    this.scanner == 'clamdscan';
+            // Backwards compatibilty section
+            if ('quarantine_path' in this.settings && this.settings.quarantine_path) {
+                this.settings.quarantine_infected = this.settings.quarantine_path;
+            }
+
+            // Determine whether to use clamdscan or clamscan
+            this.scanner = this.default_scanner;
+            if (('preference' in this.settings && typeof this.settings.preference !== 'string') || !['clamscan','clamdscan'].includes(this.settings.preference)) {
+                // Disable local fallback of socket connection if no valid scanner is found.
+                //console.log("Scanner Pref: ", this.settings.clamdscan);
+                if (this.settings.clamdscan.socket || this.settings.clamdscan.host) {
+                    this.settings.clamdscan.local_fallback = false;
                 } else {
-                    // Disable local fallback of socket connection if preferred scanner is not a valid binary
-                    if (this.settings.clamdscan.socket || this.settings.clamdscan.host) {
-                        this.settings.clamdscan.local_fallback = false;
-                    } else {
-                        throw new NodeClamError("No valid & active virus scanning binaries are active and available!");
-                    }
+                    const err = new NodeClamError("Invalid virus scanner preference defined!");
+                    return (has_cb ? cb(err, null) : reject(err));
                 }
             }
-        } catch (err) {
-            throw err;
-        }
-
-        // Make sure quarantine_infected path exists at specified location
-        if ((!this.settings.clamdscan.socket && !this.settings.clamdscan.host && ((this.settings.clamdscan.active === true && this.settings.clamdscan.local_fallback === true) || (this.settings.clamscan.active === true))) && this.settings.quarantine_infected) {
-            try {
-                await fs_access(this.settings.quarantine_infected, fs.constants.R_OK);
-            } catch (err) {
-                if (this.settings.debug_mode) console.log(`${this.debug_label} error:`, err);
-                throw new NodeClamError(`Quarantine infected path (${this.settings.quarantine_infected}) is invalid.`);
+            if ('preference' in this.settings && this.settings.preference === 'clamscan' && 'clamscan' in this.settings && 'active' in this.settings.clamscan && this.settings.clamscan.active === true) {
+                this.scanner = 'clamscan';
             }
-        }
 
-        // If using clamscan, make sure definition db exists at specified location
-        if (!this.settings.clamdscan.socket && !this.settings.clamdscan.host && this.scanner === 'clamscan' && this.settings.clamscan.db) {
+            // Check to make sure preferred scanner exists and actually is a clamscan binary
             try {
-                await fs_access(this.settings.clamscan.db, fs.constants.R_OK);
-            } catch (err) {
-                if (this.settings.debug_mode) console.log(`${this.debug_label} error:`, err);
-                //throw new Error(`Definitions DB path (${this.settings.clamscan.db}) is invalid.`);
-                this.settings.clamscan.db = null;
-            }
-        }
-
-        // Make sure scan_log exists at specified location
-        if (
-            (
-                (!this.settings.clamdscan.socket && !this.settings.clamdscan.host) ||
-                (
-                    (this.settings.clamdscan.socket || this.settings.clamdscan.host) &&
-                    this.settings.clamdscan.local_fallback === true &&
-                    this.settings.clamdscan.active === true
-                ) ||
-                (this.settings.clamdscan.active === false && this.settings.clamscan.active === true) ||
-                (this.preference)
-            ) &&
-            this.settings.scan_log
-        ) {
-            try {
-                await fs_access(this.settings.scan_log, fs.constants.R_OK);
-            } catch (err) {
-                //console.log("DID NOT Find scan log!");
-                //found_scan_log = false;
-                if (this.settings.debug_mode) console.log(`${this.debug_label} error:`, err);
-                //throw new Error(`Scan Log path (${this.settings.scan_log}) is invalid.` + err);
-                this.settings.scan_log = null;
-            }
-        }
-
-        // Check the availability of the clamd service if socket or host/port are provided
-        if (this.settings.clamdscan.socket || this.settings.clamdscan.host || this.settings.clamdscan.port) {
-            if (this.settings.debug_mode)
-                console.log(`${this.debug_label}: Initially testing socket/tcp connection to clamscan server.`);
-            try {
-                const client = await this._init_socket('test_availability');
-                //console.log("Client: ", client);
-
-                if (this.settings.debug_mode) console.log(`${this.debug_label}: Established connection to clamscan server for testing!`);
-
-                client.write('PING');
-                client.on('data', data => {
-                    if (data.toString().trim() === 'PONG') {
-                        if (this.settings.debug_mode) console.log(`${this.debug_label}: PING-PONG!`);
+                if (!await this._is_clamav_binary(this.scanner)) {
+                    // Fall back to other option:
+                    if (this.scanner == 'clamdscan' && this.settings.clamscan.active === true && await this._is_clamav_binary('clamscan')) {
+                        this.scanner == 'clamscan';
+                    } else if (this.scanner == 'clamscan' && this.settings.clamdscan.active === true && await this._is_clamav_binary('clamdscan')) {
+                        this.scanner == 'clamdscan';
                     } else {
-                        // I'm not even sure this case is possible, but...
-                        throw new NodeClamError(data, "Could not establish connection to the remote clamscan server.");
+                        // Disable local fallback of socket connection if preferred scanner is not a valid binary
+                        if (this.settings.clamdscan.socket || this.settings.clamdscan.host) {
+                            this.settings.clamdscan.local_fallback = false;
+                        } else {
+                            const err = new NodeClamError("No valid & active virus scanning binaries are active and available!");
+                            return (has_cb ? cb(err, null) : reject(err));
+                        }
                     }
-                });
+                }
             } catch (err) {
-                throw err;
+                return (has_cb ? cb(err, null) : reject(err));
             }
-        }
 
-        //if (found_scan_log === false) console.log("No Scan Log: ", this.settings);
+            // Make sure quarantine_infected path exists at specified location
+            if ((!this.settings.clamdscan.socket && !this.settings.clamdscan.host && ((this.settings.clamdscan.active === true && this.settings.clamdscan.local_fallback === true) || (this.settings.clamscan.active === true))) && this.settings.quarantine_infected) {
+                try {
+                    await fs_access(this.settings.quarantine_infected, fs.constants.R_OK);
+                } catch (e) {
+                    if (this.settings.debug_mode) console.log(`${this.debug_label} error:`, err);
+                    const err = new NodeClamError({err: e}, `Quarantine infected path (${this.settings.quarantine_infected}) is invalid.`);
+                    return (has_cb ? cb(err, null) : reject(err));
+                }
+            }
 
-        // Build clam flags
-        this.clam_flags = this._build_clam_flags(this.scanner, this.settings);
+            // If using clamscan, make sure definition db exists at specified location
+            if (!this.settings.clamdscan.socket && !this.settings.clamdscan.host && this.scanner === 'clamscan' && this.settings.clamscan.db) {
+                try {
+                    await fs_access(this.settings.clamscan.db, fs.constants.R_OK);
+                } catch (err) {
+                    if (this.settings.debug_mode) console.log(`${this.debug_label} error:`, err);
+                    //throw new Error(`Definitions DB path (${this.settings.clamscan.db}) is invalid.`);
+                    this.settings.clamscan.db = null;
+                }
+            }
 
-        //if (found_scan_log === false) console.log("No Scan Log: ", this.settings);
+            // Make sure scan_log exists at specified location
+            if (
+                (
+                    (!this.settings.clamdscan.socket && !this.settings.clamdscan.host) ||
+                    (
+                        (this.settings.clamdscan.socket || this.settings.clamdscan.host) &&
+                        this.settings.clamdscan.local_fallback === true &&
+                        this.settings.clamdscan.active === true
+                    ) ||
+                    (this.settings.clamdscan.active === false && this.settings.clamscan.active === true) ||
+                    (this.preference)
+                ) &&
+                this.settings.scan_log
+            ) {
+                try {
+                    await fs_access(this.settings.scan_log, fs.constants.R_OK);
+                } catch (err) {
+                    //console.log("DID NOT Find scan log!");
+                    //found_scan_log = false;
+                    if (this.settings.debug_mode) console.log(`${this.debug_label} error:`, err);
+                    //throw new Error(`Scan Log path (${this.settings.scan_log}) is invalid.` + err);
+                    this.settings.scan_log = null;
+                }
+            }
 
-        // This ClamScan instance is now initialized
-        this.initialized = true;
+            // Check the availability of the clamd service if socket or host/port are provided
+            if (this.settings.clamdscan.socket || this.settings.clamdscan.host || this.settings.clamdscan.port) {
+                if (this.settings.debug_mode)
+                    console.log(`${this.debug_label}: Initially testing socket/tcp connection to clamscan server.`);
+                try {
+                    const client = await this._init_socket('test_availability');
+                    //console.log("Client: ", client);
 
-        // Return instance based on type of expected response (callback vs promise)
-        if (cb && typeof cb === 'function') {
-            return cb(null, this);
-        } else {
-            return this;
-        }
+                    if (this.settings.debug_mode) console.log(`${this.debug_label}: Established connection to clamscan server for testing!`);
+
+                    client.write('PING');
+                    client.on('data', data => {
+                        if (data.toString().trim() === 'PONG') {
+                            if (this.settings.debug_mode) console.log(`${this.debug_label}: PING-PONG!`);
+                        } else {
+                            // I'm not even sure this case is possible, but...
+                            const err = new NodeClamError(data, "Could not establish connection to the remote clamscan server.");
+                            return (has_cb ? cb(err, null) : reject(err));
+                        }
+                    });
+                } catch (err) {
+                    return (has_cb ? cb(err, null) : reject(err));
+                }
+            }
+
+            //if (found_scan_log === false) console.log("No Scan Log: ", this.settings);
+
+            // Build clam flags
+            this.clam_flags = this._build_clam_flags(this.scanner, this.settings);
+
+            //if (found_scan_log === false) console.log("No Scan Log: ", this.settings);
+
+            // This ClamScan instance is now initialized
+            this.initialized = true;
+
+            // Return instance based on type of expected response (callback vs promise)
+            return (has_cb ? cb(null, this) : resolve(this));
+        });
     }
 
     // ****************************************************************************
@@ -688,25 +703,25 @@ class NodeClam {
                     const {stdout, stderr} = await execFile(self.settings[self.scanner].path, self._build_clam_args(file));
 
                     if (stderr) {
-                        const err = new NodeClamError({stderr, file}, "The file was scanned but the ClamAV responded with an unexpected response.");
+                        const err = new NodeClamError({stderr, file}, "The file was scanned but ClamAV responded with an unexpected response.");
                         if (self.settings.debug_mode) console.log(`${this.debug_label}: `, err);
-                        return (has_cb ? cb(err, file, null) : reject(err));
+                        return (has_cb ? cb(null, file, null) : resolve({file, is_infected: null}));
                     } else {
                         try {
                             const is_infected = self._process_result(stdout);
-                            return (has_cb ? cb(null, file, {is_infected}) : resolve({file, is_infected}));
+                            return (has_cb ? cb(null, file, is_infected) : resolve({file, is_infected}));
                         } catch (e) {
-                            const err = new NodeClamError({file, err: e}, "There was an error processing the results from ClamAV");
-                            return (has_cb ? cb(err, file, null) : reject({file, is_infected: null}, err));
+                            const err = new NodeClamError({file, err: e, is_infected: null}, "There was an error processing the results from ClamAV");
+                            return (has_cb ? cb(err, file, null) : reject(err));
                         }
                     }
                 } catch (e) {
                     if (e.hasOwnProperty('code') && e.code === 1) {
-                        return (has_cb ? cb(null, file, true) : resolve({file, is_infected: false}));
+                        return (has_cb ? cb(null, file, true) : resolve({file, is_infected: true}));
                     } else {
-                        const err = new NodeClamError({file, err: e}, "There was an error scanning the file.");
+                        const err = new NodeClamError({file, err: e, is_infected: null}, "There was an error scanning the file.");
                         if (self.settings.debug_mode) console.log(`${this.debug_label}`, err);
-                        return (has_cb ? cb(err, file, null) : reject({file, is_infected: null}, err));
+                        return (has_cb ? cb(err, file, null) : reject(err));
                     }
                 }
             };
@@ -798,7 +813,11 @@ class NodeClam {
 
             // If the user just wants to scan locally...
             else {
-                return await local_scan();
+                try {
+                    return await local_scan();
+                } catch (err) {
+                    return (has_cb ? cb(err, file, null) : reject(err));
+                }
             }
         });
     }
@@ -853,7 +872,7 @@ class NodeClam {
                         if (/^[\-]+$/.test(result)) return;
 
                         //console.log("PATH: " + result)
-                        const path = result.match(/^(.*): /);
+                        let path = result.match(/^(.*): /);
                         if (path && path.length > 0) {
                             path = path[1];
                         } else {
@@ -872,10 +891,10 @@ class NodeClam {
                 bad_files = Array.from(new Set(bad_files));
                 good_files = Array.from(new Set(good_files));
 
-                return (has_cb ? end_cb(err, [], []) : reject(err));
+                return (has_cb ? end_cb(err, [], [], null) : reject(err));
 
-                if (err) return (has_cb ? end_cb(err, [], bad_files) : reject(new NodeClamError({bad_files}, err)));
-                return (has_cb ? end_cb(null, good_files, bad_files) : resolve({good_files, bad_files}));
+                if (err) return (has_cb ? end_cb(err, [], bad_files, null) : reject(new NodeClamError({bad_files}, err)));
+                return (has_cb ? end_cb(null, good_files, bad_files, null) : resolve({good_files, bad_files, errors: null}));
             };
 
             // Use this method when scanning using local binaries
@@ -907,9 +926,9 @@ class NodeClam {
                         }
                     }
 
-                    return parse_stdout(err, stdout);
+                    return parse_stdout(null, stdout);
                 } catch (e) {
-                    return parse_stdout(e, null);
+                    return parse_stdout(e, '');
                 }
             };
 
@@ -933,7 +952,7 @@ class NodeClam {
                         }
 
                         // Scan 10 files then move to the next set...
-                        const chunk_results = await Promise.all(chunk.map(file => this.is_infected(file)));
+                        const chunk_results = await Promise.all(chunk.map(file => this.is_infected(file).catch(e => e)));
 
                         // Re-map results back to their filenames
                         const chunk_results_mapped = chunk_results.map((v,i) => [chunk[i], v]);
@@ -948,13 +967,16 @@ class NodeClam {
                     // Build out the good and bad files arrays
                     final_results.forEach(v => {
                         if (v[1] === true) bad_files.push(v[0]);
-                        else good_files.push(v[0]);
+                        else if (v[1] === false) good_files.push(v[0]);
+                        else if (v[1] instanceof Error) {
+                            errors[v[0]] = v[1];
+                        }
                     });
 
                     // Make sure the number of results matches the original number of files to be scanned
                     if (num_files !== results.length) {
                         const err_msg = "The number of results did not match the number of files to scan!";
-                        return (has_cb ? end_cb(new NodeClamError(err_msg), good_files, bad_files) : resolve(new NodeClamError({good_files, bad_files}, err_msg)));
+                        return (has_cb ? end_cb(new NodeClamError(err_msg), good_files, bad_files, null) : reject(new NodeClamError({good_files, bad_files}, err_msg)));
                     }
 
                     // Make sure the list of bad and good files is unique...(just for good measure)
@@ -967,27 +989,29 @@ class NodeClam {
                         console.log(`${self.debug_label}: Num Good Files: `, good_files.length);
                     }
 
-                    return (has_cb ? end_cb(null, good_files, bad_files) : resolve({good_files, bad_files}));
+                    return (has_cb ? end_cb(null, good_files, bad_files, null) : resolve({good_files, bad_files, errors: null}));
                 }
 
                 // The quicker but less-talkative way
                 else {
                     let all_files = [];
 
-                    // This is where we scan the every file/path in the `all_files` array once it's been fully populated
+                    // This is where we scan every file/path in the `all_files` array once it's been fully populated
                     const finish_scan = async () => {
                         // Make sure there are no dupes, falsy values, or non-strings... just because we can
                         all_files = Array.from(new Set(all_files.filter(v => !!v))).filter(v => typeof v === 'string');
 
+                        const all_files_orig = [].concat(all_files);
+                        //console.log("Files: ", all_files);
+
                         // If file list is empty, return error
                         if (all_files.length <= 0) {
                             const err = new NodeClamError("No valid files provided to scan!");
-                            return (has_cb ? end_cb(err, [], []) : reject(err));
+                            return (has_cb ? end_cb(err, [], [], null) : reject(err));
                         }
 
                         // If scanning via sockets, use that method, otherwise use `local_scan`
                         if (self.settings.clamdscan.socket || self.settings.clamdscan.port) {
-
                             const chunk_size = 10;
                             let results = [];
                             while (all_files.length > 0) {
@@ -1003,6 +1027,7 @@ class NodeClam {
 
                                 // Re-map results back to their filenames
                                 const chunk_results_mapped = chunk_results.map((v,i) => [chunk[i], v]);
+                                //const chunk_results_mapped = chunk_results;
 
                                 // Add mapped chunk results to overall scan results array
                                 results = results.concat(chunk_results_mapped);
@@ -1010,11 +1035,9 @@ class NodeClam {
 
                             // Build out the good and bad files arrays
                             results.forEach(v => {
-                                if (v[1] === true) bad_files.push(v[0]);
-                                else if (v[1] === false) good_files.push(v[0]);
-                                else if (v[1] instanceof Error) {
-                                    errors[v[0]] = v[1];
-                                }
+                                if (v[1] instanceof Error) errors[v[0]] = v[1];
+                                else if (typeof v[1] === 'object' && 'is_infected' in v[1] && v[1].is_infected === true) bad_files.push(v[1].file);
+                                else if (typeof v[1] === 'object' && 'is_infected' in v[1] && v[1].is_infected === false) good_files.push(v[1].file);
                             });
 
                             // Make sure the list of bad and good files is unique...(just for good measure)
@@ -1027,7 +1050,7 @@ class NodeClam {
                                 console.log(`${self.debug_label}: Num Good Files: `, good_files.length);
                             }
 
-                            return (has_cb ? end_cb(null, good_files, bad_files) : resolve({good_files, bad_files}));
+                            return (has_cb ? end_cb(null, good_files, bad_files, errors) : resolve({errors, good_files, bad_files}));
                         } else {
                             return local_scan();
                         }
@@ -1047,19 +1070,28 @@ class NodeClam {
                             }
 
                             // Scan 10 files then move to the next set...
-                            const chunk_results = await Promise.all(chunk.map(file => fs_stat(file)));
+                            const chunk_results = await Promise.all(chunk.map(file => fs_stat(file).catch(e => e)));
 
                             // Add each file to `all_files` array
-                            chunk_results.forEach(async (v,i) => {
-                                // If the file
-                                if (v.isFile()) {
+                            // chunk_results.forEach(async (v,i) => {
+                            for (let i in chunk_results) {
+                                const v = chunk_results[i];
+                                // If the result is an error, add it to the error
+                                // object and skip adding this file to the `all_files` array
+                                if (v instanceof Error) {
+                                    errors[chunk[i]] = v;
+                                } else if (v.isFile()) {
                                     all_files.push(chunk[i]);
                                 } else if (v.isDirectory()) {
                                     const rgx = new RegExp(`^(?!${v})(.+)$`);
-                                    const contents = (await fs_readdir(v, {withFileTypes: true})).filter(x => x.isFile()).map(x => x.name.replace(rgx, `${v}/${x.name}`));
-                                    all_files = all_files.concat(contents);
+                                    try {
+                                        const contents = (await fs_readdir(chunk[i], {withFileTypes: true})).filter(x => x.isFile()).map(x => x.name.replace(rgx, `${v}/${x.name}`));
+                                        all_files = all_files.concat(contents);
+                                    } catch (e) {
+                                        errors[chunk[i]] = e;
+                                    }
                                 }
-                            });
+                            }
 
                             // Scan the files in the all_files array
                             return finish_scan();
@@ -1088,9 +1120,12 @@ class NodeClam {
                 files = files.filter(v => !!v).filter(v => typeof v === 'string');
 
                 // If any items specified were not valid strings, fail...
-                if (files.length !== orig_num_files) {
-                    const err = new NodeClamError({files, settings: this.settings}, "You've specified at least one invalid item to the files list (first parameter) of the `scan_files` method.");
-                    return (has_cb ? end_cb(err, [], []) : reject(err));
+                if (files.length < orig_num_files) {
+                    const err = new NodeClamError({num_files: files.length, orig_num_files}, "You've specified at least one invalid item to the files list (first parameter) of the `scan_files` method.");
+                    // console.log("Files: ", files);
+                    // console.log("Num Files: ", files.length);
+                    // console.log("Original Num Files: ", orig_num_files);
+                    return (has_cb ? end_cb(err, [], [], null) : reject(err));
                 }
             }
 
@@ -1099,7 +1134,7 @@ class NodeClam {
                 // Before failing completely, check if there is a file list specified
                 if (!('file_list' in this.settings) || !this.settings.file_list) {
                     const err = new NodeClamError({files, settings: this.settings}, "No files provided to scan and no file list provided!");
-                    return (has_cb ? end_cb(err, [], []) : reject(err));
+                    return (has_cb ? end_cb(err, [], [], null) : reject(err));
                 }
 
                 // If the file list is specified, read it in and scan listed files...
@@ -1108,7 +1143,7 @@ class NodeClam {
                     return do_scan(data);
                 } catch (e) {
                     const err = new NodeClamError({err: e, file_list: this.settings.file_list}, `No files provided and file list was provided but could not be found! ${e}`);
-                    return (has_cb ? end_cb(err, [], []) : reject(err));
+                    return (has_cb ? end_cb(err, [], [], null) : reject(err));
                 }
             } else {
                 return do_scan(files);
@@ -1195,7 +1230,7 @@ class NodeClam {
                         return (has_cb ? end_cb(null, [], []) : resolve({stderr, path, is_infected, good_files: [], bad_files: []}));
                     }
 
-                    const files = stdout.split("\n").map(path => path.replace(/ /g,'\\ '));
+                    const files = stdout.trim().split("\n").map(path => path.replace(/ /g,'\\ ').trim());
                     return this.scan_files(files, end_cb, file_cb);
                 } catch (e) {
                     const err = new NodeClamError({path, err: e}, "There was an issue scanning the path specified!");
@@ -1395,4 +1430,4 @@ class NodeClam {
 }
 
 
-module.exports = new NodeClam();
+module.exports = NodeClam;
