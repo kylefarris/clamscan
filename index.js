@@ -11,6 +11,7 @@ const net = require('net');
 const fs = require('fs');
 const node_path = require('path'); // renamed to prevent conflicts in `scan_dir`
 const child_process = require('child_process');
+const {PassThrough, Transform, Writable} = require('stream');
 
 // Enable these once the FS.promises API is no longer experimental
 // const fsPromises = require('fs').promises;
@@ -27,7 +28,6 @@ const fs_stat = util.promisify(fs.stat);
 const {exec, execSync, execFile, spawn} = child_process;
 const {promisify} = util;
 
-const recursive = require('recursive-readdir');
 const NodeClamTransform = require('./NodeClamTransform.js');
 
 // Convert some stuff to promises
@@ -818,6 +818,68 @@ class NodeClam {
                 } catch (err) {
                     return (has_cb ? cb(err, file, null) : reject(err));
                 }
+            }
+        });
+    }
+
+    // ****************************************************************************
+    // This will return a Node Stream object that will allow a user to pass a stream
+    // THROUGH this module and on to something else
+    // -----
+    // @param   Stream  stream  A valid NodeJS stream object to pipe through ClamAV
+    // ****************************************************************************
+    passthrough() {
+        const me = this;
+
+        return new Transform({
+            transform(chunk, encoding, cb) {
+                const self = this;
+
+                const do_transform = function() {
+                    self._fork_stream.write(chunk);
+                    process.nextTick(() => {
+                        self.push(chunk)
+                        cb();
+                    });
+                };
+
+                if (!this._clamav_socket) {
+                    this._fork_stream = new PassThrough();
+                    this._clamav_transform = new NodeClamTransform();
+                    this._clamav_reponse_chunks = [];
+
+                    me._init_socket().then(socket => {
+                        this._clamav_socket = socket;
+                        this._fork_stream.pipe(this._clamav_transform).pipe(socket);
+
+                        // ClamAV is sending stuff to us
+                        socket.on('data', chunk => {
+                            this._clamav_reponse_chunks.push(chunk);
+
+                            // Parse what we've gotten back from ClamAV so far...
+                            const response = Buffer.concat(this._clamav_reponse_chunks);
+                            const result = me._process_result(response.toString());
+
+                            // If we detect a virus, stop stream immediately.
+                            if (result === false) {
+                                const error = new Error("Fail!!");
+                                this.emit('error', error);
+                                cb(error);
+                            }
+                        });
+
+                        do_transform();
+                    })
+                } else {
+                    do_transform();
+                }
+            },
+
+            flush(cb) {
+                const size = Buffer.alloc(4);
+                size.writeInt32BE(0, 0);
+                this.push(size);
+                cb();
             }
         });
     }

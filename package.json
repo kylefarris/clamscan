@@ -17,9 +17,7 @@
     "type": "git",
     "url": "git@github.com:kylefarris/clamscan.git"
   },
-  "dependencies": {
-    "recursive-readdir": "^2.2.2"
-  },
+  "dependencies": {},
   "keywords": [
     "clamav",
     "virus",
