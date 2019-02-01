@@ -21,6 +21,9 @@ class NodeClamTransform extends Transform {
         size.writeInt32BE(chunk.length, 0);
         this.push(size);
         this.push(chunk);
+
+        console.log("Transforming for ClamAV...", chunk.toString())
+
         cb();
     }
 

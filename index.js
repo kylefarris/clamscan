@@ -458,7 +458,7 @@ class NodeClam {
                 .on('close', () => {
                     if (this.settings.debug_mode) console.log(`${client.id}: ${this.debug_label}: Socket connection closed: ${label}`);
                 })
-                // .on('data', chunk => chunks.push(chunk))
+                //.on('data', chunk => chunks.push(chunk))
                 //.on('end', () => resolve(Buffer.concat(chunks)))
                 .on('error', reject);
         });
@@ -824,7 +824,8 @@ class NodeClam {
 
     // ****************************************************************************
     // This will return a Node Stream object that will allow a user to pass a stream
-    // THROUGH this module and on to something else
+    // THROUGH this module and on to something else whereby if a virus is detected
+    // mid-stream, the entire pipeline haults and an error event is emitted.
     // -----
     // @param   Stream  stream  A valid NodeJS stream object to pipe through ClamAV
     // ****************************************************************************
@@ -836,11 +837,16 @@ class NodeClam {
                 const self = this;
 
                 const do_transform = function() {
-                    self._fork_stream.write(chunk);
-                    process.nextTick(() => {
-                        self.push(chunk)
-                        cb();
+                    console.log("Writing chunk to ClamAV socket...");
+                    self._fork_stream.write(chunk, () => {
+                        console.log("Flushed!");
+                        process.nextTick(() => self.push(chunk));
+                        process.nextTick(cb);
                     });
+                    // process.nextTick(() => {
+                    //     self.push(chunk)
+                    //     cb();
+                    // });
                 };
 
                 if (!this._clamav_socket) {
@@ -850,11 +856,26 @@ class NodeClam {
 
                     me._init_socket().then(socket => {
                         this._clamav_socket = socket;
-                        this._fork_stream.pipe(this._clamav_transform).pipe(socket);
+                        this._fork_stream.pipe(this._clamav_transform).pipe(this._clamav_socket);
+
+                        console.log("ClamAV Socket Initialized...");
+
+                        this._clamav_socket.on('close', hadError => {
+                            console.log("ClamAV socket has been closed!", hadError);
+                        }).on('end', () => {
+                            console.log("ClamAV socket has received the last chunk!");
+                        }).on('ready', () => {
+                            console.log("ClamAV socket ready to receive");
+                        }).on('connect', () => {
+                            console.log("Connected to ClamAV socket");
+                        }).on('error', err => {
+                            console.log("Error emitted from ClamAV socket: ", err);
+                        });
 
                         // ClamAV is sending stuff to us
-                        socket.on('data', chunk => {
-                            this._clamav_reponse_chunks.push(chunk);
+                        this._clamav_socket.on('data', cv_chunk => {
+                            console.log("got result!", cv_chunk.toString());
+                            this._clamav_reponse_chunks.push(cv_chunk);
 
                             // Parse what we've gotten back from ClamAV so far...
                             const response = Buffer.concat(this._clamav_reponse_chunks);
@@ -863,24 +884,22 @@ class NodeClam {
                             // If we detect a virus, stop stream immediately.
                             if (result === false) {
                                 const error = new Error("Fail!!");
+                                this._fork_stream.unpipe();
+                                this._fork_stream.destroy();
+                                this._clamav_transform.destroy();
+                                this._clamav_reponse_chunks = [];
                                 this.emit('error', error);
-                                cb(error);
                             }
                         });
 
+                        console.log("Doing initial transform!");
                         do_transform();
-                    })
+                    });
                 } else {
+                    console.log("Doing transform!");
                     do_transform();
                 }
             },
-
-            flush(cb) {
-                const size = Buffer.alloc(4);
-                size.writeInt32BE(0, 0);
-                this.push(size);
-                cb();
-            }
         });
     }
 

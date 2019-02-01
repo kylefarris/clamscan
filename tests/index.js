@@ -1070,7 +1070,7 @@ describe('passthrough', () => {
     const passthru_file = __dirname + '/passthrough.txt';
 
     before(async () => {
-        clamscan = await reset_clam();
+        clamscan = await reset_clam({scan_log: null});
     });
 
     // afterEach(() => {
