@@ -74,7 +74,6 @@ class NodeClam {
         this.debug_label = 'node-clam';
         this.default_scanner = 'clamdscan';
 
-
         // Configuration Settings
         this.defaults = Object.freeze({
             remove_infected: false,
@@ -111,7 +110,9 @@ class NodeClam {
     // ****************************************************************************
     // Initialize Method
     // -----
-    //
+    // @param   Object      options     User options for the Clamscan module
+    // @param   Function    cb          (optional) Callback method
+    // @return  Promise                 If no callback is provided, a Promise is returned
     // ****************************************************************************
     async init(options={}, cb) {
         const self = this;
@@ -141,6 +142,9 @@ class NodeClam {
                 delete options.clamdscan;
             }
             this.settings = Object.assign({}, this.defaults, settings, options);
+
+            if (this.settings && 'debug_mode' in this.settings && this.settings.debug_mode === true)
+                console.log(`${this.debug_label}: DEBUG MODE ON`);
 
             // Backwards compatibilty section
             if ('quarantine_path' in this.settings && this.settings.quarantine_path) {
@@ -566,15 +570,28 @@ class NodeClam {
 
         if (/OK$/.test(result)) {
             if (this.settings.debug_mode) console.log(`${this.debug_label}: File is OK!`);
-            return false;
+            return {is_infected: false, viruses: []};
         }
 
-        if (/FOUND$/.test(result)) {
+        if (/FOUND\n?$/gm.test(result)) {
             if (this.settings.debug_mode) {
                 if (this.settings.debug_mode) console.log(`${this.debug_label}: Scan Response: `, result);
                 if (this.settings.debug_mode) console.log(`${this.debug_label}: File is INFECTED!`);
             }
-            return true;
+
+            // Parse out the name of the virus found...
+            const viruses = result.split(String.fromCharCode(10)).map(v => /FOUND\n?$/.test(v) ? v.replace(/(.+):\s+(.+)FOUND\n?$/, "$2").trim() : null).filter(v => !!v);
+
+            return {is_infected: true, viruses};
+        }
+
+        if (/ERROR\n?$/gm.test(result)) {
+            const error = result.replace(/^(.+)ERROR\n?$/, "$1").trim();
+            if (this.settings.debug_mode) {
+                if (this.settings.debug_mode) console.log(`${this.debug_label}: Error Response: `, error);
+                if (this.settings.debug_mode) console.log(`${this.debug_label}: File may be INFECTED!`);
+            }
+            return new NodeClamError({error}, "An error occurred while scanning the piped-through stream.");
         }
 
         if (this.settings.debug_mode) {
@@ -582,7 +599,7 @@ class NodeClam {
             if (this.settings.debug_mode) console.log(`${this.debug_label}: File may be INFECTED!`);
         }
 
-        return null;
+        return {is_infected: null, viruses: []};
     }
 
     // ****************************************************************************
@@ -608,12 +625,12 @@ class NodeClam {
                 const command = self.settings[self.scanner].path + self.clam_flags + '--version';
 
                 if (self.settings.debug_mode) {
-                    console.log(`${this.debug_label}: Configured clam command: ${self.settings[self.scanner].path} ${self._build_clam_args(file).join(' ')}`);
+                    console.log(`${this.debug_label}: Configured clam command: ${self.settings[self.scanner].path} ${self._build_clam_args('--version').join(' ')}`);
                 }
 
                 // Execute the clam binary with the proper flags
                 try {
-                    const {stdout, stderr} = await execFile(self.settings[self.scanner].path, self._build_clam_args(file));
+                    const {stdout, stderr} = await cp_execfile(self.settings[self.scanner].path, self._build_clam_args('--version'));
 
                     if (stderr) {
                         const err = new NodeClamError({stderr, file}, "ClamAV responded with an unexpected response when requesting version.");
@@ -685,45 +702,50 @@ class NodeClam {
                 return (has_cb ? cb(err, file, null) : reject(err));
             }
 
-            // Trim filename
-            file = file.trim();
+            // Clean file name
+            file = file.trim().replace(/ /g,'\\ ');
 
             // This is the function used for scanning viruses using the clamd command directly
-            const local_scan = async () => {
+            const local_scan = () => {
                 //console.log("Doing local scan...");
                 if (self.settings.debug_mode) console.log(`${this.debug_label}: Scanning ${file}`);
-
                 // Build the actual command to run
-                const command = self.settings[self.scanner].path + self.clam_flags + file;
+                const args = self._build_clam_args(file);
                 if (self.settings.debug_mode)
-                    console.log(`${this.debug_label}: Configured clam command: ${self.settings[self.scanner].path} ${self._build_clam_args(items).join(' ')}`);
+                    console.log(`${this.debug_label}: Configured clam command: ${self.settings[self.scanner].path}`, args.join(' '));
 
                 // Execute the clam binary with the proper flags
-                try {
-                    const {stdout, stderr} = await execFile(self.settings[self.scanner].path, self._build_clam_args(file));
+                // NOTE: The async/await version of this will not allow us to capture the virus(es) name(s).
+                execFile(self.settings[self.scanner].path, args, (err, stdout, stderr) => {
+                    const {is_infected, viruses} = self._process_result(stdout);
 
-                    if (stderr) {
+                    // It may be a real error or a virus may have been found.
+                    if (err) {
+                        // Code 1 is when a virus is found... It's not really an "error", per se...
+                        if (err.hasOwnProperty('code') && err.code === 1) {
+                            return (has_cb ? cb(null, file, true) : resolve({file, is_infected, viruses}));
+                        } else {
+                            const error = new NodeClamError({file, err: e, is_infected: null}, `There was an error scanning the file (ClamAV Error Code: ${err.code})`);
+                            if (self.settings.debug_mode) console.log(`${this.debug_label}`, error);
+                            return (has_cb ? cb(error, file, null) : reject(error));
+                        }
+                    }
+                    // Not sure in what scenario a `stderr` would show up, but, it's worth handling here
+                    else if (stderr) {
                         const err = new NodeClamError({stderr, file}, "The file was scanned but ClamAV responded with an unexpected response.");
                         if (self.settings.debug_mode) console.log(`${this.debug_label}: `, err);
-                        return (has_cb ? cb(null, file, null) : resolve({file, is_infected: null}));
-                    } else {
+                        return (has_cb ? cb(err, file, null) : resolve({file, is_infected, viruses}));
+                    }
+                    // No viruses were found!
+                    else {
                         try {
-                            const is_infected = self._process_result(stdout);
-                            return (has_cb ? cb(null, file, is_infected) : resolve({file, is_infected}));
+                            return (has_cb ? cb(null, file, is_infected, viruses) : resolve({file, is_infected, viruses}));
                         } catch (e) {
                             const err = new NodeClamError({file, err: e, is_infected: null}, "There was an error processing the results from ClamAV");
                             return (has_cb ? cb(err, file, null) : reject(err));
                         }
                     }
-                } catch (e) {
-                    if (e.hasOwnProperty('code') && e.code === 1) {
-                        return (has_cb ? cb(null, file, true) : resolve({file, is_infected: true}));
-                    } else {
-                        const err = new NodeClamError({file, err: e, is_infected: null}, "There was an error scanning the file.");
-                        if (self.settings.debug_mode) console.log(`${this.debug_label}`, err);
-                        return (has_cb ? cb(err, file, null) : reject(err));
-                    }
-                }
+                })
             };
 
             // See if we can find/read the file
@@ -753,7 +775,7 @@ class NodeClam {
                 // If it's a directory/path, scan it useing the `scan_dir` method instead
                 else if (!is_file && is_directory) {
                     const {is_infected} = await this.scan_dir(file);
-                    return (has_cb ? cb(null, file, is_infected) : resolve({file, is_infected}));
+                    return (has_cb ? cb(null, file, is_infected) : resolve({file, is_infected, viruses: []}));
                 }
             } catch (err) {
                 return (has_cb ? cb(err, file, null) : reject(err));
@@ -777,8 +799,8 @@ class NodeClam {
                         client.on('data', async data => {
                             if (this.settings.debug_mode) console.log(`${this.debug_label}: Received response from remote clamd service.`);
                             try {
-                                const is_infected = this._process_result(data.toString());
-                                return (has_cb ? cb(null, file, is_infected) : resolve({file, is_infected}));
+                                const {is_infected, viruses} = this._process_result(data.toString());
+                                return (has_cb ? cb(null, file, is_infected, viruses) : resolve({file, is_infected, viruses}));
                             } catch (err) {
                                 return (has_cb ? cb(err, file, null) : reject(err));
                             }
@@ -796,7 +818,7 @@ class NodeClam {
                     // Attempt to scan the stream.
                     try {
                         const is_infected = await this.scan_stream(stream);
-                        return (has_cb ? cb(null, file, is_infected) : resolve({file, is_infected}));
+                        return (has_cb ? cb(null, file, is_infected) : resolve({file, is_infected, viruses: []}));
                     } catch (e) {
                         // Fallback to local if that's an option
                         if (this.settings.clamdscan.local_fallback === true) return await local_scan();
@@ -837,9 +859,9 @@ class NodeClam {
                 const self = this;
 
                 const do_transform = function() {
-                    console.log("Writing chunk to ClamAV socket...");
+                    //console.log("Writing chunk to ClamAV socket...");
                     self._fork_stream.write(chunk, () => {
-                        console.log("Flushed!");
+                        //console.log("Flushed!");
                         process.nextTick(() => self.push(chunk));
                         process.nextTick(cb);
                     });
@@ -881,9 +903,14 @@ class NodeClam {
                             const response = Buffer.concat(this._clamav_reponse_chunks);
                             const result = me._process_result(response.toString());
 
-                            // If we detect a virus, stop stream immediately.
-                            if (result === false) {
-                                const error = new Error("Fail!!");
+                            // If there's an error supplied or if we detect a virus, stop stream immediately.
+                            if (result instanceof NodeClamError || (typeof result === 'object' && 'is_infected' in result && result.is_infected === true)) {
+                                let error;
+                                if (typeof result === 'object' && 'is_infected' in result && result.is_infected === true) {
+                                    error = new Error(`Virus(es) found! ${'viruses' in result && Array.isArray(result.viruses) ? `Suspects: ${result.viruses.join(', ')}` : ''}`);
+                                } else {
+                                    error = result;
+                                }
                                 this._fork_stream.unpipe();
                                 this._fork_stream.destroy();
                                 this._clamav_transform.destroy();
@@ -947,6 +974,9 @@ class NodeClam {
 
             // The function that parses the stdout from clamscan/clamdscan
             const parse_stdout = (err, stdout) => {
+                // Get Virus List
+                const viruses = stdout.trim().split(String.fromCharCode(10)).map(v => /FOUND\n?$/.test(v) ? v.replace(/(.+):\s+(.+)FOUND\n?$/, "$2").trim() : null).filter(v => !!v);
+
                 stdout.trim()
                     .split(String.fromCharCode(10))
                     .forEach(result => {
@@ -975,7 +1005,7 @@ class NodeClam {
                 return (has_cb ? end_cb(err, [], [], null) : reject(err));
 
                 if (err) return (has_cb ? end_cb(err, [], bad_files, null) : reject(new NodeClamError({bad_files}, err)));
-                return (has_cb ? end_cb(null, good_files, bad_files, null) : resolve({good_files, bad_files, errors: null}));
+                return (has_cb ? end_cb(null, good_files, bad_files, null) : resolve({good_files, bad_files, viruses, errors: null}));
             };
 
             // Use this method when scanning using local binaries
@@ -989,9 +1019,10 @@ class NodeClam {
                     if (self.settings.debug_mode) console.log(`${self.debug_label}: Configured clam command: ${self.settings[self.scanner].path} ${self._build_clam_args(items).join(' ')}`);
 
                 // Execute the clam binary with the proper flags
-                try {
-                    const {stdout, stderr} = await cp_execfile(self.settings[self.scanner].path, self._build_clam_args(items));
+                execFile(self.settings[self.scanner].path, self._build_clam_args(items), (err, stdout, stderr) => {
                     if (self.settings.debug_mode) console.log(`${this.debug_label}: stdout:`, stdout);
+
+                    if (err) return parse_stdout(err, stdout);
 
                     if (stderr) {
                         if (self.settings.debug_mode) console.log(`${this.debug_label}: `, stderr);
@@ -1006,11 +1037,8 @@ class NodeClam {
                             bad_files = bad_files.filter(v => !!v);
                         }
                     }
-
                     return parse_stdout(null, stdout);
-                } catch (e) {
-                    return parse_stdout(e, '');
-                }
+                });
             };
 
             // This is the function that actually scans the files
@@ -1070,7 +1098,7 @@ class NodeClam {
                         console.log(`${self.debug_label}: Num Good Files: `, good_files.length);
                     }
 
-                    return (has_cb ? end_cb(null, good_files, bad_files, null) : resolve({good_files, bad_files, errors: null}));
+                    return (has_cb ? end_cb(null, good_files, bad_files, null) : resolve({good_files, bad_files, errors: null, viruses: []}));
                 }
 
                 // The quicker but less-talkative way
@@ -1131,7 +1159,7 @@ class NodeClam {
                                 console.log(`${self.debug_label}: Num Good Files: `, good_files.length);
                             }
 
-                            return (has_cb ? end_cb(null, good_files, bad_files, errors) : resolve({errors, good_files, bad_files}));
+                            return (has_cb ? end_cb(null, good_files, bad_files, errors) : resolve({errors, good_files, bad_files, viruses: []}));
                         } else {
                             return local_scan();
                         }
@@ -1278,27 +1306,28 @@ class NodeClam {
             }
 
             // Execute the clam binary with the proper flags
-            const local_scan = async () => {
-                try {
-                    const {stdout, stderr} = await cp_execfile(self.settings[self.scanner].path, self._build_clam_args(path));
-                    const is_infected = self._process_result(stdout);
+            const local_scan = () => {
+                execFile(self.settings[self.scanner].path, self._build_clam_args(path), (err, stdout, stderr) => {
+                    const {is_infected, viruses} = self._process_result(stdout);
+
+                    if (err) {
+                        if (err.hasOwnProperty('code') && err.code === 1) {
+                            return (has_cb ? end_cb(null, [], [path]) : resolve({path, is_infected, bad_files: [], good_files: [path], viruses}));
+                        } else {
+                            const error = new NodeClamError({path, err}, "There was an error scanning the path or processing the result.");
+                            return (has_cb ? end_cb(error, [], []) : reject(error));
+                        }
+                    }
 
                     if (stderr) {
                         console.error(`${self.debug_label} error: `, stderr);
-                        return (has_cb ? end_cb(null, [], []) : resolve({stderr, path, is_infected, good_files: [], bad_files: []}));
+                        return (has_cb ? end_cb(null, [], []) : resolve({stderr, path, is_infected, good_files: [], bad_files: [], viruses}));
                     }
 
                     const good_files = (infected ? [] : [path]);
                     const bad_files = (infected ? [path] : []);
-                    return (has_cb ? end_cb(null, good_files, bad_files) : resolve({path, is_infected, good_files, bad_files}));
-                } catch (e) {
-                    if (e.hasOwnProperty('code') && e.code === 1) {
-                        return (has_cb ? end_cb(null, [], [path]) : resolve({path, is_infected, bad_files: [], good_files: [path]}));
-                    } else {
-                        const err = new NodeClamError({path, err: e}, "There was an error scanning the path or processing the result.");
-                        return (has_cb ? end_cb(err, [], []) : reject(err));
-                    }
-                }
+                    return (has_cb ? end_cb(null, good_files, bad_files) : resolve({path, is_infected, good_files, bad_files, viruses}));
+                });
             }
 
             // Get all files recursively using `scan_files`
@@ -1308,17 +1337,16 @@ class NodeClam {
 
                     if (stderr) {
                         console.log(`${this.debug_label}: `, stderr);
-                        return (has_cb ? end_cb(null, [], []) : resolve({stderr, path, is_infected, good_files: [], bad_files: []}));
+                        return (has_cb ? end_cb(null, [], []) : resolve({stderr, path, is_infected, good_files: [], bad_files: [], viruses: []}));
                     }
 
-                    const files = stdout.trim().split("\n").map(path => path.replace(/ /g,'\\ ').trim());
+                    const files = stdout.trim().split(os.EOL).map(path => path.replace(/ /g,'\\ ').trim());
                     return this.scan_files(files, end_cb, file_cb);
                 } catch (e) {
                     const err = new NodeClamError({path, err: e}, "There was an issue scanning the path specified!");
                     return (has_cb ? end_cb(err, [], []) : reject(err));
                 }
             }
-
             // Clamdscan always does recursive, so, here's a way to avoid that if you want (will call `scan_files` method)
             else if (this.settings.scan_recursively === false && this.scanner === 'clamdscan') {
                 try {
@@ -1362,10 +1390,10 @@ class NodeClam {
                             .on('end', () => {
                                 if (this.settings.debug_mode) console.log(`${this.debug_label}: Received response from remote clamd service.`);
                                 const response = Buffer.concat(chunks);
-                                const is_infected = this._process_result(response.toString());
+                                const {is_infected, viruses} = this._process_result(response.toString());
                                 const good_files = (is_infected ? [] : [path]);
                                 const bad_files = (is_infected ? [path] : []);
-                                return (has_cb ? end_cb(null, good_files, bad_files) : resolve({path, is_infected, good_files, bad_files}));
+                                return (has_cb ? end_cb(null, good_files, bad_files) : resolve({path, is_infected, good_files, bad_files, viruses}));
                             });
                     } catch (e) {
                         const err = new NodeClamError({path, err: e}, "There was an issue scanning the path provided.");
@@ -1383,7 +1411,7 @@ class NodeClam {
 
                         if (stderr) {
                             console.log(`${this.debug_label}: `, stderr);
-                            return (has_cb ? end_cb(null, [], []) : resolve({stderr, path, is_infected, good_files: [], bad_files: []}));
+                            return (has_cb ? end_cb(null, [], []) : resolve({stderr, path, is_infected, good_files: [], bad_files: [], viruses: []}));
                         }
 
                         // Get the proper recursive list of files from the path
@@ -1407,7 +1435,7 @@ class NodeClam {
                         const is_infected = results.any(v => v === false);
                         const good_files = (is_infected ? [] : [path]);
                         const bad_files = (is_infected ? [path] : []);
-                        return (has_cb ? end_cb(null, good_files, bad_files) : resolve({path, is_infected, good_files, bad_files}));
+                        return (has_cb ? end_cb(null, good_files, bad_files) : resolve({path, is_infected, good_files, bad_files, viruses}));
                     } catch (e) {
                         const err = new NodeClamError({path, err: e}, "Invalid path provided! Path must be a string!");
                         return (has_cb ? end_cb(err, [], []) : reject(err));

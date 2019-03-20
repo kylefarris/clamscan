@@ -22,7 +22,7 @@ class NodeClamTransform extends Transform {
         this.push(size);
         this.push(chunk);
 
-        console.log("Transforming for ClamAV...", chunk.toString())
+        // console.log("Transforming for ClamAV...", chunk.toString())
 
         cb();
     }

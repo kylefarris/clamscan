@@ -15,6 +15,7 @@ const bad_scan_file = `${bad_scan_dir}/bad_file_1.txt`;
 const bad_file_list = __dirname + '/bad_files_list.txt';
 const bad_file = __dirname + '/bad_file.txt';
 const fake_virus_url = 'https://secure.eicar.org/eicar_com.txt';
+const fake_virus_url2 = 'https://secure.eicar.org/eicarcom2.zip';
 
 // Promisify some stuff
 const prequest = promisify(request);
@@ -1087,18 +1088,6 @@ describe('passthrough', () => {
         clamscan.passthrough.should.be.a('function');
     });
 
-    // it('should allow a uninfected file to passthrough without cancelling the stream', () => {
-    //     const in_file = fs.createReadStream(good_scan_file);
-    //     const out_file = fs.createWriteStream(passthru_file);
-    //
-    //     in_file.pipe(clamscan.passthrough()).pipe(out_file);
-    //
-    //     // out_file.on('end', () => {
-    //     //     console.log("Done!");
-    //     //     out_file.destroy();
-    //     // })
-    // });
-
     it('should not allow a infected file to passthrough without cancelling the stream', () => {
         const in_file = fs.createReadStream(bad_scan_file);
         const out_file = fs.createWriteStream(passthru_file);
@@ -1110,4 +1099,16 @@ describe('passthrough', () => {
         //     out_file.destroy();
         // })
     });
+
+    // it('should allow a uninfected file to passthrough without cancelling the stream', () => {
+    //     const in_file = fs.createReadStream(good_scan_file);
+    //     const out_file = fs.createWriteStream(passthru_file);
+    //
+    //     in_file.pipe(clamscan.passthrough()).pipe(out_file);
+    //
+    //     // out_file.on('end', () => {
+    //     //     console.log("Done!");
+    //     //     out_file.destroy();
+    //     // })
+    // });
 });
