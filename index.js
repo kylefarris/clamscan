@@ -464,7 +464,10 @@ class NodeClam {
                 })
                 //.on('data', chunk => chunks.push(chunk))
                 //.on('end', () => resolve(Buffer.concat(chunks)))
-                .on('error', reject);
+                .on('error', (e) => {
+                    console.log("Got an error: ", e);
+                    reject(e);
+                });
         });
     }
 
@@ -853,6 +856,7 @@ class NodeClam {
     // ****************************************************************************
     passthrough() {
         const me = this;
+        let counter = 0;
 
         return new Transform({
             transform(chunk, encoding, cb) {
@@ -923,7 +927,7 @@ class NodeClam {
                         do_transform();
                     });
                 } else {
-                    console.log("Doing transform!");
+                    console.log(`Doing transform: ${++counter}`);
                     do_transform();
                 }
             },
