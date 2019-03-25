@@ -462,8 +462,8 @@ class NodeClam {
                 .on('close', () => {
                     if (this.settings.debug_mode) console.log(`${this.debug_label}: Socket connection closed.`);
                 })
-                //.on('data', chunk => chunks.push(chunk))
-                //.on('end', () => resolve(Buffer.concat(chunks)))
+                // .on('data', chunk => chunks.push(chunk))
+                // .on('end', () => resolve(Buffer.concat(chunks)))
                 .on('error', (e) => {
                     console.log("Got an error: ", e);
                     reject(e);
@@ -879,12 +879,17 @@ class NodeClam {
                         this._clamav_socket = socket;
                         this._fork_stream.pipe(this._clamav_transform).pipe(this._clamav_socket);
 
-                        console.log("ClamAV Socket Initialized...");
-
+                        if (me.settings.debug_mode) console.log(`${this.debug_label}: ClamAV Socket Initialized...`);
+                        
                         this._clamav_socket.on('close', hadError => {
                             if (me.settings.debug_mode) console.log(`${this.debug_label}: ClamAV socket has been closed!`, hadError);
                         }).on('end', () => {
-                            if (me.settings.debug_mode) console.log(`${this.debug_label}: ClamAV socket has received the last chunk!`);
+                            if (me.settings.debug_mode) {
+                                console.log(`${this.debug_label}: ClamAV socket has received the last chunk!`);
+                                const response = Buffer.concat(this._clamav_reponse_chunks);
+                                const result = this._process_result(response.toString());
+                                console.log(`${this.debug_label}: Result of scan:`, result);
+                            }
                         }).on('ready', () => {
                             if (me.settings.debug_mode) console.log(`${this.debug_label}: ClamAV socket ready to receive`);
                         }).on('connect', () => {
@@ -895,7 +900,7 @@ class NodeClam {
 
                         // ClamAV is sending stuff to us
                         this._clamav_socket.on('data', cv_chunk => {
-                            console.log("got result!", cv_chunk.toString());
+                            if (me.settings.debug_mode) console.log(`${this.debug_label}: Got result!`, cv_chunk.toString());
                             this._clamav_reponse_chunks.push(cv_chunk);
 
                             // Parse what we've gotten back from ClamAV so far...
