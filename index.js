@@ -877,7 +877,7 @@ class NodeClam {
 
                     me._init_socket().then(socket => {
                         this._clamav_socket = socket;
-                        this._fork_stream.pipe(this._clamav_transform).pipe(me._clamav_socket);
+                        this._fork_stream.pipe(this._clamav_transform).pipe(this._clamav_socket);
 
                         if (me.settings.debug_mode) console.log(`${me.debug_label}: ClamAV Socket Initialized...`);
 
