@@ -22,12 +22,13 @@ class NodeClamTransform extends Transform {
         this.push(size);
         this.push(chunk);
 
-        // console.log("Transforming for ClamAV...", chunk.toString())
+        console.log("node-clam: Transforming for ClamAV...", chunk.toString())
 
         cb();
     }
 
     _flush(cb) {
+        console.log("node-clam: Received final data from file stream");
         const size = Buffer.alloc(4);
         size.writeInt32BE(0, 0);
         this.push(size);
