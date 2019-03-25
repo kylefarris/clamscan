@@ -446,9 +446,9 @@ class NodeClam {
                         if (this.settings.debug_mode) console.log(`${this.debug_label}: using local unix domain socket: ${this.settings.clamdscan.socket}`);
                     } else {
                         if (this.settings.debug_mode) {
-                            const meta = client.address();
-                            console.log(`${this.debug_label}: meta port value: ${meta.port} vs ${client.remotePort}`);
-                            console.log(`${this.debug_label}: meta address value: ${meta.address} vs ${client.remoteAddress}`);
+                            const {port, address} = client.address();
+                            console.log(`${this.debug_label}: meta port value: ${port} vs ${client.remotePort}`);
+                            console.log(`${this.debug_label}: meta address value: ${address} vs ${client.remoteAddress}`);
                             console.log(`${this.debug_label}: something is not working...`);
                         }
                     }
@@ -456,11 +456,11 @@ class NodeClam {
                     return resolve(client);
                 })
                 .on('timeout', () => {
-                    if (this.settings.debug_mode) console.log(`${client.id}: ${this.debug_label}: Socket connection timed out: ${label}`);
+                    if (this.settings.debug_mode) console.log(`${client.id}: ${this.debug_label}: Socket connection timed out.`);
                     client.end();
                 })
                 .on('close', () => {
-                    if (this.settings.debug_mode) console.log(`${client.id}: ${this.debug_label}: Socket connection closed: ${label}`);
+                    if (this.settings.debug_mode) console.log(`${client.id}: ${this.debug_label}: Socket connection closed.`);
                 })
                 //.on('data', chunk => chunks.push(chunk))
                 //.on('end', () => resolve(Buffer.concat(chunks)))
