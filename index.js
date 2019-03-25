@@ -457,7 +457,7 @@ class NodeClam {
                 })
                 .on('timeout', () => {
                     if (this.settings.debug_mode) console.log(`${client.id}: ${this.debug_label}: Socket connection timed out: ${label}`);
-                    client.close();
+                    client.end();
                 })
                 .on('close', () => {
                     if (this.settings.debug_mode) console.log(`${client.id}: ${this.debug_label}: Socket connection closed: ${label}`);
@@ -887,15 +887,15 @@ class NodeClam {
                         console.log("ClamAV Socket Initialized...");
 
                         this._clamav_socket.on('close', hadError => {
-                            console.log("ClamAV socket has been closed!", hadError);
+                            if (this.settings.debug_mode) console.log("ClamAV socket has been closed!", hadError);
                         }).on('end', () => {
-                            console.log("ClamAV socket has received the last chunk!");
+                            if (this.settings.debug_mode) console.log("ClamAV socket has received the last chunk!");
                         }).on('ready', () => {
-                            console.log("ClamAV socket ready to receive");
+                            if (this.settings.debug_mode) console.log("ClamAV socket ready to receive");
                         }).on('connect', () => {
-                            console.log("Connected to ClamAV socket");
+                            if (this.settings.debug_mode) console.log("Connected to ClamAV socket");
                         }).on('error', err => {
-                            console.log("Error emitted from ClamAV socket: ", err);
+                            console.error("Error emitted from ClamAV socket: ", err);
                         });
 
                         // ClamAV is sending stuff to us
@@ -923,11 +923,11 @@ class NodeClam {
                             }
                         });
 
-                        console.log("Doing initial transform!");
+                        if (this.settings.debug_mode) console.log("Doing initial transform!");
                         do_transform();
                     });
                 } else {
-                    console.log(`Doing transform: ${++counter}`);
+                    if (this.settings.debug_mode) console.log(`Doing transform: ${++counter}`);
                     do_transform();
                 }
             },
