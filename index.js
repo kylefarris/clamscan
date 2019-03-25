@@ -887,13 +887,13 @@ class NodeClam {
                         console.log("ClamAV Socket Initialized...");
 
                         this._clamav_socket.on('close', hadError => {
-                            if (this.settings.debug_mode) console.log("ClamAV socket has been closed!", hadError);
+                            if (me.settings.debug_mode) console.log("ClamAV socket has been closed!", hadError);
                         }).on('end', () => {
-                            if (this.settings.debug_mode) console.log("ClamAV socket has received the last chunk!");
+                            if (me.settings.debug_mode) console.log("ClamAV socket has received the last chunk!");
                         }).on('ready', () => {
-                            if (this.settings.debug_mode) console.log("ClamAV socket ready to receive");
+                            if (me.settings.debug_mode) console.log("ClamAV socket ready to receive");
                         }).on('connect', () => {
-                            if (this.settings.debug_mode) console.log("Connected to ClamAV socket");
+                            if (me.settings.debug_mode) console.log("Connected to ClamAV socket");
                         }).on('error', err => {
                             console.error("Error emitted from ClamAV socket: ", err);
                         });
@@ -923,11 +923,11 @@ class NodeClam {
                             }
                         });
 
-                        if (this.settings.debug_mode) console.log("Doing initial transform!");
+                        if (me.settings.debug_mode) console.log("Doing initial transform!");
                         do_transform();
                     });
                 } else {
-                    if (this.settings.debug_mode) console.log(`Doing transform: ${++counter}`);
+                    if (me.settings.debug_mode) console.log(`Doing transform: ${++counter}`);
                     do_transform();
                 }
             },
