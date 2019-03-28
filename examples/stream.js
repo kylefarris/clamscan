@@ -1,18 +1,21 @@
-const {PassThrough} = require('stream');
+const {PassThrough, Readable, Writable} = require('stream');
 const request = require('request');
 
 const fake_virus_url = 'https://secure.eicar.org/eicar_com.txt';
 const normal_file_url = 'https://raw.githubusercontent.com/kylefarris/clamscan/sockets/README.md';
 const test_url = normal_file_url;
-// const test_url = fake_virus_url;
 
 // Initialize the clamscan module
 const NodeClam = require('../index.js'); // Offically: require('clamscan');
 
 async function test() {
     const clamscan = await new NodeClam().init({
+        debug_mode: true,
         clamdscan: {
-            socket: '/var/run/clamd.scan/clamd.sock',
+            bypass_test: true,
+            host: 'localhost',
+            port: 3310,
+            // socket: '/var/run/clamd.scan/clamd.sock',
         },
     });
 

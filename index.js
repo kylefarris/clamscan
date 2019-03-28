@@ -99,7 +99,8 @@ class NodeClam {
                 config_file: '/etc/clamd.conf',
                 multiscan: true,
                 reload_db: false,
-                active: true
+                active: true,
+                bypass_test: false,
             },
             preference: this.default_scanner
         });
@@ -163,7 +164,7 @@ class NodeClam {
                     return (has_cb ? cb(err, null) : reject(err));
                 }
             }
-            if ('preference' in this.settings && this.settings.preference === 'clamscan' && 'clamscan' in this.settings && 'active' in this.settings.clamscan && this.settings.clamscan.active === true) {
+            if (('preference' in this.settings && this.settings.preference === 'clamscan' && 'clamscan' in this.settings && 'active' in this.settings.clamscan && this.settings.clamscan.active === true) || (this.settings.preference === 'clamdscan' && 'clamdscan' in this.settings && 'active' in this.settings.clamdscan && this.settings.clamdscan.active !== true && 'clamscan' in this.settings && 'active' in this.settings.clamscan && this.settings.clamscan.active === true)) {
                 this.scanner = 'clamscan';
             }
 
@@ -237,7 +238,7 @@ class NodeClam {
             }
 
             // Check the availability of the clamd service if socket or host/port are provided
-            if (this.settings.clamdscan.socket || this.settings.clamdscan.host || this.settings.clamdscan.port) {
+            if (this.scanner === 'clamdscan' && this.settings.clamdscan.bypass_test === false && (this.settings.clamdscan.socket || this.settings.clamdscan.host || this.settings.clamdscan.port)) {
                 if (this.settings.debug_mode)
                     console.log(`${this.debug_label}: Initially testing socket/tcp connection to clamscan server.`);
                 try {
@@ -465,7 +466,6 @@ class NodeClam {
                 // .on('data', chunk => chunks.push(chunk))
                 // .on('end', () => resolve(Buffer.concat(chunks)))
                 .on('error', (e) => {
-                    console.log("Got an error: ", e);
                     reject(e);
                 });
         });
@@ -571,25 +571,25 @@ class NodeClam {
 
         result = result.trim();
 
-        if (/OK$/.test(result)) {
+        if (/:\s+OK/.test(result)) {
             if (this.settings.debug_mode) console.log(`${this.debug_label}: File is OK!`);
             return {is_infected: false, viruses: []};
         }
 
-        if (/FOUND\n?$/gm.test(result)) {
+        if (/:\s+(.+)FOUND/gm.test(result)) {
             if (this.settings.debug_mode) {
                 if (this.settings.debug_mode) console.log(`${this.debug_label}: Scan Response: `, result);
                 if (this.settings.debug_mode) console.log(`${this.debug_label}: File is INFECTED!`);
             }
 
-            // Parse out the name of the virus found...
-            const viruses = result.split(String.fromCharCode(10)).map(v => /FOUND\n?$/.test(v) ? v.replace(/(.+):\s+(.+)FOUND\n?$/, "$2").trim() : null).filter(v => !!v);
+            // Parse out the name of the virus(es) found...
+            const viruses = result.split(String.fromCharCode(10)).map(v => /:\s+(.+)FOUND/gm.test(v) ? v.replace(/(.+):\s+(.+)FOUND\n?$/, "$2").trim() : null).filter(v => !!v);
 
             return {is_infected: true, viruses};
         }
 
-        if (/ERROR\n?$/gm.test(result)) {
-            const error = result.replace(/^(.+)ERROR\n?$/, "$1").trim();
+        if (/^(.+)ERROR/gm.test(result)) {
+            const error = result.replace(/^(.+)ERROR/gm, "$1").trim();
             if (this.settings.debug_mode) {
                 if (this.settings.debug_mode) console.log(`${this.debug_label}: Error Response: `, error);
                 if (this.settings.debug_mode) console.log(`${this.debug_label}: File may be INFECTED!`);
@@ -654,7 +654,7 @@ class NodeClam {
             };
 
             // If user wants to connect via socket or TCP...
-            if (this.settings.clamdscan.socket || this.settings.clamdscan.host) {
+            if (this.scanner === 'clamdscan' && (this.settings.clamdscan.socket || this.settings.clamdscan.host)) {
                 const chunks = [];
 
                 try {
@@ -859,24 +859,30 @@ class NodeClam {
         let counter = 0;
 
         return new Transform({
-            transform(chunk, encoding, cb) {
-                const self = this;
-
-                const do_transform = function() {
+            async transform(chunk, encoding, cb) {
+                const do_transform = () => {
                     //console.log("Writing chunk to ClamAV socket...");
-                    self._fork_stream.write(chunk, () => {
-                        process.nextTick(() => self.push(chunk));
+                    this._fork_stream.write(chunk, () => {
+                        process.nextTick(() => this.push(chunk));
                         process.nextTick(cb);
                     });
                 };
 
+                const handle_error = err => {
+                    this._fork_stream.unpipe();
+                    this._fork_stream.destroy();
+                    this._clamav_transform.destroy();
+                    this._clamav_reponse_chunks = [];
+                    this.emit('error', err);
+                }
+
                 if (!this._clamav_socket) {
                     this._fork_stream = new PassThrough();
-                    this._clamav_transform = new NodeClamTransform();
+                    this._clamav_transform = new NodeClamTransform({}, me.settings.debug_mode);
                     this._clamav_reponse_chunks = [];
 
-                    me._init_socket().then(socket => {
-                        this._clamav_socket = socket;
+                    try {
+                        this._clamav_socket = await me._init_socket('passthrough');
                         this._fork_stream.pipe(this._clamav_transform).pipe(this._clamav_socket);
 
                         if (me.settings.debug_mode) console.log(`${me.debug_label}: ClamAV Socket Initialized...`);
@@ -895,7 +901,8 @@ class NodeClam {
                         }).on('connect', () => {
                             if (me.settings.debug_mode) console.log(`${me.debug_label}: Connected to ClamAV socket`);
                         }).on('error', err => {
-                            console.error("Error emitted from ClamAV socket: ", err);
+                            console.error(`${me.debug_label}: Error emitted from ClamAV socket: `, err);
+                            handle_error(err);
                         });
 
                         // ClamAV is sending stuff to us
@@ -911,26 +918,29 @@ class NodeClam {
                             if (result instanceof NodeClamError || (typeof result === 'object' && 'is_infected' in result && result.is_infected === true)) {
                                 let error;
                                 if (typeof result === 'object' && 'is_infected' in result && result.is_infected === true) {
-                                    error = new Error(`Virus(es) found! ${'viruses' in result && Array.isArray(result.viruses) ? `Suspects: ${result.viruses.join(', ')}` : ''}`);
+                                    handle_error(new Error(`Virus(es) found! ${'viruses' in result && Array.isArray(result.viruses) ? `Suspects: ${result.viruses.join(', ')}` : ''}`));
                                 } else {
-                                    error = result;
+                                    handle_error(result);
                                 }
-                                this._fork_stream.unpipe();
-                                this._fork_stream.destroy();
-                                this._clamav_transform.destroy();
-                                this._clamav_reponse_chunks = [];
-                                this.emit('error', error);
+                            } else {
+                                if (me.settings.debug_mode) console.log(`${me.debug_label}: Processed Result: `, result, response.toString());
                             }
                         });
 
                         if (me.settings.debug_mode) console.log(`${me.debug_label}: Doing initial transform!`);
                         do_transform();
-                    });
+                    } catch (err) {
+                        console.error(`${me.debug_label}: Error initiating socket to ClamAV: `, err);
+                    }
                 } else {
-                    if (me.settings.debug_mode) console.log(`${me.debug_label}: Doing transform: ${++counter}`);
+                    //if (me.settings.debug_mode) console.log(`${me.debug_label}: Doing transform: ${++counter}`);
                     do_transform();
                 }
             },
+            flush(cb) {
+                if (me.settings.debug_mode) console.log(`${me.debug_label}: Done with the full pipeline.`);
+                cb();
+            }
         });
     }
 
@@ -1478,6 +1488,8 @@ class NodeClam {
             if (!this._is_readable_stream(stream)) {
                 const err = new NodeClamError({stream}, "Invalid stream provided to scan.");
                 return (has_cb ? cb(err, null) : reject(err));
+            } else {
+                if (this.settings.debug_mode) console.log(`${this.debug_label}: Provided stream is readable.`);
             }
 
             // Verify that they have a valid socket or host/port config
@@ -1490,7 +1502,7 @@ class NodeClam {
             try {
                 // Get an instance of our stream tranform that coddles
                 // the chunks from the incoming stream to what ClamAV wants
-                const transform = new NodeClamTransform();
+                const transform = new NodeClamTransform({}, this.settings.debug_mode);
 
                 // Get a socket
                 const socket = await this._init_socket();
@@ -1502,11 +1514,13 @@ class NodeClam {
                 stream
                     // The stream has dried up
                     .on('end', () => {
+                        if (this.settings.debug_mode) console.log(`${this.debug_label}: The input stream has dried up.`);
                         finished = true;
                         stream.destroy();
                     })
                     // There was an error with the stream (ex. uploader closed browser)
                     .on('error', err => {
+                        if (this.settings.debug_mode) console.log(`${this.debug_label}: There was an error with the input stream (maybe uploader closed browser?).`, err);
                         return (has_cb ? cb(err, null) : reject(err));
                     });
 
@@ -1520,18 +1534,32 @@ class NodeClam {
                 socket
                     // ClamAV is sending stuff to us
                     .on('data', chunk => {
+                        if (this.settings.debug_mode) console.log(`${this.debug_label}: Received output from ClamAV Socket.`);
                         if (!stream.isPaused()) stream.pause();
                         chunks.push(chunk);
                     })
 
+
+                    .on('close', hadError => {
+                        if (this.settings.debug_mode) console.log(`${this.debug_label}: ClamAV socket has been closed!`, hadError);
+                    })
+
+                    .on('error', err => {
+                        console.error(`${this.debug_label}: Error emitted from ClamAV socket: `, err);
+                        return (has_cb ? cb(err, null) : reject(err));
+                    })
+
                     // ClamAV is done sending stuff to us
                     .on('end', () => {
+                        if (this.settings.debug_mode) console.log(`${this.debug_label}: ClamAV is done scanning.`);
                         const response = Buffer.concat(chunks);
                         if (!finished) {
-                            const err = new NodeClamError('Scan aborted. Reply from server: ' + response.toString())
+                            const err = new NodeClamError('Scan aborted. Reply from server: ' + response.toString('utf8'))
                             return (has_cb ? cb(err, null) : reject(err));
                         } else {
-                            const result = this._process_result(response.toString());
+                            if (this.settings.debug_mode) console.log(`${this.debug_label}: I guess things worked? ${response.toString()}`);
+                            const result = this._process_result(response.toString('utf8'));
+                            console.log(result);
                             return (has_cb ? cb(null, result) : resolve(result));
                         }
                     })
