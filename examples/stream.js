@@ -15,7 +15,7 @@ async function test() {
             bypass_test: true,
             host: 'localhost',
             port: 3310,
-            // socket: '/var/run/clamd.scan/clamd.sock',
+            socket: '/var/run/clamd.scan/clamd.sock',
         },
     });
 

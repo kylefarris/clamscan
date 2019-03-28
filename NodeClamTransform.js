@@ -32,7 +32,7 @@ class NodeClamTransform extends Transform {
         this._num_chunks++;
         if (this._debug_mode) console.log("node-clam: Transforming for ClamAV...", this._num_chunks, this._total_size);
 
-        // cb(null, chunk);
+        //cb(null, chunk);
         cb();
     }
 

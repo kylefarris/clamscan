@@ -11,7 +11,7 @@ const net = require('net');
 const fs = require('fs');
 const node_path = require('path'); // renamed to prevent conflicts in `scan_dir`
 const child_process = require('child_process');
-const {PassThrough, Transform, Writable} = require('stream');
+const {PassThrough, Transform, Writable, finished} = require('stream');
 
 // Enable these once the FS.promises API is no longer experimental
 // const fsPromises = require('fs').promises;
@@ -853,90 +853,134 @@ class NodeClam {
     // mid-stream, the entire pipeline haults and an error event is emitted.
     // -----
     // @param   Stream  stream  A valid NodeJS stream object to pipe through ClamAV
+    // @return  Stream          A Transform stream
     // ****************************************************************************
     passthrough() {
         const me = this;
+        // A chunk counter for debugging
         let counter = 0;
 
+        // Return a Transform stream so this can act as a "man-in-the-middle"
+        // for the streaming pipeline.
+        // Ex. upload_stream.pipe(<this_transform_stream>).pipe(destination_stream)
         return new Transform({
+            // This should be fired on each chunk received
             async transform(chunk, encoding, cb) {
+                // DRY method for handling each chunk as it comes in
                 const do_transform = () => {
-                    //console.log("Writing chunk to ClamAV socket...");
-                    this._fork_stream.write(chunk, () => {
-                        process.nextTick(() => this.push(chunk));
-                        process.nextTick(cb);
-                    });
+                    // Write data to our fork stream. If it fails,
+                    // emit a 'drain' event
+                    if (!this._fork_stream.write(chunk)) {
+                        this._fork_stream.once('drain', () => {
+                            if (me.settings.debug_mode) console.log(`${me.debug_label}: Fork stream requests drain.`);
+                            cb(null, chunk);
+                        });
+                    } else {
+                        // Push data back out to whatever is listening (if anything)
+                        // and let Node know we're ready for more data
+                        cb(null, chunk);
+                    }
                 };
 
+                // DRY method for handling errors when the arise from the
+                // ClamAV Socket connection
                 const handle_error = err => {
                     this._fork_stream.unpipe();
                     this._fork_stream.destroy();
                     this._clamav_transform.destroy();
-                    this._clamav_reponse_chunks = [];
+                    this._clamav_response_chunks = [];
                     this.emit('error', err);
-                }
+                };
 
+                // If we haven't initialized a socket connection to ClamAV yet,
+                // now is the time...
                 if (!this._clamav_socket) {
+                    // We're using a PassThrough stream as a middle man to fork the input
+                    // into two paths... (1) ClamAV and (2) The final destination.
                     this._fork_stream = new PassThrough();
+                    // Instantiate our custom Transform stream that coddles
+                    // chunks into the correct format for the ClamAV socket.
                     this._clamav_transform = new NodeClamTransform({}, me.settings.debug_mode);
-                    this._clamav_reponse_chunks = [];
+                    // Setup an array to collect the responses from ClamAV
+                    this._clamav_response_chunks = [];
 
                     try {
+                        // Get a connection to the ClamAV Socket
                         this._clamav_socket = await me._init_socket('passthrough');
-                        this._fork_stream.pipe(this._clamav_transform).pipe(this._clamav_socket);
-
                         if (me.settings.debug_mode) console.log(`${me.debug_label}: ClamAV Socket Initialized...`);
 
+                        // Setup a pipeline that will pass chunks through our custom Tranform and on to ClamAV
+                        this._fork_stream.pipe(this._clamav_transform).pipe(this._clamav_socket);
+
+                        // When the CLamAV socket connection is closed (could be after 'end' or because of an error)...
                         this._clamav_socket.on('close', hadError => {
                             if (me.settings.debug_mode) console.log(`${me.debug_label}: ClamAV socket has been closed!`, hadError);
-                        }).on('end', () => {
+                        })
+                        // When the ClamAV socket connection ends (receives chunk)
+                        .on('end', () => {
                             if (me.settings.debug_mode) {
                                 console.log(`${me.debug_label}: ClamAV socket has received the last chunk!`);
-                                const response = Buffer.concat(this._clamav_reponse_chunks);
+                                // Process the collected chunks
+                                const response = Buffer.concat(this._clamav_response_chunks);
                                 const result = me._process_result(response.toString());
                                 console.log(`${me.debug_label}: Result of scan:`, result);
                             }
-                        }).on('ready', () => {
+                        })
+                        // When the ClamAV socket is ready to receive packets (this will probably never fire here)
+                        .on('ready', () => {
                             if (me.settings.debug_mode) console.log(`${me.debug_label}: ClamAV socket ready to receive`);
-                        }).on('connect', () => {
+                        })
+                        // When we are officially connected to the ClamAV socket (probably will never fire here)
+                        .on('connect', () => {
                             if (me.settings.debug_mode) console.log(`${me.debug_label}: Connected to ClamAV socket`);
-                        }).on('error', err => {
+                        })
+                        // If an error is emitted from the ClamAV socket
+                        .on('error', err => {
                             console.error(`${me.debug_label}: Error emitted from ClamAV socket: `, err);
                             handle_error(err);
-                        });
-
-                        // ClamAV is sending stuff to us
-                        this._clamav_socket.on('data', cv_chunk => {
+                        })
+                        // If ClamAV is sending stuff to us (ie, an "OK", "Virus FOUND", or "ERROR")
+                        .on('data', cv_chunk => {
+                            // Push this chunk to our results collection array
+                            this._clamav_response_chunks.push(cv_chunk);
                             if (me.settings.debug_mode) console.log(`${me.debug_label}: Got result!`, cv_chunk.toString());
-                            this._clamav_reponse_chunks.push(cv_chunk);
 
                             // Parse what we've gotten back from ClamAV so far...
-                            const response = Buffer.concat(this._clamav_reponse_chunks);
+                            const response = Buffer.concat(this._clamav_response_chunks);
                             const result = me._process_result(response.toString());
 
                             // If there's an error supplied or if we detect a virus, stop stream immediately.
                             if (result instanceof NodeClamError || (typeof result === 'object' && 'is_infected' in result && result.is_infected === true)) {
-                                let error;
+                                // If a virus is detected...
                                 if (typeof result === 'object' && 'is_infected' in result && result.is_infected === true) {
                                     handle_error(new Error(`Virus(es) found! ${'viruses' in result && Array.isArray(result.viruses) ? `Suspects: ${result.viruses.join(', ')}` : ''}`));
-                                } else {
+                                }
+                                // If any other kind of error is detected...
+                                else {
                                     handle_error(result);
                                 }
-                            } else {
+                            }
+                            // For debugging purposes, spit out what was processed (if anything).
+                            else {
                                 if (me.settings.debug_mode) console.log(`${me.debug_label}: Processed Result: `, result, response.toString());
                             }
                         });
 
                         if (me.settings.debug_mode) console.log(`${me.debug_label}: Doing initial transform!`);
+                        // Handle the chunk
                         do_transform();
                     } catch (err) {
+                        // If there's an issue connecting to the ClamAV socket, this is where that's handled
                         console.error(`${me.debug_label}: Error initiating socket to ClamAV: `, err);
                     }
                 } else {
                     //if (me.settings.debug_mode) console.log(`${me.debug_label}: Doing transform: ${++counter}`);
+                    // Handle the chunk
                     do_transform();
                 }
             },
+
+            // This is what is called when the input stream has dried up
             flush(cb) {
                 if (me.settings.debug_mode) console.log(`${me.debug_label}: Done with the full pipeline.`);
                 cb();
@@ -1557,9 +1601,8 @@ class NodeClam {
                             const err = new NodeClamError('Scan aborted. Reply from server: ' + response.toString('utf8'))
                             return (has_cb ? cb(err, null) : reject(err));
                         } else {
-                            if (this.settings.debug_mode) console.log(`${this.debug_label}: I guess things worked? ${response.toString()}`);
+                            if (this.settings.debug_mode) console.log(`${this.debug_label}: Raw Response:  ${response.toString('utf8')}`);
                             const result = this._process_result(response.toString('utf8'));
-                            console.log(result);
                             return (has_cb ? cb(null, result) : resolve(result));
                         }
                     })
