@@ -2,7 +2,7 @@
 const NodeClam = require('../index.js'); // Offically: require('clamscan');
 
 const ClamScan = new NodeClam().init({
-    debug_mode: true,
+    debug_mode: false,
     clamdscan: {
         // Run scan using command line
         path: '/usr/bin/clamdscan',                // <-- Secondary fallback to command line -|

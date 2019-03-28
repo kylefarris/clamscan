@@ -10,7 +10,7 @@ const NodeClam = require('../index.js'); // Offically: require('clamscan');
 
 async function test() {
     const clamscan = await new NodeClam().init({
-        debug_mode: true,
+        debug_mode: false,
         clamdscan: {
             bypass_test: true,
             host: 'localhost',

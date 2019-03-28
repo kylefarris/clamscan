@@ -22,17 +22,12 @@ class NodeClamTransform extends Transform {
 
         this._total_size += chunk.length;
 
-        // console.log(`Chunk Length: ${chunk.length}`);
         const size = Buffer.alloc(4);
         size.writeInt32BE(chunk.length, 0);
-        // console.log(`Size:`, size);
-        // console.log(`Chunk:`, chunk.toString());
         this.push(size);
         this.push(chunk);
         this._num_chunks++;
-        if (this._debug_mode) console.log("node-clam: Transforming for ClamAV...", this._num_chunks, this._total_size);
-
-        //cb(null, chunk);
+        //if (this._debug_mode) console.log("node-clam: Transforming for ClamAV...", this._num_chunks, this._total_size);
         cb();
     }
 

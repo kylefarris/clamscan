@@ -11,7 +11,9 @@ const net = require('net');
 const fs = require('fs');
 const node_path = require('path'); // renamed to prevent conflicts in `scan_dir`
 const child_process = require('child_process');
-const {PassThrough, Transform, Writable, finished} = require('stream');
+const {PassThrough, Transform} = require('stream');
+const {promisify} = util;
+const {exec, execSync, execFile, spawn} = child_process;
 
 // Enable these once the FS.promises API is no longer experimental
 // const fsPromises = require('fs').promises;
@@ -20,13 +22,10 @@ const {PassThrough, Transform, Writable, finished} = require('stream');
 // const fs_readdir = fsPromises.readdir;
 // const fs_stat = fsPromises.stat;
 
-const fs_access = util.promisify(fs.access);
-const fs_readfile = util.promisify(fs.readFile);
-const fs_readdir = util.promisify(fs.readdir);
-const fs_stat = util.promisify(fs.stat);
-
-const {exec, execSync, execFile, spawn} = child_process;
-const {promisify} = util;
+const fs_access = promisify(fs.access);
+const fs_readfile = promisify(fs.readFile);
+const fs_readdir = promisify(fs.readdir);
+const fs_stat = promisify(fs.stat);
 
 const NodeClamTransform = require('./NodeClamTransform.js');
 
@@ -583,7 +582,7 @@ class NodeClam {
             }
 
             // Parse out the name of the virus(es) found...
-            const viruses = result.split(String.fromCharCode(10)).map(v => /:\s+(.+)FOUND/gm.test(v) ? v.replace(/(.+):\s+(.+)FOUND\n?$/, "$2").trim() : null).filter(v => !!v);
+            const viruses = result.split(/(\u0000|\R)/).map(v => /:\s+(.+)FOUND/gm.test(v) ? v.replace(/(.+:\s+)(.+)FOUND/gm, "$2").trim() : null).filter(v => !!v);
 
             return {is_infected: true, viruses};
         }
@@ -872,7 +871,6 @@ class NodeClam {
                     // emit a 'drain' event
                     if (!this._fork_stream.write(chunk)) {
                         this._fork_stream.once('drain', () => {
-                            if (me.settings.debug_mode) console.log(`${me.debug_label}: Fork stream requests drain.`);
                             cb(null, chunk);
                         });
                     } else {
@@ -888,7 +886,6 @@ class NodeClam {
                     this._fork_stream.unpipe();
                     this._fork_stream.destroy();
                     this._clamav_transform.destroy();
-                    this._clamav_response_chunks = [];
                     this.emit('error', err);
                 };
 
@@ -914,17 +911,17 @@ class NodeClam {
 
                         // When the CLamAV socket connection is closed (could be after 'end' or because of an error)...
                         this._clamav_socket.on('close', hadError => {
-                            if (me.settings.debug_mode) console.log(`${me.debug_label}: ClamAV socket has been closed!`, hadError);
+                            if (me.settings.debug_mode) console.log(`${me.debug_label}: ClamAV socket has been closed! Because of Error:`, hadError);
                         })
                         // When the ClamAV socket connection ends (receives chunk)
                         .on('end', () => {
-                            if (me.settings.debug_mode) {
-                                console.log(`${me.debug_label}: ClamAV socket has received the last chunk!`);
-                                // Process the collected chunks
-                                const response = Buffer.concat(this._clamav_response_chunks);
-                                const result = me._process_result(response.toString());
-                                console.log(`${me.debug_label}: Result of scan:`, result);
-                            }
+                            if (me.settings.debug_mode) console.log(`${me.debug_label}: ClamAV socket has received the last chunk!`);
+                            // Process the collected chunks
+                            const response = Buffer.concat(this._clamav_response_chunks);
+                            const result = me._process_result(response.toString('utf8'));
+                            this._clamav_response_chunks = [];
+                            if (me.settings.debug_mode) console.log(`${me.debug_label}: Result of scan:`, result);
+                            this.emit('scan-complete', result);
                         })
                         // When the ClamAV socket is ready to receive packets (this will probably never fire here)
                         .on('ready', () => {
@@ -953,7 +950,7 @@ class NodeClam {
                             if (result instanceof NodeClamError || (typeof result === 'object' && 'is_infected' in result && result.is_infected === true)) {
                                 // If a virus is detected...
                                 if (typeof result === 'object' && 'is_infected' in result && result.is_infected === true) {
-                                    handle_error(new Error(`Virus(es) found! ${'viruses' in result && Array.isArray(result.viruses) ? `Suspects: ${result.viruses.join(', ')}` : ''}`));
+                                    handle_error(new NodeClamError(result, `Virus(es) found! ${'viruses' in result && Array.isArray(result.viruses) ? `Suspects: ${result.viruses.join(', ')}` : ''}`));
                                 }
                                 // If any other kind of error is detected...
                                 else {
@@ -983,7 +980,16 @@ class NodeClam {
             // This is what is called when the input stream has dried up
             flush(cb) {
                 if (me.settings.debug_mode) console.log(`${me.debug_label}: Done with the full pipeline.`);
-                cb();
+
+                // TODO: Investigate why this needs to be done in order
+                // for the ClamAV socket to be closed (why NodeClamTransform's
+                // `_flush` method isn't getting called)
+                if (this._clamav_socket.writable === true) {
+                    const size = Buffer.alloc(4);
+                    size.writeInt32BE(0, 0);
+                    this.push(size);
+                    this._clamav_socket.write(size, cb);
+                }
             }
         });
     }
