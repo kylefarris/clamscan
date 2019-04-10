@@ -858,23 +858,23 @@ class NodeClam {
         const me = this;
         // A chunk counter for debugging
         let counter = 0;
+        let _scan_complete = false;
+        let _av_waiting = null;
+        let _av_scan_time = false;
+
+        // DRY method for clearing the interval and counter related to scan times
+        const clear_scan_benchmark = () => {
+            if (_av_waiting) clearInterval(_av_waiting);
+            _av_waiting = null;
+            _av_scan_time = 0;
+        }
 
         // Return a Transform stream so this can act as a "man-in-the-middle"
         // for the streaming pipeline.
         // Ex. upload_stream.pipe(<this_transform_stream>).pipe(destination_stream)
         return new Transform({
-            _av_waiting: null,
-            _av_scan_time: 0,
-
             // This should be fired on each chunk received
             async transform(chunk, encoding, cb) {
-
-                // DRY method for clearing the interval and counter related to scan times
-                const clear_scan_benchmark = () => {
-                    if (this._av_waiting) clearInterval(this._av_waiting);
-                    this._av_waiting = null;
-                    this._av_scan_time = 0;
-                }
 
                 // DRY method for handling each chunk as it comes in
                 const do_transform = () => {
@@ -893,12 +893,22 @@ class NodeClam {
 
                 // DRY method for handling errors when the arise from the
                 // ClamAV Socket connection
-                const handle_error = err => {
+                const handle_error = (err, is_infected=null, result=null) => {
                     this._fork_stream.unpipe();
                     this._fork_stream.destroy();
                     this._clamav_transform.destroy();
                     clear_scan_benchmark();
-                    this.emit('error', err);
+
+                    // Finding an infected file isn't really an error...
+                    if (is_infected === true) {
+                        if (_scan_complete === false) {
+                            _scan_complete = true;
+                            this.emit('scan-complete', result);
+                        }
+                        this.emit('stream-infected', result); // just another way to catch an infected stream
+                    } else {
+                        this.emit('error', err);
+                    }
                 };
 
                 // If we haven't initialized a socket connection to ClamAV yet,
@@ -934,10 +944,16 @@ class NodeClam {
                             this._clamav_response_chunks = [];
                             if (me.settings.debug_mode) {
                                 console.log(`${me.debug_label}: Result of scan:`, result);
-                                console.log(`${me.debug_label}: It took ${this._av_scan_time} seconds to scan the file(s).`);
+                                console.log(`${me.debug_label}: It took ${_av_scan_time} seconds to scan the file(s).`);
                                 clear_scan_benchmark();
                             }
-                            this.emit('scan-complete', result);
+
+                            // NOTE: "scan-complete" could be called by the `handle_error` method.
+                            // We don't want to to double-emit this message.
+                            if (_scan_complete === false) {
+                                _scan_complete = true;
+                                this.emit('scan-complete', result);
+                            }
                         })
                         // When the ClamAV socket is ready to receive packets (this will probably never fire here)
                         .on('ready', () => {
@@ -966,7 +982,8 @@ class NodeClam {
                             if (result instanceof NodeClamError || (typeof result === 'object' && 'is_infected' in result && result.is_infected === true)) {
                                 // If a virus is detected...
                                 if (typeof result === 'object' && 'is_infected' in result && result.is_infected === true) {
-                                    handle_error(new NodeClamError(result, `Virus(es) found! ${'viruses' in result && Array.isArray(result.viruses) ? `Suspects: ${result.viruses.join(', ')}` : ''}`));
+                                    // handle_error(new NodeClamError(result, `Virus(es) found! ${'viruses' in result && Array.isArray(result.viruses) ? `Suspects: ${result.viruses.join(', ')}` : ''}`));
+                                    handle_error(null, true, result);
                                 }
                                 // If any other kind of error is detected...
                                 else {
@@ -998,12 +1015,12 @@ class NodeClam {
                 if (me.settings.debug_mode) console.log(`${me.debug_label}: Done with the full pipeline.`);
 
                 // Keep track of how long it's taking to scan a file..
-                this._av_waiting = null;
-                this._av_scan_time = 0;
+                _av_waiting = null;
+                _av_scan_time = 0;
                 if (me.settings.debug_mode) {
-                    this._av_waiting = setInterval(() => {
-                        this._av_scan_time += 1;
-                        if (this._av_scan_time % 5 === 0) console.log(`${me.debug_label}: ClamAV has been scanning for ${this._av_scan_time} seconds...`);
+                    _av_waiting = setInterval(() => {
+                        _av_scan_time += 1;
+                        if (_av_scan_time % 5 === 0) console.log(`${me.debug_label}: ClamAV has been scanning for ${_av_scan_time} seconds...`);
                     }, 1000);
                 }
 
@@ -1013,7 +1030,6 @@ class NodeClam {
                 if (this._clamav_socket.writable === true) {
                     const size = Buffer.alloc(4);
                     size.writeInt32BE(0, 0);
-                    this.push(size);
                     this._clamav_socket.write(size, cb);
                 }
             }

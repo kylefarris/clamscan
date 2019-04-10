@@ -2,7 +2,7 @@ const fs = require('fs');
 const p = require('path');
 
 // walk $PATH to find bin
-const which = function (bin) {
+const which = bin => {
     const path = process.env.PATH.split(p.delimiter);
     for (let i in path) {
         const file = path[i] + p.sep + bin;

@@ -14,11 +14,16 @@ const bad_scan_dir = __dirname + '/bad_scan_dir';
 const bad_scan_file = `${bad_scan_dir}/bad_file_1.txt`;
 const bad_file_list = __dirname + '/bad_files_list.txt';
 const bad_file = __dirname + '/bad_file.txt';
+const passthru_file = __dirname + '/output';
+const no_virus_url = 'https://raw.githubusercontent.com/kylefarris/clamscan/sockets/README.md';
 const fake_virus_url = 'https://secure.eicar.org/eicar_com.txt';
 const fake_virus_url2 = 'https://secure.eicar.org/eicarcom2.zip';
 
 // Promisify some stuff
 const prequest = promisify(request);
+const fs_stat = promisify(fs.stat);
+const fs_unlink = promisify(fs.unlink);
+const fs_readfile = promisify(fs.readFile);
 
 // Chai plugins
 chai.use(chaiAsPromised);
@@ -340,7 +345,7 @@ const reset_clam = async (overrides = {}) => {
 //
 //     it('should require a string representing the path to a file to be scanned', done => {
 //         Promise.all([
-//             expect(clamscan.is_infected(good_scan_file),          'valid file').to.eventually.eql({file:'/home/kfarris/gitrepos/kfarris/clamscan/tests/good_scan_dir/good_file_1.txt', is_infected: false}),
+//             expect(clamscan.is_infected(good_scan_file),          'valid file').to.eventually.eql({file:'/home/kfarris/gitrepos/kfarris/clamscan/tests/good_scan_dir/good_file_1.txt', is_infected: false, viruses: []}),
 //             expect(clamscan.is_infected(),                        'nothing provided').to.be.rejectedWith(Error),
 //             expect(clamscan.is_infected(undefined),               'undefined provided').to.be.rejectedWith(Error),
 //             expect(clamscan.is_infected(null),                    'null provided').to.be.rejectedWith(Error),
@@ -957,9 +962,11 @@ const reset_clam = async (overrides = {}) => {
 //
 //         it('should set the `is_infected` reponse value to FALSE if stream is not infected.', async () => {
 //             clamscan = await reset_clam();
-//             const is_infected = await clamscan.scan_stream(get_good_stream());
+//             const {is_infected, viruses} = await clamscan.scan_stream(get_good_stream());
 //             expect(is_infected).to.be.a('boolean');
 //             expect(is_infected).to.eql(false);
+//             expect(viruses).to.be.an('array');
+//             expect(viruses).to.have.length(0);
 //         });
 //
 //         it('should set the `is_infected` reponse value to TRUE if stream IS infected.', async () => {
@@ -968,9 +975,11 @@ const reset_clam = async (overrides = {}) => {
 //             // Fetch fake Eicar virus file from the internet and pipe it through to our scan_stream method
 //             request.get(fake_virus_url).pipe(passthrough);
 //
-//             const is_infected = await clamscan.scan_stream(passthrough);
+//             const {is_infected, viruses} = await clamscan.scan_stream(passthrough);
 //             expect(is_infected).to.be.a('boolean');
 //             expect(is_infected).to.eql(true);
+//             expect(viruses).to.be.an('array');
+//             expect(viruses).to.have.length(1);
 //         });
 //     });
 //
@@ -1008,11 +1017,15 @@ const reset_clam = async (overrides = {}) => {
 //             // Reset from previous test
 //             clamscan.settings.clamdscan = Object.assign({}, clamscan.defaults.clamdscan, config.clamdscan || {});
 //
-//             clamscan.scan_stream(get_good_stream(), (err, is_infected) => {
+//             clamscan.scan_stream(get_good_stream(), (err, result) => {
 //                 check(done, () => {
 //                     expect(err).to.not.be.instanceof(Error);
+//
+//                     const {is_infected, viruses} = result;
 //                     expect(is_infected).to.be.a('boolean');
 //                     expect(is_infected).to.eql(false);
+//                     expect(viruses).to.be.an('array');
+//                     expect(viruses).to.have.length(0);
 //                 });
 //             });
 //         });
@@ -1024,10 +1037,13 @@ const reset_clam = async (overrides = {}) => {
 //             // Fetch fake Eicar virus file and pipe it through to our scan screeam
 //             source.pipe(passthrough);
 //
-//             clamscan.scan_stream(passthrough, (err, is_infected) => {
+//             clamscan.scan_stream(passthrough, (err, result) => {
 //                 check(done, () => {
+//                     const {is_infected, viruses} = result;
 //                     expect(is_infected).to.be.a('boolean');
 //                     expect(is_infected).to.eql(true);
+//                     expect(viruses).to.be.an('array');
+//                     expect(viruses).to.have.length(1);
 //                 });
 //             });
 //         });
@@ -1068,7 +1084,6 @@ const reset_clam = async (overrides = {}) => {
 
 describe('passthrough', () => {
     let clamscan;
-    const passthru_file = __dirname + '/passthrough.txt';
 
     before(async () => {
         clamscan = await reset_clam({scan_log: null});
@@ -1088,27 +1103,85 @@ describe('passthrough', () => {
         clamscan.passthrough.should.be.a('function');
     });
 
-    it('should not allow a infected file to passthrough without cancelling the stream', () => {
-        const in_file = fs.createReadStream(bad_scan_file);
-        const out_file = fs.createWriteStream(passthru_file);
+    it('should fire a "scan-complete" event when the stream has been fully scanned and provide a result object that contains "is_infected" and "viruses" properties', done => {
+        const input = request.get(fake_virus_url);
+        const output = fs.createWriteStream(passthru_file);
+        const av = clamscan.passthrough();
 
-        in_file.pipe(clamscan.passthrough()).pipe(out_file);
+        input.pipe(av).pipe(output);
 
-        // out_file.on('end', () => {
-        //     console.log("Done!");
-        //     out_file.destroy();
-        // })
+        av.on('scan-complete', result => {
+            check(done, () => {
+                expect(result).to.be.an('object').that.has.all.keys('is_infected', 'viruses');
+            });
+        });
     });
 
-    // it('should allow a uninfected file to passthrough without cancelling the stream', () => {
-    //     const in_file = fs.createReadStream(good_scan_file);
-    //     const out_file = fs.createWriteStream(passthru_file);
-    //
-    //     in_file.pipe(clamscan.passthrough()).pipe(out_file);
-    //
-    //     // out_file.on('end', () => {
-    //     //     console.log("Done!");
-    //     //     out_file.destroy();
-    //     // })
-    // });
+    it('should indicate that a stream was infected in the "scan-complete" event if the stream DOES contain a virus', done => {
+        const input = request.get(fake_virus_url);
+        const output = fs.createWriteStream(passthru_file);
+        const av = clamscan.passthrough();
+
+        input.pipe(av).pipe(output);
+
+        av.on('scan-complete', result => {
+            check(done, () => {
+                const {is_infected, viruses} = result;
+                expect(is_infected).to.be.a('boolean');
+                expect(is_infected).to.eql(true);
+                expect(viruses).to.be.an('array');
+                expect(viruses).to.have.length(1);
+            });
+        })
+    });
+
+    it('should indicate that a stream was NOT infected in the "scan-complete" event if the stream DOES NOT contain a virus', done => {
+        const input = request.get(no_virus_url);
+        const output = fs.createWriteStream(passthru_file);
+        const av = clamscan.passthrough();
+
+        input.pipe(av).pipe(output);
+
+        av.on('scan-complete', result => {
+            check(done, () => {
+                const {is_infected, viruses} = result;
+                expect(is_infected).to.be.a('boolean');
+                expect(is_infected).to.eql(false);
+                expect(viruses).to.be.an('array');
+                expect(viruses).to.have.length(0);
+            });
+        });
+    });
+
+    it('should (for example) have created the file that the stream is being piped to', done => {
+        const input = fs.createReadStream(good_scan_file);
+        const output = fs.createWriteStream(passthru_file);
+        const av = clamscan.passthrough();
+
+        input.pipe(av).pipe(output);
+
+        output.on('finish', () => {
+            const ref_file = 'fasdfa';
+            // const ref_file = await fs_readfile(good_scan_file);
+            Promise.all([
+                expect(fs_stat(passthru_file),          'get passthru file stats').to.not.be.rejectedWith(Error),
+                expect(fs_readfile(passthru_file),      'get passthru file').to.not.be.rejectedWith(Error),
+            ]).should.notify(done);
+        });
+    });
+
+    it('should have cleanly piped input to output', () => {
+        const input = fs.createReadStream(good_scan_file);
+        const output = fs.createWriteStream(passthru_file);
+        const av = clamscan.passthrough();
+
+        input.pipe(av).pipe(output);
+
+        output.on('finish', () => {
+            const orig_file = fs.readFileSync(good_scan_file);
+            const out_file = fs.readFileSync(passthru_file);
+
+            expect(orig_file).to.eql(out_file);
+        });
+    });
 });

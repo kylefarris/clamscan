@@ -19,7 +19,7 @@ const NodeClam = require('../index.js'); // Offically: require('clamscan');
 
 async function test() {
     const clamscan = await new NodeClam().init({
-        debug_mode: false,
+        debug_mode: true,
         clamdscan: {
             host: 'localhost',
             port: 3310,
@@ -47,12 +47,14 @@ async function test() {
         console.log("All data has been scanned sent on to the destination!");
     }).on('scan-complete', result => {
         console.log("Scan Complete: Result: ", result);
-        if (result.is_infected) {
+        if (result.is_infected === true) {
             console.log(`You've downloaded a virus (${result.viruses.join(', ')})! Don't worry, it's only a test one and is not malicious...`);
-            remove_final_file();
+        } else if (result.is_infected === null) {
+            console.log(`There was an issue scanning the file you downloaded...`);
         } else {
             console.log(`The file (${test_url}) you downloaded was just fine... Carry on...`);
         }
+        remove_final_file();
         process.exit(0);
     });
 
