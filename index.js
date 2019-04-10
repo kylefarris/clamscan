@@ -863,8 +863,19 @@ class NodeClam {
         // for the streaming pipeline.
         // Ex. upload_stream.pipe(<this_transform_stream>).pipe(destination_stream)
         return new Transform({
+            _av_waiting: null,
+            _av_scan_time: 0,
+
             // This should be fired on each chunk received
             async transform(chunk, encoding, cb) {
+
+                // DRY method for clearing the interval and counter related to scan times
+                const clear_scan_benchmark = () => {
+                    if (this._av_waiting) clearInterval(this._av_waiting);
+                    this._av_waiting = null;
+                    this._av_scan_time = 0;
+                }
+
                 // DRY method for handling each chunk as it comes in
                 const do_transform = () => {
                     // Write data to our fork stream. If it fails,
@@ -886,6 +897,7 @@ class NodeClam {
                     this._fork_stream.unpipe();
                     this._fork_stream.destroy();
                     this._clamav_transform.destroy();
+                    clear_scan_benchmark();
                     this.emit('error', err);
                 };
 
@@ -920,7 +932,11 @@ class NodeClam {
                             const response = Buffer.concat(this._clamav_response_chunks);
                             const result = me._process_result(response.toString('utf8'));
                             this._clamav_response_chunks = [];
-                            if (me.settings.debug_mode) console.log(`${me.debug_label}: Result of scan:`, result);
+                            if (me.settings.debug_mode) {
+                                console.log(`${me.debug_label}: Result of scan:`, result);
+                                console.log(`${me.debug_label}: It took ${this._av_scan_time} seconds to scan the file(s).`);
+                                clear_scan_benchmark();
+                            }
                             this.emit('scan-complete', result);
                         })
                         // When the ClamAV socket is ready to receive packets (this will probably never fire here)
@@ -980,6 +996,16 @@ class NodeClam {
             // This is what is called when the input stream has dried up
             flush(cb) {
                 if (me.settings.debug_mode) console.log(`${me.debug_label}: Done with the full pipeline.`);
+
+                // Keep track of how long it's taking to scan a file..
+                this._av_waiting = null;
+                this._av_scan_time = 0;
+                if (me.settings.debug_mode) {
+                    this._av_waiting = setInterval(() => {
+                        this._av_scan_time += 1;
+                        if (this._av_scan_time % 5 === 0) console.log(`${me.debug_label}: ClamAV has been scanning for ${this._av_scan_time} seconds...`);
+                    }, 1000);
+                }
 
                 // TODO: Investigate why this needs to be done in order
                 // for the ClamAV socket to be closed (why NodeClamTransform's
