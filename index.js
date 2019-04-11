@@ -153,6 +153,8 @@ class NodeClam {
 
             // Determine whether to use clamdscan or clamscan
             this.scanner = this.default_scanner;
+
+            // If preference is not defined is invalid, fallback to streaming scan or completely fail
             if (('preference' in this.settings && typeof this.settings.preference !== 'string') || !['clamscan','clamdscan'].includes(this.settings.preference)) {
                 // Disable local fallback of socket connection if no valid scanner is found.
                 //console.log("Scanner Pref: ", this.settings.clamdscan);
@@ -163,7 +165,29 @@ class NodeClam {
                     return (has_cb ? cb(err, null) : reject(err));
                 }
             }
-            if (('preference' in this.settings && this.settings.preference === 'clamscan' && 'clamscan' in this.settings && 'active' in this.settings.clamscan && this.settings.clamscan.active === true) || (this.settings.preference === 'clamdscan' && 'clamdscan' in this.settings && 'active' in this.settings.clamdscan && this.settings.clamdscan.active !== true && 'clamscan' in this.settings && 'active' in this.settings.clamscan && this.settings.clamscan.active === true)) {
+
+            // Set 'clamscan' as the scanner preference if it's specified as such and activated
+            // OR if 'clamdscan is the preference but inactivated and clamscan is activated
+            if (
+                (   // If preference is 'clamscan' and clamscan is active
+                    'preference' in this.settings
+                    && this.settings.preference === 'clamscan'
+                    && 'clamscan' in this.settings
+                    && 'active' in this.settings.clamscan
+                    && this.settings.clamscan.active === true
+                )
+                ||  // OR ...
+                (   // If preference is 'clamdscan' and it's NOT active but 'clamscan' is...
+                    this.settings.preference === 'clamdscan'
+                    && 'clamdscan' in this.settings
+                    && 'active' in this.settings.clamdscan
+                    && this.settings.clamdscan.active !== true
+                    && 'clamscan' in this.settings
+                    && 'active' in this.settings.clamscan
+                    && this.settings.clamscan.active === true
+                )
+            ) {
+                // Set scanner to clamscan
                 this.scanner = 'clamscan';
             }
 
