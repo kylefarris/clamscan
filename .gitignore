@@ -17,3 +17,4 @@ tests/clamscan-log
 tests/infected/*
 tests/bad_scan_dir/*
 tests/good_files_list_tmp.txt
+tests/output
