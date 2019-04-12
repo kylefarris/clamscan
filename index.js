@@ -154,14 +154,13 @@ class NodeClam {
             // Determine whether to use clamdscan or clamscan
             this.scanner = this.default_scanner;
 
-            // If preference is not defined is invalid, fallback to streaming scan or completely fail
+            // If scanner preference is not defined or is invalid, fallback to streaming scan or completely fail
             if (('preference' in this.settings && typeof this.settings.preference !== 'string') || !['clamscan','clamdscan'].includes(this.settings.preference)) {
-                // Disable local fallback of socket connection if no valid scanner is found.
-                //console.log("Scanner Pref: ", this.settings.clamdscan);
+                // If no valid scanner is found (but a socket/host is), disable the fallback to a local CLI scanning method
                 if (this.settings.clamdscan.socket || this.settings.clamdscan.host) {
                     this.settings.clamdscan.local_fallback = false;
                 } else {
-                    const err = new NodeClamError("Invalid virus scanner preference defined!");
+                    const err = new NodeClamError("Invalid virus scanner preference defined and no valid host/socket option provided!");
                     return (has_cb ? cb(err, null) : reject(err));
                 }
             }
@@ -193,6 +192,7 @@ class NodeClam {
 
             // Check to make sure preferred scanner exists and actually is a clamscan binary
             try {
+                // If scanner binary doesn't exist...
                 if (!await this._is_clamav_binary(this.scanner)) {
                     // Fall back to other option:
                     if (this.scanner == 'clamdscan' && this.settings.clamscan.active === true && await this._is_clamav_binary('clamscan')) {
@@ -200,11 +200,13 @@ class NodeClam {
                     } else if (this.scanner == 'clamscan' && this.settings.clamdscan.active === true && await this._is_clamav_binary('clamdscan')) {
                         this.scanner == 'clamdscan';
                     } else {
-                        // Disable local fallback of socket connection if preferred scanner is not a valid binary
+                        // If preferred scanner is not a valid binary but there is a socket/host option, disabled
+                        // failover to local CLI implementation
                         if (this.settings.clamdscan.socket || this.settings.clamdscan.host) {
+                            this.scanner = false;
                             this.settings.clamdscan.local_fallback = false;
                         } else {
-                            const err = new NodeClamError("No valid & active virus scanning binaries are active and available!");
+                            const err = new NodeClamError("No valid & active virus scanning binaries are active and available and host/socket option provided!");
                             return (has_cb ? cb(err, null) : reject(err));
                         }
                     }
@@ -270,10 +272,10 @@ class NodeClam {
 
                     if (this.settings.debug_mode) console.log(`${this.debug_label}: Established connection to clamscan server for testing!`);
 
-                    client.write('PING');
+                    client.write('PING!');
                     client.on('data', data => {
                         if (data.toString().trim() === 'PONG') {
-                            if (this.settings.debug_mode) console.log(`${this.debug_label}: PING-PONG!`);
+                            if (this.settings.debug_mode) console.log(`${this.debug_label}: PONG!`);
                         } else {
                             // I'm not even sure this case is possible, but...
                             const err = new NodeClamError(data, "Could not establish connection to the remote clamscan server.");

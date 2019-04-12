@@ -28,7 +28,7 @@ module.exports = {
         path: which('clamscan'),                   // required for testing
     },
     clamdscan: {
-        socket: '/var/run/clamd.scan/clamd.sock',   // required for testing (change for your system) - can be set to null
+        socket: '/var/run/clamd.daemon/clamd.sock',   // required for testing (change for your system) - can be set to null
         host: '127.0.0.1',                          // required for testing (change for your system) - can be set to null
         port: 3310,                                 // required for testing (change for your system) - can be set to null
         path: which('clamdscan'),                   // required for testing

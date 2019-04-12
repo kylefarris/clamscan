@@ -160,7 +160,9 @@ describe('Initialized NodeClam module', () => {
                 config_file: config.clamdscan.config_file,
                 multiscan: false,
                 reload_db: true,
-                active: false
+                active: false,
+                timeout: 300000,
+                bypass_test: true,
             },
             preference: 'clamscan'
         });
@@ -190,15 +192,13 @@ describe('Initialized NodeClam module', () => {
         expect(clamscan.settings.clamdscan.multiscan).to.be.eql(false);
         expect(clamscan.settings.clamdscan.reload_db).to.eql(true);
         expect(clamscan.settings.clamdscan.active).to.eql(false);
+        expect(clamscan.settings.clamdscan.timeout).to.eql(300000);
+        expect(clamscan.settings.clamdscan.bypass_test).to.eql(true);
     });
 
     it('should failover to alternate scanner if preferred scanner is inactive', async () => {
         const clamscan = await reset_clam({clamdscan: { active: false }});
         expect(clamscan.scanner).to.eql('clamscan');
-    });
-
-    it('should try and fallback to local daemon if CLI scanners are not found (if `local_fallback` is set to TRUE)', async () => {
-        const clamscan = await reset_clam();
     });
 
     it('should fail if an invalid scanner preference is supplied when socket or host is not specified and local_fallback is not false', () => {
@@ -328,6 +328,21 @@ describe('_init_socket', () => {
     });
     it('should be a function', () => {
         clamscan._init_socket.should.be.a('function');
+    });
+    it('should return a valid socket client', async () => {
+        const client = await clamscan._init_socket();
+        expect(client).to.be.an('object');
+        // console.log("CLIENT: ", client);
+        expect(client.writable).to.eql(true);
+        expect(client.readable).to.eql(true);
+        expect(client._hadError).to.eql(false);
+        expect(client).to.respondTo('on');
+        expect(client).to.not.respondTo('foobar');
+    });
+    it('should have the same timeout as the one configured through this module', async () => {
+        clamscan = await reset_clam({clamdscan: { timeout: 300000 }});
+        const client = await clamscan._init_socket();
+        expect(client.timeout).to.eql(clamscan.settings.clamdscan.timeout);
     });
 });
 
@@ -1158,22 +1173,6 @@ describe('passthrough', () => {
     });
 
     it('should have cleanly piped input to output', () => {
-        const input = fs.createReadStream(good_scan_file);
-        const output = fs.createWriteStream(passthru_file);
-        const av = clamscan.passthrough();
-
-        input.pipe(av).pipe(output);
-
-        output.on('finish', () => {
-            const orig_file = fs.readFileSync(good_scan_file);
-            const out_file = fs.readFileSync(passthru_file);
-
-            expect(orig_file).to.eql(out_file);
-            if (fs.existsSync(passthru_file)) fs.unlinkSync(passthru_file);
-        });
-    });
-
-    it('should fire an "error" event when no connection can be established to streaming clamav server', () => {
         const input = fs.createReadStream(good_scan_file);
         const output = fs.createWriteStream(passthru_file);
         const av = clamscan.passthrough();
