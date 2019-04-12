@@ -378,7 +378,7 @@ describe('is_infected', () => {
 
     it('should require a string representing the path to a file to be scanned', done => {
         Promise.all([
-            expect(clamscan.is_infected(good_scan_file),          'valid file').to.eventually.eql({file:'/home/kfarris/gitrepos/kfarris/clamscan/tests/good_scan_dir/good_file_1.txt', is_infected: false, viruses: []}),
+            expect(clamscan.is_infected(good_scan_file),          'valid file').to.eventually.eql({file: __dirname + 'tests/good_scan_dir/good_file_1.txt', is_infected: false, viruses: []}),
             expect(clamscan.is_infected(),                        'nothing provided').to.be.rejectedWith(Error),
             expect(clamscan.is_infected(undefined),               'undefined provided').to.be.rejectedWith(Error),
             expect(clamscan.is_infected(null),                    'null provided').to.be.rejectedWith(Error),
