@@ -95,7 +95,7 @@ class NodeClam {
                 timeout: 60000, // 60 seconds
                 local_fallback: true,
                 path: '/usr/bin/clamdscan',
-                config_file: '/etc/clamd.conf',
+                config_file: null,
                 multiscan: true,
                 reload_db: false,
                 active: true,
@@ -200,7 +200,7 @@ class NodeClam {
                     } else if (this.scanner == 'clamscan' && this.settings.clamdscan.active === true && await this._is_clamav_binary('clamdscan')) {
                         this.scanner == 'clamdscan';
                     } else {
-                        // If preferred scanner is not a valid binary but there is a socket/host option, disabled
+                        // If preferred scanner is not a valid binary but there is a socket/host option, disable
                         // failover to local CLI implementation
                         if (this.settings.clamdscan.socket || this.settings.clamdscan.host) {
                             this.scanner = false;
@@ -394,7 +394,7 @@ class NodeClam {
             if (settings.remove_infected === true) flags_array.push('--remove');
 
             // Specify a config file
-            if ('clamdscan' in settings && typeof settings.clamdscan === 'object' && 'config_file' in settings.clamdscan && settings.clamdscan.config_file && typeof settings.clamdscan.config_file)
+            if ('clamdscan' in settings && typeof settings.clamdscan === 'object' && 'config_file' in settings.clamdscan && settings.clamdscan.config_file && typeof settings.clamdscan.config_file === 'string')
                 flags_array.push(`--config-file=${settings.clamdscan.config_file}`);
 
             // Turn on multi-threaded scanning
@@ -533,30 +533,6 @@ class NodeClam {
     }
 
     // ****************************************************************************
-    // Checks to see if a particular path contains a clamav binary
-    // -----
-    // @param   String  scanner     Scanner (clamscan or clamdscan) to check
-    // @return  Boolean             TRUE: Is binary; FALSE: Not binary
-    // ****************************************************************************
-    _is_clamav_binary_sync(scanner) {
-        const  path = this.settings[scanner].path || null;
-        if (!path) {
-            if (this.settings.testing_mode) console.log(`${this.debug_label}: Could not determine path for clamav binary.`);
-            return false;
-        }
-
-        /*
-         * Saving this line for version 1.0 release--the one that requires Node 0> .12
-         * if (!fs.existsSync(path) || execSync(version_cmds[scanner]).toString().match(/ClamAV/) === null) {
-         */
-        if (!fs.existsSync(path)) {
-            if (this.settings.testing_mode) console.log(`${this.debug_label}: Could not verify the ${scanner} binary.`);
-            return false;
-        }
-        return true;
-    }
-
-    // ****************************************************************************
     // Really basic method to check if the configured `host` is actually the localhost
     // machine. It's not flawless but a decently acurate check for our purposes.
     // -----
@@ -619,7 +595,7 @@ class NodeClam {
                 if (this.settings.debug_mode) console.log(`${this.debug_label}: Error Response: `, error);
                 if (this.settings.debug_mode) console.log(`${this.debug_label}: File may be INFECTED!`);
             }
-            return new NodeClamError({error}, "An error occurred while scanning the piped-through stream.");
+            return new NodeClamError({error}, `An error occurred while scanning the piped-through stream: ${error}`);
         }
 
         if (this.settings.debug_mode) {
@@ -729,7 +705,6 @@ class NodeClam {
                 const err = new NodeClamError({file}, "Invalid or empty file name provided.");
                 return (has_cb ? cb(err, file, null) : reject(err));
             }
-
             // Clean file name
             file = file.trim().replace(/ /g,'\\ ');
 
@@ -753,7 +728,7 @@ class NodeClam {
                         if (err.hasOwnProperty('code') && err.code === 1) {
                             return (has_cb ? cb(null, file, true) : resolve({file, is_infected, viruses}));
                         } else {
-                            const error = new NodeClamError({file, err: e, is_infected: null}, `There was an error scanning the file (ClamAV Error Code: ${err.code})`);
+                            const error = new NodeClamError({file, err, is_infected: null}, `There was an error scanning the file (ClamAV Error Code: ${err.code})`);
                             if (self.settings.debug_mode) console.log(`${this.debug_label}`, error);
                             return (has_cb ? cb(error, file, null) : reject(error));
                         }
@@ -788,7 +763,6 @@ class NodeClam {
                 const err = new NodeClamError({err: e, file}, `Could not find file to scan!`);
                 return (has_cb ? cb(err, file, true) : reject(err));
             }
-
             // Make sure the "file" being scanned is actually a file and not a directory (or something else)
             try {
                 const stats = await fs_stat(file);
@@ -800,7 +774,7 @@ class NodeClam {
                     throw Error(`${file} is not a valid file or directory.`);
                 }
 
-                // If it's a directory/path, scan it useing the `scan_dir` method instead
+                // If it's a directory/path, scan it using the `scan_dir` method instead
                 else if (!is_file && is_directory) {
                     const {is_infected} = await this.scan_dir(file);
                     return (has_cb ? cb(null, file, is_infected) : resolve({file, is_infected, viruses: []}));
@@ -811,6 +785,7 @@ class NodeClam {
 
             // If user wants to scan via socket or TCP...
             if (this.settings.clamdscan.socket || this.settings.clamdscan.host) {
+                // console.log("Yep");
                 // Scan using local unix domain socket (much simpler/faster process--especially with MULTISCAN enabled)
                 if (this.settings.clamdscan.socket) {
                     try {
@@ -824,16 +799,26 @@ class NodeClam {
                             // Use single or default # of threads (potentially slower)
                             client.write(`SCAN ${file}`);
                         }
+
                         client.on('data', async data => {
                             if (this.settings.debug_mode) console.log(`${this.debug_label}: Received response from remote clamd service.`);
                             try {
-                                const {is_infected, viruses} = this._process_result(data.toString());
+                                const result = this._process_result(data.toString());
+                                if (result instanceof Error) throw result;
+
+                                const {is_infected, viruses} = result;
                                 return (has_cb ? cb(null, file, is_infected, viruses) : resolve({file, is_infected, viruses}));
                             } catch (err) {
+                                // Fallback to local if that's an option
+                                if (this.settings.clamdscan.local_fallback === true) return await local_scan();
+
                                 return (has_cb ? cb(err, file, null) : reject(err));
                             }
                         });
                     } catch (err) {
+                        // Fallback to local if that's an option
+                        if (this.settings.clamdscan.local_fallback === true) return await local_scan();
+
                         return (has_cb ? cb(err, file, null) : reject(err));
                     }
                 }
@@ -860,6 +845,7 @@ class NodeClam {
                     }
                 }
             }
+
 
             // If the user just wants to scan locally...
             else {
@@ -1456,8 +1442,8 @@ class NodeClam {
                         return (has_cb ? end_cb(null, [], []) : resolve({stderr, path, is_infected, good_files: [], bad_files: [], viruses}));
                     }
 
-                    const good_files = (infected ? [] : [path]);
-                    const bad_files = (infected ? [path] : []);
+                    const good_files = (is_infected ? [] : [path]);
+                    const bad_files = (is_infected ? [path] : []);
                     return (has_cb ? end_cb(null, good_files, bad_files) : resolve({path, is_infected, good_files, bad_files, viruses}));
                 });
             }
@@ -1468,7 +1454,7 @@ class NodeClam {
                     const {stdout, stderr} = await cp_execfile('find', [path]);
 
                     if (stderr) {
-                        console.log(`${this.debug_label}: `, stderr);
+                        if (this.settings.debug_mode) console.log(`${this.debug_label}: `, stderr);
                         return (has_cb ? end_cb(null, [], []) : resolve({stderr, path, is_infected, good_files: [], bad_files: [], viruses: []}));
                     }
 
@@ -1519,10 +1505,19 @@ class NodeClam {
                                 chunks.push(chunk);
                             })
                             // ClamAV is done sending stuff to us
-                            .on('end', () => {
+                            .on('end', async () => {
                                 if (this.settings.debug_mode) console.log(`${this.debug_label}: Received response from remote clamd service.`);
                                 const response = Buffer.concat(chunks);
-                                const {is_infected, viruses} = this._process_result(response.toString());
+
+                                const result = this._process_result(response.toString());
+                                if (result instanceof Error) {
+                                    // Fallback to local if that's an option
+                                    if (this.settings.clamdscan.local_fallback === true) return await local_scan();
+                                    const err = new NodeClamError({path, err: result}, "There was an issue scanning the path provided.");
+                                    return (has_cb ? end_cb(err, [], []) : reject(err));
+                                }
+
+                                const {is_infected, viruses} = result;
                                 const good_files = (is_infected ? [] : [path]);
                                 const bad_files = (is_infected ? [path] : []);
                                 return (has_cb ? end_cb(null, good_files, bad_files) : resolve({path, is_infected, good_files, bad_files, viruses}));
@@ -1542,7 +1537,7 @@ class NodeClam {
                         const {stdout, stderr} = await cp_execfile('find', [path]);
 
                         if (stderr) {
-                            console.log(`${this.debug_label}: `, stderr);
+                            if (this.settings.debug_mode) console.log(`${this.debug_label}: `, stderr);
                             return (has_cb ? end_cb(null, [], []) : resolve({stderr, path, is_infected, good_files: [], bad_files: [], viruses: []}));
                         }
 

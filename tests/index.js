@@ -131,7 +131,7 @@ describe('Initialized NodeClam module', () => {
         expect(clamscan.defaults.clamdscan.port).to.eql(false);
         expect(clamscan.defaults.clamdscan.local_fallback).to.eql(true);
         expect(clamscan.defaults.clamdscan.path).to.eql('/usr/bin/clamdscan');
-        expect(clamscan.defaults.clamdscan.config_file).to.eql('/etc/clamd.conf');
+        expect(clamscan.defaults.clamdscan.config_file).to.eql(null);
         expect(clamscan.defaults.clamdscan.multiscan).to.be.eql(true);
         expect(clamscan.defaults.clamdscan.reload_db).to.eql(false);
         expect(clamscan.defaults.clamdscan.active).to.eql(true);
@@ -269,18 +269,19 @@ describe('build_clam_flags', () => {
 
     it('should build a series of flags', () => {
         if (clamscan.settings.preference === 'clamdscan') {
-            clamscan.clam_flags.should.be.eql([
-              '--no-summary',
-              '--fdpass',
-              '--config-file=' + config.clamdscan.config_file,
-              '--multiscan',
-              '--move=' + config.quarantine_infected,
-              '--log=' + config.scan_log,
-            ]);
+            let flags = [
+                '--no-summary',
+                '--fdpass',
+                config.clamdscan.config_file ? '--config-file=' + config.clamdscan.config_file : null,
+                '--multiscan',
+                '--move=' + config.quarantine_infected,
+                config.scan_log ? '--log=' + config.scan_log : null,
+            ].filter(v => !!v);
+            clamscan.clam_flags.should.be.eql(flags);
         } else {
             clamscan.clam_flags.should.be.eql([
-              '--no-summary',
-              '--log=' + config.scan_log,
+                '--no-summary',
+                '--log=' + config.scan_log,
             ]);
         }
     });
