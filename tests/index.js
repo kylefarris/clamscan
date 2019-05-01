@@ -455,6 +455,39 @@ describe('is_infected', () => {
                 }
             });
         });
+
+        it('should respond with an empty array of viruses when file is NOT infected', done => {
+            clamscan.is_infected(good_scan_file, (err, file, is_infected, viruses) => {
+                check(done, () => {
+                    expect(err).to.not.be.instanceof(Error);
+                    expect(viruses).to.be.an('array');
+                    expect(viruses).to.have.length(0);
+                });
+            });
+        });
+
+        it('should respond with name of virus when file is infected', done => {
+            request(fake_virus_url, (error, response, body) => {
+                if (!error && response.statusCode == 200) {
+                    fs.writeFileSync(bad_scan_file, body);
+
+                    clamscan.is_infected(bad_scan_file, (err, file, is_infected, viruses) => {
+                        check(done, () => {
+                            expect(viruses).to.be.an('array');
+                            expect(viruses).to.have.length(1);
+                            expect(viruses[0]).to.match(/^Eicar\-Test\-Signature/);
+
+                            if (fs.existsSync(bad_scan_file)) {
+                                fs.unlinkSync(bad_scan_file);
+                            }
+                        });
+                    });
+                } else {
+                    console.log("Could not download test virus file!");
+                    console.error(error);
+                }
+            });
+        });
     });
 
     describe('promise-style', () => {
@@ -490,7 +523,18 @@ describe('is_infected', () => {
             });
         });
 
-        it('should respond with TRUE when non-archive file is infected', done => {
+        it('should respond with an empty array of viruses when file is NOT infected', done => {
+            clamscan.is_infected(good_scan_file).then(result => {
+                const {viruses} = result;
+                expect(viruses).to.be.an('array');
+                expect(viruses).to.have.length(0);
+                done();
+            }).catch(err => {
+                done(err);
+            });
+        });
+
+        it('should respond with name of virus when file is infected', done => {
             prequest(fake_virus_url).then(result => {
                 const {body, statusCode} = result;
                 expect(body).to.be.a('string');
@@ -503,9 +547,10 @@ describe('is_infected', () => {
 
                 return clamscan.is_infected(bad_scan_file);
             }).then(result => {
-                const {file, is_infected} = result;
-                expect(is_infected).to.be.a('boolean');
-                expect(is_infected).to.eql(true);
+                const {viruses} = result;
+                expect(viruses).to.be.an('array');
+                expect(viruses).to.have.length(1);
+                expect(viruses[0]).to.match(/^Eicar\-Test\-Signature/);
 
                 done();
             }).catch(err => {
@@ -550,6 +595,33 @@ describe('is_infected', () => {
                 }
             }
         });
+
+        it('should respond with an empty array of viruses when file is NOT infected', async () => {
+            try {
+                const {viruses} = await clamscan.is_infected(good_scan_file);
+                expect(viruses).to.be.an('array');
+                expect(viruses).to.have.length(0);
+            } catch (err) {
+                throw err;
+            }
+        });
+
+        it('should respond with name of virus when file is infected', async () => {
+            const {body, statusCode} = await request(fake_virus_url);
+            if (statusCode == 200 && body && typeof body === 'string') {
+                fs.writeFileSync(bad_scan_file, body);
+                try {
+                    const {viruses} = await clamscan.is_infected(bad_scan_file);
+                    expect(viruses).to.be.an('array');
+                    expect(viruses).to.have.length(1);
+                    expect(viruses[0]).to.match(/^Eicar\-Test\-Signature/);
+                } catch (err) {
+                    throw err;
+                } finally {
+                    if (fs.existsSync(bad_scan_file)) fs.unlinkSync(bad_scan_file);
+                }
+            }
+        });
     });
 });
 
@@ -567,30 +639,43 @@ describe('scan_file', () => {
         clamscan.scan_file.should.be.a('function');
     });
     it('should behave just like is_infected (callback)', done => {
-        clamscan.scan_file(good_scan_file, (err, file, is_infected) => {
+        clamscan.scan_file(good_scan_file, (err, file, is_infected, viruses) => {
             check(done, () => {
                 expect(err).to.not.be.instanceof(Error);
                 expect(file).to.not.be.empty;
                 file.should.be.a('string');
                 file.should.eql(good_scan_file);
+                expect(is_infected).to.be.a('boolean');
+                expect(is_infected).to.eql(false);
+                expect(viruses).to.be.an('array');
+                expect(viruses).to.have.length(0);
             });
         });
     });
     it('should behave just like is_infected (promise)', done => {
         clamscan.scan_file(good_scan_file).then(result => {
-            const {file, is_infected} = result;
+            const {file, is_infected, viruses} = result;
             expect(file).to.not.be.empty;
             file.should.be.a('string');
             file.should.eql(good_scan_file);
+            expect(is_infected).to.be.a('boolean');
+            expect(is_infected).to.eql(false);
+            expect(viruses).to.be.an('array');
+            expect(viruses).to.have.length(0);
             done();
         }).catch(err => {
             done(err);
         })
     });
     it('should behave just like is_infected (async/await)', async () => {
-        const {file, is_infected} = await clamscan.scan_file(good_scan_file);
+        const {file, is_infected, viruses} = await clamscan.scan_file(good_scan_file);
+        expect(file).to.not.be.empty;
+        expect(file).to.be.a('string');
+        expect(file).to.eql(good_scan_file);
         expect(is_infected).to.be.a('boolean');
         expect(is_infected).to.eql(false);
+        expect(viruses).to.be.an('array');
+        expect(viruses).to.have.length(0);
     });
 });
 
@@ -828,6 +913,51 @@ describe('scan_files', () => {
                 });
             });
         });
+
+        it('should provide an empty array for the "viruses" parameter if no infected files are found', done => {
+            clamscan.scan_files(good_scan_file, (err, good_files, bad_files, error_files, viruses) => {
+                check(done, () => {
+                    expect(err).to.not.be.instanceof(Error);
+
+                    expect(viruses).to.be.an('array');
+                    expect(viruses).to.have.length(0);
+                });
+            });
+        });
+
+        it('should provide a list of viruses found if the any of the files in the list is infected', done => {
+            request(fake_virus_url, (error, response, body) => {
+                if (!error && response.statusCode == 200) {
+                    fs.writeFileSync(bad_scan_file, body);
+
+                    clamscan.scan_files([bad_scan_file, `${__dirname}/good_scan_dir/good_file_1.txt`], (err, good_files, bad_files, error_files, viruses) => {
+                        check(done, () => {
+                            expect(err).to.not.be.instanceof(Error);
+
+                            expect(good_files).to.not.be.empty;
+                            expect(good_files).to.be.an('array');
+                            expect(good_files).to.have.length(1);
+
+                            expect(bad_files).to.not.be.empty;
+                            expect(bad_files).to.be.an('array');
+                            expect(bad_files).to.have.length(1);
+
+                            expect(error_files).to.be.eql({});
+
+                            expect(viruses).to.not.be.empty;
+                            expect(viruses).to.be.an('array');
+                            expect(viruses).to.have.length(1);
+                            expect(viruses[0]).to.match(/^Eicar\-Test\-Signature/);
+
+                            if (fs.existsSync(bad_scan_file)) fs.unlinkSync(bad_scan_file);
+                        });
+                    });
+                } else {
+                    console.log("Could not download test virus file!");
+                    console.error(error);
+                }
+            });
+        });
     });
 });
 
@@ -920,6 +1050,29 @@ describe('scan_dir', () => {
 
                         expect(good_files).to.be.an('array');
                         expect(good_files).to.be.empty;
+
+                        if (fs.existsSync(bad_scan_file)) fs.unlinkSync(bad_scan_file);
+                    });
+                });
+            } else {
+                console.log("Could not download test virus file!");
+                console.error(error);
+            }
+        });
+    });
+
+    it('should supply an array with viruses found when directory has infected files', done => {
+        request(fake_virus_url, (error, response, body) => {
+            if (!error && response.statusCode == 200) {
+                fs.writeFileSync(bad_scan_file, body);
+
+                clamscan.scan_dir(bad_scan_dir, (err, good_files, bad_files, viruses) => {
+                    check(done, () => {
+                        expect(err).to.not.be.instanceof(Error);
+                        expect(viruses).to.not.be.empty;
+                        expect(viruses).to.be.an('array');
+                        expect(viruses).to.have.length(1);
+                        expect(viruses[0]).to.match(/^Eicar\-Test\-Signature/);
 
                         if (fs.existsSync(bad_scan_file)) fs.unlinkSync(bad_scan_file);
                     });
