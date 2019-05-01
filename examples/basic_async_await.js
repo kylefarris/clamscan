@@ -7,20 +7,22 @@ const scan_file = `${temp_dir}/tmp_file.txt`;
 //const test_file = normal_file_url;
 const test_file = fake_virus_url;
 
+const config = {
+    remove_infected: true,
+    debug_mode: false,
+    scan_recursively: false,
+    clamdscan: {
+        path: '/usr/bin/clamdscan',
+        // config_file: '/etc/clamd.d/daemon.conf'
+    },
+    preference: 'clamdscan'
+};
+
 // Initialize the clamscan module
 const NodeClam = require('../index.js'); // Offically: require('clamscan');
 
-async function test() {
-    const clamscan = await new NodeClam().init({
-        remove_infected: true,
-        debug_mode: false,
-        scan_recursively: false,
-        clamdscan: {
-            path: '/usr/bin/clamdscan',
-            config_file: '/etc/clamd.d/daemon.conf'
-        },
-        preference: 'clamdscan'
-    });
+;(async () => {
+    const clamscan = await new NodeClam().init(config);
 
     // Request a test file from the internet...
     request(test_file, async (error, response, body) => {
@@ -55,6 +57,4 @@ async function test() {
             process.exit(1);
         }
     });
-}
-
-test();
+})();
