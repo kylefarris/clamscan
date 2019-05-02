@@ -1,3 +1,8 @@
+[![NPM Version][npm-version-image]][npm-url]
+[![NPM Downloads][npm-downloads-image]][npm-url]
+[![Node.js Version][node-image]][node-url]
+[![Build Status][travis-image]][travis-url]
+
 # NodeJS Clamscan Virus Scanning Utility
 
 Use Node JS to scan files on your server with ClamAV's clamscan/clamdscan binary or via TCP to a remote server or local UNIX Domain socket. This is especially useful for scanning uploaded files provided by un-trusted sources.
@@ -11,6 +16,24 @@ All other versions in NPM have been deprecated.
 # Version 1.0.0 Information:
 
 If you are migrating from v0.8.5 or less to v1.0.0 or greater, please read the [release notes](https://github.com/kylefarris/clamscan/releases/tag/v1.0.0) as there are some breaking changes (but also some awesome new features!).
+
+# Table of Contents
+- [Dependencies](#dependencies)
+  - [Local Binary Method](#to-use-local-binary-method-of-scanning)
+  - [TCP/Domain Socket Method](#to-use-clamav-using-tcp-sockets)
+- [How to Install](#how-to-install)
+- [License Info](#license-info)
+- [Getting Started](#getting-started)
+  - [A note about using this module via sockets or TCP](#a-note-about-using-this-module-via-sockets-or-tcp)
+- [Basic Usage Example](#basic-usage-example)
+- [API](#api)
+  - [get_version](#get_version)
+  - [is_infected (alias: scan_file)](#is_infected)
+  - [scan_dir](#scan_dir)
+  - [scan_files](#scan_files)
+  - [scan_stream](#scan_stream)
+  - [passthrough](#passthrough)
+- [Changing Configuration After Instantiation](#changing-configuration-after-instantiation)
 
 # Dependencies
 
@@ -61,7 +84,7 @@ You will need access to either:
 npm install clamscan
 ```
 
-# Licence info
+# License Info
 
 Licensed under the MIT License:
 
@@ -217,6 +240,8 @@ some_function();
 
 Complete/functional examples for various use-cases can be found in the [examples folder](https://github.com/kylefarris/clamscan/tree/master/examples).
 
+<a name="get_version"></a>
+
 ## .get_version([callback])
 
 This method allows you to determine the version of ClamAV you are interfacing with. It supports a callback and Promise API. If no callback is supplied, a Promise will be returned.
@@ -252,6 +277,8 @@ clamscan.get_version().then(version => {
     console.error(err);
 });
 ```
+
+<a name="is_infected"></a>
 
 ## .is_infected(file_path[,callback])
 
@@ -309,6 +336,8 @@ clamscan.is_infected('/a/picture/for_example.jpg').then(result => {
 ```javascript
 const {file, is_infected, viruses} = await clamscan.is_infected('/a/picture/for_example.jpg');
 ```
+
+<a name="scan_dir"></a>
 
 ## .scan_dir(dir_path[,end_callback[,file_callback]])
 
@@ -384,6 +413,8 @@ clamscan.scan_dir('/some/path/to/scan').then(results => {
 ```javascript
 const {path, is_infected, good_files, bad_files, viruses} = await clamscan.scan_dir('/some/path/to/scan');
 ```
+
+<a name="scan_files"></a>
 
 ## .scan_files(files[,end_callback[,file_callback]])
 
@@ -490,6 +521,8 @@ ClamScan.then(async clamscan => {
 });
 ```
 
+<a name="scan_stream"></a>
+
 ## .scan_stream(stream[,callback])
 
 This method allows you to scan a binary stream. **NOTE**: This method will only work if you've configured the module to allow the use of a TCP or UNIX Domain socket. In other words, this will not work if you only have access to a local ClamAV binary.
@@ -518,6 +551,16 @@ This method allows you to scan a binary stream. **NOTE**: This method will only 
 **Callback Example:**
 
 ```javascript
+const NodeClam = require('clamscan');
+
+// You'll need to specify your socket or TCP connection info
+const clamscan = new NodeClam().init({
+    clamdscan: {
+        socket: '/var/run/clamd.scan/clamd.sock',
+        host: '127.0.0.1',
+        port: 3310,
+    }
+});
 const Readable = require('stream').Readable;
 const rs = Readable();
 
@@ -549,7 +592,63 @@ clamscan.scan_stream(stream).then(is_infected => {
 const is_infected = await clamscan.scan_stream(stream);
 ```
 
-### Changing Configuration After Instantiation
+<a name="passthrough"></a>
+
+## .passthrough()
+
+The `passthrough` method returns a PassthroughStream object which allows you pipe a ReadbleStream through it and on to another output. In the case of this module's passthrough implementation, it's actually forking the data to also go to ClamAV via TCP or Domain Sockets. Each data chunk is only passed on to the output if that chunk was successfully sent to and received by ClamAV. The PassthroughStream object returned from this method has a special event that is emitted when ClamAV finishes scanning the streamed data so that you can decide if there's anything you need to do with the final output destination (ex. delete a file or S3 object).
+
+Typically, a file is uploaded to the local filesytem and then subsequently scanned. In this case, you have to wait for the upload to complete *and then* for the scan to complete. This method could theoretically speed up user uploads intended to be scanned by up to 2x because the files are simultaneously scanned and written to any WriteableStream output (examples: filesystem, S3, gzip, etc...). 
+
+As for the theoretical gains, your mileage my vary and I'd love to hear feedback on this to see where things can still be improved.
+
+Pleae note that this method is different than all the others in that it returns a PassthroughStream object and does not support a Promise or Callback API. This makes sense once you see the example below (a practical working example can be found in the examples directory of this module):
+
+### Example
+
+```javascript
+const NodeClam = require('clamscan');
+
+// You'll need to specify your socket or TCP connection info
+const clamscan = new NodeClam().init({
+    clamdscan: {
+        socket: '/var/run/clamd.scan/clamd.sock',
+        host: '127.0.0.1',
+        port: 3310,
+    }
+});
+
+// For example's sake, we're using the RequestJS module
+const request = require('request');
+
+// Get a readable stream for a URL request
+const input = request.get(some_url);
+
+// Create a writable stream to a local file
+const output = fs.createWriteStream(some_local_file);
+
+// Get instance of this module's PassthroughStream object
+const av = clamscan.passthrough();
+
+// Send output of RequestJS stream to ClamAV.
+// Send output of RequestJS to `some_local_file` if ClamAV receives data successfully
+input.pipe(av).pipe(output);
+
+// What happens when scan is completed
+av.on('scan-complete', result => {
+   const {is_infected, viruses} = result;
+   // Do stuff if you want
+});
+
+// What happens when data has been fully written to `output`
+output.on('finish', () => {
+    // Do stuff if you want
+});
+
+// NOTE: no errors are being handled in this example but standard errors will be emitted according to NodeJS's Stream specifications
+```
+
+## Changing Configuration After Instantiation
 
 You can set settings directly on an instance of this module using the following syntax:
 
@@ -577,7 +676,10 @@ Got a missing feature you'd like to use? Found a bug? Go ahead and fork this rep
 - <http://cpansearch.perl.org/src/JMEHNLE/ClamAV-Client-0.11/lib/ClamAV/Client.pm>
 - <https://github.com/yongtang/clamav.js>
 
-## Items for version 1.0 release:
-
-- Slight change of API to allow for a completely asynchronous module (ie, removal of all `fs.xxSync` items).
-- Allow the ability to scan Buffers, Streams, and Strings directly.
+[npm-version-image]: https://img.shields.io/npm/v/clamscan.svg
+[npm-downloads-image]: https://img.shields.io/npm/dm/clamscan.svg
+[npm-url]: https://npmjs.org/package/clamscan
+[travis-image]: https://img.shields.io/travis/kylefarris/node-querybuilder/master.svg
+[travis-url]: https://travis-ci.org/kylefarris/clamscan
+[node-image]: https://img.shields.io/node/v/clamscan.svg
+[node-url]: https://nodejs.org/en/download
