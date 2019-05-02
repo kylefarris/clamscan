@@ -22,12 +22,14 @@ If you are migrating from v0.8.5 or less to v1.0.0 or greater, please read the [
   - [TCP/Domain Socket Method](#to-use-clamav-using-tcp-sockets)
 
 - [How to Install](#how-to-install)
+
 - [License Info](#license-info)
 - [Getting Started](#getting-started)
 
   - [A note about using this module via sockets or TCP](#a-note-about-using-this-module-via-sockets-or-tcp)
 
 - [Basic Usage Example](#basic-usage-example)
+
 - [API](#api)
 
   - [get_version](#get_version)
@@ -38,6 +40,7 @@ If you are migrating from v0.8.5 or less to v1.0.0 or greater, please read the [
   - [passthrough](#passthrough)
 
 - [Contribute](#contribute)
+
 - [Resources used to help develop this module](#resources-used-to-help-develop-this-module)
 
 # Dependencies
