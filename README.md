@@ -1,7 +1,4 @@
-[![NPM Version][npm-version-image]][npm-url]
-[![NPM Downloads][npm-downloads-image]][npm-url]
-[![Node.js Version][node-image]][node-url]
-[![Build Status][travis-image]][travis-url]
+[![NPM Version][npm-version-image]][npm-url] [![NPM Downloads][npm-downloads-image]][npm-url] [![Node.js Version][node-image]][node-url] [![Build Status][travis-image]][travis-url]
 
 # NodeJS Clamscan Virus Scanning Utility
 
@@ -18,22 +15,30 @@ All other versions in NPM have been deprecated.
 If you are migrating from v0.8.5 or less to v1.0.0 or greater, please read the [release notes](https://github.com/kylefarris/clamscan/releases/tag/v1.0.0) as there are some breaking changes (but also some awesome new features!).
 
 # Table of Contents
+
 - [Dependencies](#dependencies)
+
   - [Local Binary Method](#to-use-local-binary-method-of-scanning)
   - [TCP/Domain Socket Method](#to-use-clamav-using-tcp-sockets)
+
 - [How to Install](#how-to-install)
 - [License Info](#license-info)
 - [Getting Started](#getting-started)
+
   - [A note about using this module via sockets or TCP](#a-note-about-using-this-module-via-sockets-or-tcp)
+
 - [Basic Usage Example](#basic-usage-example)
 - [API](#api)
+
   - [get_version](#get_version)
   - [is_infected (alias: scan_file)](#is_infected)
   - [scan_dir](#scan_dir)
   - [scan_files](#scan_files)
   - [scan_stream](#scan_stream)
   - [passthrough](#passthrough)
-- [Changing Configuration After Instantiation](#changing-configuration-after-instantiation)
+
+- [Contribute](#contribute)
+- [Resources used to help develop this module](#resources-used-to-help-develop-this-module)
 
 # Dependencies
 
@@ -240,7 +245,7 @@ some_function();
 
 Complete/functional examples for various use-cases can be found in the [examples folder](https://github.com/kylefarris/clamscan/tree/master/examples).
 
-<a name="get_version"></a>
+[]()
 
 ## .get_version([callback])
 
@@ -278,7 +283,7 @@ clamscan.get_version().then(version => {
 });
 ```
 
-<a name="is_infected"></a>
+[]()
 
 ## .is_infected(file_path[,callback])
 
@@ -337,7 +342,7 @@ clamscan.is_infected('/a/picture/for_example.jpg').then(result => {
 const {file, is_infected, viruses} = await clamscan.is_infected('/a/picture/for_example.jpg');
 ```
 
-<a name="scan_dir"></a>
+[]()
 
 ## .scan_dir(dir_path[,end_callback[,file_callback]])
 
@@ -414,7 +419,7 @@ clamscan.scan_dir('/some/path/to/scan').then(results => {
 const {path, is_infected, good_files, bad_files, viruses} = await clamscan.scan_dir('/some/path/to/scan');
 ```
 
-<a name="scan_files"></a>
+[]()
 
 ## .scan_files(files[,end_callback[,file_callback]])
 
@@ -521,7 +526,7 @@ ClamScan.then(async clamscan => {
 });
 ```
 
-<a name="scan_stream"></a>
+[]()
 
 ## .scan_stream(stream[,callback])
 
@@ -592,13 +597,13 @@ clamscan.scan_stream(stream).then(is_infected => {
 const is_infected = await clamscan.scan_stream(stream);
 ```
 
-<a name="passthrough"></a>
+[]()
 
 ## .passthrough()
 
 The `passthrough` method returns a PassthroughStream object which allows you pipe a ReadbleStream through it and on to another output. In the case of this module's passthrough implementation, it's actually forking the data to also go to ClamAV via TCP or Domain Sockets. Each data chunk is only passed on to the output if that chunk was successfully sent to and received by ClamAV. The PassthroughStream object returned from this method has a special event that is emitted when ClamAV finishes scanning the streamed data so that you can decide if there's anything you need to do with the final output destination (ex. delete a file or S3 object).
 
-Typically, a file is uploaded to the local filesytem and then subsequently scanned. In this case, you have to wait for the upload to complete *and then* for the scan to complete. This method could theoretically speed up user uploads intended to be scanned by up to 2x because the files are simultaneously scanned and written to any WriteableStream output (examples: filesystem, S3, gzip, etc...). 
+Typically, a file is uploaded to the local filesytem and then subsequently scanned. In this case, you have to wait for the upload to complete _and then_ for the scan to complete. This method could theoretically speed up user uploads intended to be scanned by up to 2x because the files are simultaneously scanned and written to any WriteableStream output (examples: filesystem, S3, gzip, etc...).
 
 As for the theoretical gains, your mileage my vary and I'd love to hear feedback on this to see where things can still be improved.
 
@@ -648,22 +653,6 @@ output.on('finish', () => {
 // NOTE: no errors are being handled in this example but standard errors will be emitted according to NodeJS's Stream specifications
 ```
 
-## Changing Configuration After Instantiation
-
-You can set settings directly on an instance of this module using the following syntax:
-
-```javascript
-var clam = require('clamscan')({ /** Some configs here... */});
-
-// will quarantine files
-clam.settings.quarantine_infected = true;
-clam.is_infected('/some/file.txt');
-
-// will not quarantine files
-clam.settings.quarantine_infected = false;
-clam.is_infected('/some/file.txt');
-```
-
 Just keep in mind that some of the nice validation that happens on instantiation won't happen if it's done this way. Of course, you could also just create a new instance with different a different initial configuration.
 
 # Contribute
@@ -675,11 +664,13 @@ Got a missing feature you'd like to use? Found a bug? Go ahead and fork this rep
 - <https://stuffivelearned.org/doku.php?id=apps:clamav:general:remoteclamdscan>
 - <http://cpansearch.perl.org/src/JMEHNLE/ClamAV-Client-0.11/lib/ClamAV/Client.pm>
 - <https://github.com/yongtang/clamav.js>
+- <https://nodejs.org/dist/latest-v10.x/docs/api/stream.html>
+- <https://manpages.debian.org/jessie/clamav-daemon/clamd.8.en.html>
 
-[npm-version-image]: https://img.shields.io/npm/v/clamscan.svg
-[npm-downloads-image]: https://img.shields.io/npm/dm/clamscan.svg
-[npm-url]: https://npmjs.org/package/clamscan
-[travis-image]: https://img.shields.io/travis/kylefarris/node-querybuilder/master.svg
-[travis-url]: https://travis-ci.org/kylefarris/clamscan
 [node-image]: https://img.shields.io/node/v/clamscan.svg
 [node-url]: https://nodejs.org/en/download
+[npm-downloads-image]: https://img.shields.io/npm/dm/clamscan.svg
+[npm-url]: https://npmjs.org/package/clamscan
+[npm-version-image]: https://img.shields.io/npm/v/clamscan.svg
+[travis-image]: https://img.shields.io/travis/kylefarris/node-querybuilder/master.svg
+[travis-url]: https://travis-ci.org/kylefarris/clamscan
