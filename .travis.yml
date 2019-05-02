@@ -1,9 +1,9 @@
 language: node_js
 node_js:
-  - "0.10"
-  - "0.11"
-  - "0.12"
+  - "10.0"
+  - "11.0"
 before_install:
   - sudo apt-get update
-  - sudo apt-get install clamav
+  - sudo apt-get install clamav clamav-daemon
   - sudo freshclam -v
+  - sudo service clamav-daemon restart
