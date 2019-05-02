@@ -85,7 +85,7 @@ This file is a manually maintained list of changes for each release. Feel free t
 - Created a `scan_stream` method.
 - Minor code clean-up
 
-## 1.0.0
+## 1.0.0 (2019-05-02)
 
 This is a huge major release in which this module was essentially completely re-written. This version introduces some breaking changes and major new features. Please read the release notes below carefully.
 
@@ -288,11 +288,8 @@ This method is different than all the others in that it returns a PassthroughStr
 
         // What happens when scan is completed
         av.on('scan-complete', result => {
-            check(done, () => {
-                const {is_infected, viruses} = result;
-
-                // Do stuff if you want
-            });
+            const {is_infected, viruses} = result;
+            // Do stuff if you want
         });
 
         // What happens when data has been fully written to `output`
