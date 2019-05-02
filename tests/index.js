@@ -1083,6 +1083,8 @@ describe('scan_dir', () => {
             }
         });
     });
+
+    // TODO: Write tests for file_callback
 });
 
 describe('scan_stream', () => {
