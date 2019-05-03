@@ -4,6 +4,6 @@ node_js:
   - "11.0"
 before_install:
   - sudo apt-get update
-  - sudo apt-get install clamav clamav-daemon
+  - sudo apt-get install clamav clamav-daemon clamav-freshclam
   - sudo freshclam -v
   - sudo service clamav-daemon restart
