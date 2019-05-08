@@ -597,11 +597,11 @@ const is_infected = await clamscan.scan_stream(stream);
 
 The `passthrough` method returns a PassthroughStream object which allows you pipe a ReadbleStream through it and on to another output. In the case of this module's passthrough implementation, it's actually forking the data to also go to ClamAV via TCP or Domain Sockets. Each data chunk is only passed on to the output if that chunk was successfully sent to and received by ClamAV. The PassthroughStream object returned from this method has a special event that is emitted when ClamAV finishes scanning the streamed data so that you can decide if there's anything you need to do with the final output destination (ex. delete a file or S3 object).
 
-Typically, a file is uploaded to the local filesytem and then subsequently scanned. In this case, you have to wait for the upload to complete _and then_ for the scan to complete. This method could theoretically speed up user uploads intended to be scanned by up to 2x because the files are simultaneously scanned and written to any WriteableStream output (examples: filesystem, S3, gzip, etc...).
+In typical, non-passthrough setups, a file is uploaded to the local filesytem and then subsequently scanned. With that setup, you have to wait for the upload to complete _and then wait again_ for the scan to complete. Using this module's `passthrough` method, you could theoretically speed up user uploads intended to be scanned by up to 2x because the files are simultaneously scanned and written to any WriteableStream output (examples: filesystem, S3, gzip, etc...).
 
-As for the theoretical gains, your mileage my vary and I'd love to hear feedback on this to see where things can still be improved.
+As for these theoretical gains, your mileage my vary and I'd love to hear feedback on this to see where things can still be improved.
 
-Pleae note that this method is different than all the others in that it returns a PassthroughStream object and does not support a Promise or Callback API. This makes sense once you see the example below (a practical working example can be found in the examples directory of this module):
+Please note that this method is different than all the others in that it returns a PassthroughStream object and does not support a Promise or Callback API. This makes sense once you see the example below (a practical working example can be found in the examples directory of this module):
 
 ### Example
 
@@ -644,10 +644,9 @@ output.on('finish', () => {
     // Do stuff if you want
 });
 
-// NOTE: no errors are being handled in this example but standard errors will be emitted according to NodeJS's Stream specifications
+// NOTE: no errors (or other events) are being handled in this example but standard errors will be emitted according to NodeJS's Stream specifications
 ```
 
-Just keep in mind that some of the nice validation that happens on instantiation won't happen if it's done this way. Of course, you could also just create a new instance with different a different initial configuration.
 
 # Contribute
 
