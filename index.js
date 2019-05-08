@@ -1532,7 +1532,7 @@ class NodeClam {
                                 const {is_infected, viruses} = result;
                                 const good_files = (is_infected ? [] : [path]);
                                 const bad_files = (is_infected ? [path] : []);
-                                return (has_cb ? end_cb(null, good_files, bad_files) : resolve({path, is_infected, good_files, bad_files, viruses}));
+                                return (has_cb ? end_cb(null, good_files, bad_files, viruses) : resolve({path, is_infected, good_files, bad_files, viruses}));
                             });
                     } catch (e) {
                         const err = new NodeClamError({path, err: e}, "There was an issue scanning the path provided.");

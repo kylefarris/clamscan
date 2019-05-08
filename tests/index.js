@@ -13,16 +13,13 @@ const good_file_list = __dirname + '/good_files_list.txt';
 const bad_scan_dir = __dirname + '/bad_scan_dir';
 const bad_scan_file = `${bad_scan_dir}/bad_file_1.txt`;
 const bad_file_list = __dirname + '/bad_files_list.txt';
-const bad_file = __dirname + '/bad_file.txt';
 const passthru_file = __dirname + '/output';
 const no_virus_url = 'https://raw.githubusercontent.com/kylefarris/clamscan/sockets/README.md';
 const fake_virus_url = 'https://secure.eicar.org/eicar_com.txt';
-const fake_virus_url2 = 'https://secure.eicar.org/eicarcom2.zip';
 
 // Promisify some stuff
 const prequest = promisify(request);
 const fs_stat = promisify(fs.stat);
-const fs_unlink = promisify(fs.unlink);
 const fs_readfile = promisify(fs.readFile);
 
 // Chai plugins
@@ -47,7 +44,6 @@ fs.writeFileSync(modified_good_file_list, good_file_list_contents.split("\n").ma
 
 // Help to find unhandled promise rejections
 process.on('unhandledRejection', (reason, p) => {
-  //console.log('Unhandled Rejection at: Promise', p, 'reason:', reason, 'stack:', reason.stack);
   if (reason && typeof reason === 'object' && 'actual' in reason) {
       console.log("Reason: ", reason.message, reason.actual);
   }
@@ -67,10 +63,6 @@ const reset_clam = async (overrides = {}) => {
         delete overrides.clamscan;
 
         const new_config = Object.assign({}, config, overrides, {clamdscan, clamscan});
-
-        // if (new_config.clamdscan.path ===  __dirname + '/should/not/exist') {
-        //     console.log("New Config: ", new_config);
-        // }
 
         return await new NodeClam().init(new_config);
     } catch (err) {
@@ -1066,10 +1058,10 @@ describe('scan_dir', () => {
             if (!error && response.statusCode == 200) {
                 fs.writeFileSync(bad_scan_file, body);
 
-                clamscan.scan_dir(bad_scan_dir, (err, good_files, bad_files, viruses) => {
+                clamscan.scan_dir(bad_scan_dir, (err, _good_files, _bad_files, viruses) => {
                     check(done, () => {
                         expect(err).to.not.be.instanceof(Error);
-                        expect(viruses).to.not.be.empty;
+                        expect(viruses).to.not.be.empty
                         expect(viruses).to.be.an('array');
                         expect(viruses).to.have.length(1);
                         expect(viruses[0]).to.match(/^Eicar\-Test\-Signature/);
