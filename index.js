@@ -499,9 +499,6 @@ class NodeClam {
     // ****************************************************************************
     // Checks to see if a particular path contains a clamav binary
     // -----
-    // NOTE: Not currently being used (maybe for future implementations)
-    // SEE: in_clamav_binary_sync()
-    // -----
     // @param   String      scanner     Scanner (clamscan or clamdscan) to check
     // @return  Promise
     // ****************************************************************************
@@ -513,14 +510,14 @@ class NodeClam {
         }
 
         const version_cmds = {
-            clamdscan: `${path} -c ${this.settings.clamdscan.config_file} --version`,
+            clamdscan: `${path} --version`,
             clamscan: `${path} --version`,
         };
 
         try {
             await fs_access(path, fs.constants.R_OK);
 
-            const {stdout, stderr} = await cp_exec(version_cmds[scanner]);
+            const {stdout} = await cp_exec(version_cmds[scanner]);
             if (stdout.toString().match(/ClamAV/) === null) {
                 if (this.settings.debug_mode) console.log(`${this.debug_label}: Could not verify the ${scanner} binary.`);
                 return false;
@@ -551,7 +548,6 @@ class NodeClam {
     // @return  Boolean         TRUE: Is stream; FALSE: is not stream.
     // ****************************************************************************
     _is_readable_stream(obj) {
-        const stream = require('stream');
         if (!obj || typeof obj !== 'object') return false;
         return typeof obj.pipe === 'function' && typeof obj._readableState === 'object';
     }
