@@ -666,5 +666,5 @@ Got a missing feature you'd like to use? Found a bug? Go ahead and fork this rep
 [npm-downloads-image]: https://img.shields.io/npm/dm/clamscan.svg
 [npm-url]: https://npmjs.org/package/clamscan
 [npm-version-image]: https://img.shields.io/npm/v/clamscan.svg
-[travis-image]: https://img.shields.io/travis/kylefarris/node-querybuilder/master.svg
+[travis-image]: https://img.shields.io/travis/kylefarris/clamscan/master.svg
 [travis-url]: https://travis-ci.org/kylefarris/clamscan
