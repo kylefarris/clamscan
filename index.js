@@ -195,10 +195,10 @@ class NodeClam {
                 // If scanner binary doesn't exist...
                 if (!await this._is_clamav_binary(this.scanner)) {
                     // Fall back to other option:
-                    if (this.scanner == 'clamdscan' && this.settings.clamscan.active === true && await this._is_clamav_binary('clamscan')) {
-                        this.scanner == 'clamscan';
-                    } else if (this.scanner == 'clamscan' && this.settings.clamdscan.active === true && await this._is_clamav_binary('clamdscan')) {
-                        this.scanner == 'clamdscan';
+                    if (this.scanner === 'clamdscan' && this.settings.clamscan.active === true && await this._is_clamav_binary('clamscan')) {
+                        this.scanner = 'clamscan';
+                    } else if (this.scanner === 'clamscan' && this.settings.clamdscan.active === true && await this._is_clamav_binary('clamdscan')) {
+                        this.scanner = 'clamdscan';
                     } else {
                         // If preferred scanner is not a valid binary but there is a socket/host option, disable
                         // failover to local CLI implementation
@@ -357,7 +357,7 @@ class NodeClam {
         const flags_array = ['--no-summary'];
 
         // Flags specific to clamscan
-        if (scanner == 'clamscan') {
+        if (scanner === 'clamscan') {
             flags_array.push('--stdout');
 
             // Remove infected files
@@ -387,7 +387,7 @@ class NodeClam {
         }
 
         // Flags specific to clamdscan
-        else if (scanner == 'clamdscan') {
+        else if (scanner === 'clamdscan') {
             flags_array.push('--fdpass');
 
             // Remove infected files
