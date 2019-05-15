@@ -203,7 +203,6 @@ class NodeClam {
                         // If preferred scanner is not a valid binary but there is a socket/host option, disable
                         // failover to local CLI implementation
                         if (this.settings.clamdscan.socket || this.settings.clamdscan.host) {
-                            this.scanner = false;
                             this.settings.clamdscan.local_fallback = false;
                         } else {
                             const err = new NodeClamError("No valid & active virus scanning binaries are active and available and host/socket option provided!");
