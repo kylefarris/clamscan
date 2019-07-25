@@ -558,7 +558,7 @@ class NodeClam {
     // @access  Private
     // -----
     // @param   String      result      The ClamAV result to process and interpret
-    // @return  Boolean
+    // @return  Object      Object containing `is_infected` Boolean and `viruses` Array
     // ****************************************************************************
     _process_result(result) {
         if (typeof result !== 'string') {
@@ -827,7 +827,7 @@ class NodeClam {
                     // Attempt to scan the stream.
                     try {
                         const is_infected = await this.scan_stream(stream);
-                        return (has_cb ? cb(null, file, is_infected, []) : resolve({file, is_infected, viruses: []}));
+                        return (has_cb ? cb(null, file, is_infected, []) : resolve(Object.assign({file}, is_infected})));
                     } catch (e) {
                         // Fallback to local if that's an option
                         if (this.settings.clamdscan.local_fallback === true) return await local_scan();
