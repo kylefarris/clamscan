@@ -1090,7 +1090,7 @@ class NodeClam {
             // The function that parses the stdout from clamscan/clamdscan
             const parse_stdout = (err, stdout) => {
                 // Get Virus List
-                const viruses = stdout.trim().split(String.fromCharCode(10)).map(v => /FOUND\n?$/.test(v) ? v.replace(/(.+):\s+(.+)FOUND\n?$/, "$2").trim() : null).filter(v => !!v);
+                let viruses = stdout.trim().split(String.fromCharCode(10)).map(v => /FOUND\n?$/.test(v) ? v.replace(/(.+):\s+(.+)FOUND\n?$/, "$2").trim() : null).filter(v => !!v);
 
                 stdout.trim()
                     .split(String.fromCharCode(10))
