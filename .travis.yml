@@ -7,5 +7,6 @@ node_js:
 before_install:
   - sudo apt-get update
   - sudo apt-get install clamav clamav-daemon
+  - sudo systemctl stop clamav-freshclam
   - sudo freshclam -v
-  - sudo service clamav-daemon restart
+  - sudo systemctl restart clamav-daemon
