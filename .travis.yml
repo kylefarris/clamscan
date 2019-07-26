@@ -1,4 +1,4 @@
-dist: bionic
+dist: trusty
 language: node_js
 node_js:
   - "10.0"
@@ -7,6 +7,5 @@ node_js:
 before_install:
   - sudo apt-get update
   - sudo apt-get install clamav clamav-daemon
-  - sudo systemctl stop clamav-freshclam
   - sudo freshclam -v
-  - sudo systemctl restart clamav-daemon
+  - sudo service clamav-daemon restart
