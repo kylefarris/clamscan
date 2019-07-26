@@ -329,7 +329,7 @@ describe('_init_socket', () => {
         expect(client).to.respondTo('on');
         expect(client).to.not.respondTo('foobar');
     });
-    
+
     // TODO: earlier versions of Node (<=10.0.0) have no public way of determining the timeout
     it.skip('should have the same timeout as the one configured through this module', async () => {
         clamscan = await reset_clam({clamdscan: { timeout: 300000 }});
@@ -613,6 +613,25 @@ describe('is_infected', () => {
                 }
             }
         });
+
+        // it('should respond with properties: "file" (string), "is_infected" (boolean), and "viruses" (array) when scanning with remote host', async () => {
+        //     const clamdscan_options = Object.assign({}, config.clamdscan, {active: true, socket: false, host: 'localhost', port: 3310});
+        //     const options = Object.assign({}, config, {clamdscan: clamdscan_options});
+        //
+        //     try {
+        //         clamscan = await reset_clam(options);
+        //         const {viruses, is_infected, file} = await clamscan.is_infected(good_scan_file);
+        //         expect(viruses).to.be.an('array');
+        //         expect(viruses).to.have.length(0);
+        //         expect(is_infected).to.be.a('boolean');
+        //         expect(is_infected).to.eql(false);
+        //         expect(viruses).to.be.an('array');
+        //         expect(viruses).to.have.length(0);
+        //     } catch (e) {
+        //         // console.error("Annoying error: ", e);
+        //         throw e;
+        //     }
+        // });
     });
 });
 
