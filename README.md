@@ -588,7 +588,7 @@ clamscan.scan_stream(stream).then(is_infected => {
 **Promise Example:**
 
 ```javascript
-const is_infected = await clamscan.scan_stream(stream);
+const {is_infected, viruses} = await clamscan.scan_stream(stream);
 ```
 
 []()
