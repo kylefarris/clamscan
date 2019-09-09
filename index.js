@@ -1034,7 +1034,9 @@ class NodeClam {
                 // TODO: Investigate why this needs to be done in order
                 // for the ClamAV socket to be closed (why NodeClamTransform's
                 // `_flush` method isn't getting called)
-                if (this._clamav_socket.writable === true) {
+                // If the incoming stream is empty, transform() won't have been called, so we won't
+                // have a socket here.
+                if (this._clamav_socket && this._clamav_socket.writable === true) {
                     const size = Buffer.alloc(4);
                     size.writeInt32BE(0, 0);
                     this._clamav_socket.write(size, cb);
