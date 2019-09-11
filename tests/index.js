@@ -8,6 +8,7 @@ const should = chai.should();
 const expect = chai.expect;
 const config = require('./test_config');
 const good_scan_dir = __dirname + '/good_scan_dir';
+const empty_file = `${good_scan_dir}/empty_file.txt`;
 const good_scan_file = `${good_scan_dir}/good_file_1.txt`;
 const good_file_list = __dirname + '/good_files_list.txt';
 const bad_scan_dir = __dirname + '/bad_scan_dir';
@@ -1347,6 +1348,22 @@ describe('passthrough', () => {
 
         output.on('finish', () => {
             const orig_file = fs.readFileSync(good_scan_file);
+            const out_file = fs.readFileSync(passthru_file);
+
+            expect(orig_file).to.eql(out_file);
+            if (fs.existsSync(passthru_file)) fs.unlinkSync(passthru_file);
+        });
+    });
+
+    it('should handle a 0-byte file', () => {
+        const input = fs.createReadStream(empty_file);
+        const output = fs.createWriteStream(passthru_file);
+        const av = clamscan.passthrough();
+
+        input.pipe(av).pipe(output);
+
+        output.on('finish', () => {
+            const orig_file = fs.readFileSync(empty_file);
             const out_file = fs.readFileSync(passthru_file);
 
             expect(orig_file).to.eql(out_file);
