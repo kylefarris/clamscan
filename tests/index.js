@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 const fs = require('fs');
 const request = require('request');
 const chai = require('chai');
@@ -37,37 +38,35 @@ const check = (done, f) => {
 
 // Fix good_files list to have full paths
 const good_file_list_contents = fs.readFileSync(good_file_list).toString();
-const modified_good_file_list = __dirname + '/good_files_list_tmp.txt'
-fs.writeFileSync(modified_good_file_list, good_file_list_contents.split("\n").map(v => v.replace(/^\./, __dirname)).join("\n"), 'utf8');
+const modified_good_file_list = __dirname + '/good_files_list_tmp.txt';
+fs.writeFileSync(modified_good_file_list, good_file_list_contents.split('\n').map(v => v.replace(/^\./, __dirname)).join('\n'), 'utf8');
 
 
 // Help to find unhandled promise rejections
 process.on('unhandledRejection', (reason, p) => {
-  if (reason && typeof reason === 'object' && 'actual' in reason) {
-      console.log("Reason: ", reason.message, reason.actual);
-  }
-  if (reason === null) {
-      console.log("No reason... here's the promise: ", p);
-  }
-  console.log('Unhandled Rejection reason:', reason);
+    if (reason && typeof reason === 'object' && 'actual' in reason) {
+        console.log('Reason: ', reason.message, reason.actual); 
+    }
+    if (reason === null) {
+        console.log('No reason... here\'s the promise: ', p);
+    }
+    console.log('Unhandled Rejection reason:', reason);
 });
 
 const reset_clam = async (overrides = {}) => {
     overrides = overrides || {};
-    try {
-        const clamdscan = Object.assign({}, config.clamdscan, ('clamdscan' in overrides ? overrides.clamdscan : {}));
-        const clamscan = Object.assign({}, config.clamscan, ('clamscan' in overrides ? overrides.clamscan : {}));
+    
+    const clamdscan = Object.assign({}, config.clamdscan, ('clamdscan' in overrides ? overrides.clamdscan : {}));
+    const clamscan = Object.assign({}, config.clamscan, ('clamscan' in overrides ? overrides.clamscan : {}));
 
-        delete overrides.clamdscan;
-        delete overrides.clamscan;
+    delete overrides.clamdscan;
+    delete overrides.clamscan;
 
-        const new_config = Object.assign({}, config, overrides, {clamdscan, clamscan});
+    const new_config = Object.assign({}, config, overrides, {clamdscan, clamscan});
 
-        return await new NodeClam().init(new_config);
-    } catch (err) {
-        throw err;
-    }
-}
+    return await new NodeClam().init(new_config);
+    
+};
 
 describe('NodeClam Module', () => {
     it('should return an object', () => {
@@ -354,7 +353,7 @@ describe('is_infected', () => {
 
     it('should require second parameter to be a callback function (if truthy value provided)', () => {
         expect(() => clamscan.is_infected(good_scan_file),                'nothing provided').to.not.throw(Error);
-        expect(() => clamscan.is_infected(good_scan_file, (err, file, is_infected) => {}), 'good function provided').to.not.throw(Error);
+        expect(() => clamscan.is_infected(good_scan_file, () => {}),      'good function provided').to.not.throw(Error);
         expect(() => clamscan.is_infected(good_scan_file, undefined),     'undefined provided').to.not.throw(Error);
         expect(() => clamscan.is_infected(good_scan_file, null),          'null provided').to.not.throw(Error);
         expect(() => clamscan.is_infected(good_scan_file, ''),            'empty string provided').to.not.throw(Error);
@@ -442,7 +441,7 @@ describe('is_infected', () => {
                         });
                     });
                 } else {
-                    console.log("Could not download test virus file!");
+                    console.log('Could not download test virus file!');
                     console.error(error);
                 }
             });
@@ -467,7 +466,7 @@ describe('is_infected', () => {
                         check(done, () => {
                             expect(viruses).to.be.an('array');
                             expect(viruses).to.have.length(1);
-                            expect(viruses[0]).to.match(/^Eicar\-Test\-Signature/);
+                            expect(viruses[0]).to.match(/^Eicar-Test-Signature/);
 
                             if (fs.existsSync(bad_scan_file)) {
                                 fs.unlinkSync(bad_scan_file);
@@ -475,7 +474,7 @@ describe('is_infected', () => {
                         });
                     });
                 } else {
-                    console.log("Could not download test virus file!");
+                    console.log('Could not download test virus file!');
                     console.error(error);
                 }
             });
@@ -501,7 +500,7 @@ describe('is_infected', () => {
                 done();
             }).catch(err => {
                 done(err);
-            })
+            });
         });
 
         it('should respond with FALSE when file is not infected', done => {
@@ -542,7 +541,7 @@ describe('is_infected', () => {
                 const {viruses} = result;
                 expect(viruses).to.be.an('array');
                 expect(viruses).to.have.length(1);
-                expect(viruses[0]).to.match(/^Eicar\-Test\-Signature/);
+                expect(viruses[0]).to.match(/^Eicar-Test-Signature/);
 
                 done();
             }).catch(err => {
@@ -580,6 +579,7 @@ describe('is_infected', () => {
                     const {file, is_infected} = await clamscan.is_infected(bad_scan_file);
                     expect(is_infected).to.be.a('boolean');
                     expect(is_infected).to.eql(true);
+                // eslint-disable-next-line no-useless-catch
                 } catch (err) {
                     throw err;
                 } finally {
@@ -589,13 +589,9 @@ describe('is_infected', () => {
         });
 
         it('should respond with an empty array of viruses when file is NOT infected', async () => {
-            try {
-                const {viruses} = await clamscan.is_infected(good_scan_file);
-                expect(viruses).to.be.an('array');
-                expect(viruses).to.have.length(0);
-            } catch (err) {
-                throw err;
-            }
+            const {viruses} = await clamscan.is_infected(good_scan_file);
+            expect(viruses).to.be.an('array');
+            expect(viruses).to.have.length(0);
         });
 
         it('should respond with name of virus when file is infected', async () => {
@@ -606,7 +602,8 @@ describe('is_infected', () => {
                     const {viruses} = await clamscan.is_infected(bad_scan_file);
                     expect(viruses).to.be.an('array');
                     expect(viruses).to.have.length(1);
-                    expect(viruses[0]).to.match(/^Eicar\-Test\-Signature/);
+                    expect(viruses[0]).to.match(/^Eicar-Test-Signature/);
+                // eslint-disable-next-line no-useless-catch
                 } catch (err) {
                     throw err;
                 } finally {
@@ -676,7 +673,7 @@ describe('scan_file', () => {
             done();
         }).catch(err => {
             done(err);
-        })
+        });
     });
     it('should behave just like is_infected (async/await)', async () => {
         const {file, is_infected, viruses} = await clamscan.scan_file(good_scan_file);
@@ -958,13 +955,13 @@ describe('scan_files', () => {
                             expect(viruses).to.not.be.empty;
                             expect(viruses).to.be.an('array');
                             expect(viruses).to.have.length(1);
-                            expect(viruses[0]).to.match(/^Eicar\-Test\-Signature/);
+                            expect(viruses[0]).to.match(/^Eicar-Test-Signature/);
 
                             if (fs.existsSync(bad_scan_file)) fs.unlinkSync(bad_scan_file);
                         });
                     });
                 } else {
-                    console.log("Could not download test virus file!");
+                    console.log('Could not download test virus file!');
                     console.error(error);
                 }
             });
@@ -1066,7 +1063,7 @@ describe('scan_dir', () => {
                     });
                 });
             } else {
-                console.log("Could not download test virus file!");
+                console.log('Could not download test virus file!');
                 console.error(error);
             }
         });
@@ -1080,16 +1077,16 @@ describe('scan_dir', () => {
                 clamscan.scan_dir(bad_scan_dir, (err, _good_files, _bad_files, viruses) => {
                     check(done, () => {
                         expect(err).to.not.be.instanceof(Error);
-                        expect(viruses).to.not.be.empty
+                        expect(viruses).to.not.be.empty;
                         expect(viruses).to.be.an('array');
                         expect(viruses).to.have.length(1);
-                        expect(viruses[0]).to.match(/^Eicar\-Test\-Signature/);
+                        expect(viruses[0]).to.match(/^Eicar-Test-Signature/);
 
                         if (fs.existsSync(bad_scan_file)) fs.unlinkSync(bad_scan_file);
                     });
                 });
             } else {
-                console.log("Could not download test virus file!");
+                console.log('Could not download test virus file!');
                 console.error(error);
             }
         });
@@ -1110,7 +1107,7 @@ describe('scan_stream', () => {
         rs.push('barrrrr');
         rs.push(null);
         return rs;
-    }
+    };
 
     it('should exist', () => {
         should.exist(clamscan.scan_stream);
@@ -1156,7 +1153,7 @@ describe('scan_stream', () => {
                 clamscan = await reset_clam(options);
                 clamscan.scan_stream(get_good_stream()).should.be.rejectedWith(Error);
             } catch (e) {
-                console.error("Annoying error: ", e);
+                console.error('Annoying error: ', e);
             }
         });
 
@@ -1252,7 +1249,6 @@ describe('scan_stream', () => {
 
 describe('passthrough', () => {
     let clamscan;
-    let num = 0;
 
     before(async () => {
         clamscan = await reset_clam({scan_log: null});
@@ -1297,7 +1293,7 @@ describe('passthrough', () => {
                 expect(viruses).to.have.length(1);
                 if (fs.existsSync(passthru_file)) fs.unlinkSync(passthru_file);
             });
-        })
+        });
     });
 
     it('should indicate that a stream was NOT infected in the "scan-complete" event if the stream DOES NOT contain a virus', done => {
@@ -1327,8 +1323,6 @@ describe('passthrough', () => {
         input.pipe(av).pipe(output);
 
         output.on('finish', () => {
-            const ref_file = 'fasdfa';
-            // const ref_file = await fs_readfile(good_scan_file);
             Promise.all([
                 expect(fs_stat(passthru_file),          'get passthru file stats').to.not.be.rejectedWith(Error),
                 expect(fs_readfile(passthru_file),      'get passthru file').to.not.be.rejectedWith(Error),
