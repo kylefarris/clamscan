@@ -271,7 +271,7 @@ class NodeClam {
 
                     if (this.settings.debug_mode) console.log(`${this.debug_label}: Established connection to clamscan server for testing!`);
 
-                    client.write('PING!');
+                    client.write('PING');
                     client.on('data', data => {
                         if (data.toString().trim() === 'PONG') {
                             if (this.settings.debug_mode) console.log(`${this.debug_label}: PONG!`);
