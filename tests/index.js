@@ -338,7 +338,7 @@ describe('_init_socket', () => {
     });
 });
 
-describe('ping', () => {
+describe('_ping', () => {
     let clamscan;
     beforeEach(async () => {
         clamscan = await reset_clam();
@@ -352,7 +352,7 @@ describe('ping', () => {
     });
 
     it('should respond with a socket client (Promise API)', async () => {
-        const client = await clamscan.ping();
+        const client = await clamscan._ping();
         expect(client).to.be.an('object');
         expect(client.writable).to.eql(true);
         expect(client.readable).to.eql(true);
@@ -362,7 +362,7 @@ describe('ping', () => {
     });
 
     it('should respond with a socket client (Callback API)', done => {
-        clamscan.ping((err, client) => {
+        clamscan._ping((err, client) => {
             check(done, () => {
                 expect(err).to.not.be.instanceof(Error);
                 expect(client).to.be.an('object');

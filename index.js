@@ -262,7 +262,7 @@ class NodeClam {
                 if (this.settings.debug_mode)
                     console.log(`${this.debug_label}: Initially testing socket/tcp connection to clamscan server.`);
                 try {
-                    await this.ping();
+                    await this._ping();
                     if (this.settings.debug_mode) console.log(`${this.debug_label}: Established connection to clamscan server for testing!`);
                 } catch (err) {
                     return (has_cb ? cb(err, null) : reject(err));
@@ -525,6 +525,47 @@ class NodeClam {
     _is_readable_stream(obj) {
         if (!obj || typeof obj !== 'object') return false;
         return typeof obj.pipe === 'function' && typeof obj._readableState === 'object';
+    }
+
+    // ****************************************************************************
+    // Quick check to see if the remote/local socket is working. Callback/Resolve
+    // response is an instance to a ClamAV socket client.
+    // -----
+    // @access  Private
+    // @param   Function    cb      (optional) What to do after the ping
+    // @return  Promise
+    // ****************************************************************************
+    _ping(cb) {
+        let has_cb = false;
+
+        // Verify second param, if supplied, is a function
+        if (cb && typeof cb !== 'function')
+            throw new NodeClamError('Invalid cb provided to ping. Second parameter must be a function!');
+
+        // Making things simpler
+        if (cb && typeof cb === 'function') has_cb = true;
+
+        return new Promise(async (resolve, reject) => {
+            try {
+                const client = await this._init_socket('test_availability');
+
+                if (this.settings.debug_mode) console.log(`${this.debug_label}: Established connection to clamscan server for testing!`);
+
+                client.write('PING');
+                client.on('data', data => {
+                    if (data.toString().trim() === 'PONG') {
+                        if (this.settings.debug_mode) console.log(`${this.debug_label}: PONG!`);
+                        return (has_cb ? cb(null, client) : resolve(client));
+                    }
+
+                    // I'm not even sure this case is possible, but...
+                    const err = new NodeClamError(data, 'Could not establish connection to the remote clamscan server.');
+                    return (has_cb ? cb(err, null) : reject(err));
+                });
+            } catch (err) {
+                return (has_cb ? cb(err, false) : resolve(err));
+            }
+        });
     }
 
     // ****************************************************************************
@@ -1018,46 +1059,6 @@ class NodeClam {
                     size.writeInt32BE(0, 0);
                     this._clamav_socket.write(size, cb);
                 }
-            }
-        });
-    }
-
-    // ****************************************************************************
-    // Quick check to see if the remote/local socket is working. Callback/Resolve
-    // response is an instance to a ClamAV socket client.
-    // -----
-    // @param   Function    cb      (optional) What to do after the ping
-    // @return  Promise
-    // ****************************************************************************
-    ping(cb) {
-        let has_cb = false;
-
-        // Verify second param, if supplied, is a function
-        if (cb && typeof cb !== 'function')
-            throw new NodeClamError('Invalid cb provided to ping. Second parameter must be a function!');
-
-        // Making things simpler
-        if (cb && typeof cb === 'function') has_cb = true;
-
-        return new Promise(async (resolve, reject) => {
-            try {
-                const client = await this._init_socket('test_availability');
-
-                if (this.settings.debug_mode) console.log(`${this.debug_label}: Established connection to clamscan server for testing!`);
-
-                client.write('PING');
-                client.on('data', data => {
-                    if (data.toString().trim() === 'PONG') {
-                        if (this.settings.debug_mode) console.log(`${this.debug_label}: PONG!`);
-                        return (has_cb ? cb(null, client) : resolve(client));
-                    }
-
-                    // I'm not even sure this case is possible, but...
-                    const err = new NodeClamError(data, 'Could not establish connection to the remote clamscan server.');
-                    return (has_cb ? cb(err, null) : reject(err));
-                });
-            } catch (err) {
-                return (has_cb ? cb(err, false) : resolve(err));
             }
         });
     }
