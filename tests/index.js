@@ -338,6 +338,44 @@ describe('_init_socket', () => {
     });
 });
 
+describe('ping', () => {
+    let clamscan;
+    beforeEach(async () => {
+        clamscan = await reset_clam();
+    });
+
+    it('should exist', () => {
+        should.exist(clamscan.ping);
+    });
+    it('should be a function', () => {
+        clamscan.ping.should.be.a('function');
+    });
+
+    it('should respond with a socket client (Promise API)', async () => {
+        const client = await clamscan.ping();
+        expect(client).to.be.an('object');
+        expect(client.writable).to.eql(true);
+        expect(client.readable).to.eql(true);
+        expect(client._hadError).to.eql(false);
+        expect(client).to.respondTo('on');
+        expect(client).to.not.respondTo('foobar');
+    });
+
+    it('should respond with a socket client (Callback API)', done => {
+        clamscan.ping((err, client) => {
+            check(done, () => {
+                expect(err).to.not.be.instanceof(Error);
+                expect(client).to.be.an('object');
+                expect(client.writable).to.eql(true);
+                expect(client.readable).to.eql(true);
+                expect(client._hadError).to.eql(false);
+                expect(client).to.respondTo('on');
+                expect(client).to.not.respondTo('foobar');
+            });
+        });
+    });
+});
+
 describe('is_infected', () => {
     let clamscan;
     beforeEach(async () => {
