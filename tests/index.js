@@ -345,10 +345,10 @@ describe('_ping', () => {
     });
 
     it('should exist', () => {
-        should.exist(clamscan.ping);
+        should.exist(clamscan._ping);
     });
     it('should be a function', () => {
-        clamscan.ping.should.be.a('function');
+        clamscan._ping.should.be.a('function');
     });
 
     it('should respond with a socket client (Promise API)', async () => {
