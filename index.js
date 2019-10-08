@@ -1027,6 +1027,7 @@ class NodeClam {
                     } catch (err) {
                         // If there's an issue connecting to the ClamAV socket, this is where that's handled
                         console.error(`${me.debug_label}: Error initiating socket to ClamAV: `, err);
+                        handle_error(err);
                     }
                 } else {
                     //if (me.settings.debug_mode) console.log(`${me.debug_label}: Doing transform: ${++counter}`);
