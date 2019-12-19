@@ -574,9 +574,10 @@ class NodeClam {
     // @access  Private
     // -----
     // @param   String      result      The ClamAV result to process and interpret
+    // @param   String      file        The name of the file/path that was scanned
     // @return  Object      Object containing `is_infected` Boolean and `viruses` Array
     // ****************************************************************************
-    _process_result(result) {
+    _process_result(result, file=null) {
         if (typeof result !== 'string') {
             if (this.settings.debug_mode) console.log(`${this.debug_label}: Invalid stdout from scanner (not a string): `, result);
             throw new Error('Invalid result to process (not a string)');
@@ -584,12 +585,14 @@ class NodeClam {
 
         result = result.trim();
 
-        if (/:\s+OK/.test(result)) {
+        // eslint-disable-next-line no-control-regex
+        if (/:\s+OK(\u0000|[\r\n])?$/.test(result)) {
             if (this.settings.debug_mode) console.log(`${this.debug_label}: File is OK!`);
-            return {is_infected: false, viruses: []};
+            return { is_infected: false, viruses: [], file, resultString: result };
         }
 
-        if (/:\s+(.+)FOUND/gm.test(result)) {
+        // eslint-disable-next-line no-control-regex
+        if (/:\s+(.+)FOUND(\u0000|[\r\n])?/gm.test(result)) {
             if (this.settings.debug_mode) {
                 if (this.settings.debug_mode) console.log(`${this.debug_label}: Scan Response: `, result);
                 if (this.settings.debug_mode) console.log(`${this.debug_label}: File is INFECTED!`);
@@ -597,9 +600,9 @@ class NodeClam {
 
             // Parse out the name of the virus(es) found...
             // eslint-disable-next-line no-control-regex
-            const viruses = result.split(/(\u0000|[\r\n])/).map(v => /:\s+(.+)FOUND/gm.test(v) ? v.replace(/(.+:\s+)(.+)FOUND/gm, '$2').trim() : null).filter(v => !!v);
+            const viruses = result.split(/(\u0000|[\r\n])/).map(v => /:\s+(.+)FOUND$/gm.test(v) ? v.replace(/(.+:\s+)(.+)FOUND/gm, '$2').trim() : null).filter(v => !!v);
 
-            return {is_infected: true, viruses};
+            return { is_infected: true, viruses, file, resultString: result };
         }
 
         if (/^(.+)ERROR/gm.test(result)) {
@@ -616,7 +619,7 @@ class NodeClam {
             if (this.settings.debug_mode) console.log(`${this.debug_label}: File may be INFECTED!`);
         }
 
-        return {is_infected: null, viruses: []};
+        return { is_infected: null, viruses: [], file, resultString: result };
     }
 
     // ****************************************************************************
@@ -734,7 +737,7 @@ class NodeClam {
                 // Execute the clam binary with the proper flags
                 // NOTE: The async/await version of this will not allow us to capture the virus(es) name(s).
                 execFile(self.settings[self.scanner].path, args, (err, stdout, stderr) => {
-                    const {is_infected, viruses} = self._process_result(stdout);
+                    const {is_infected, viruses} = self._process_result(stdout, file);
 
                     // It may be a real error or a virus may have been found.
                     if (err) {
@@ -817,7 +820,7 @@ class NodeClam {
                         client.on('data', async data => {
                             if (this.settings.debug_mode) console.log(`${this.debug_label}: Received response from remote clamd service.`);
                             try {
-                                const result = this._process_result(data.toString());
+                                const result = this._process_result(data.toString(), file);
                                 if (result instanceof Error) throw result;
 
                                 const {is_infected, viruses} = result;
@@ -965,7 +968,7 @@ class NodeClam {
                                 if (me.settings.debug_mode) console.log(`${me.debug_label}: ClamAV socket has received the last chunk!`);
                                 // Process the collected chunks
                                 const response = Buffer.concat(this._clamav_response_chunks);
-                                const result = me._process_result(response.toString('utf8'));
+                                const result = me._process_result(response.toString('utf8'), null);
                                 this._clamav_response_chunks = [];
                                 if (me.settings.debug_mode) {
                                     console.log(`${me.debug_label}: Result of scan:`, result);
@@ -1001,7 +1004,7 @@ class NodeClam {
 
                                 // Parse what we've gotten back from ClamAV so far...
                                 const response = Buffer.concat(this._clamav_response_chunks);
-                                const result = me._process_result(response.toString());
+                                const result = me._process_result(response.toString(), null);
 
                                 // If there's an error supplied or if we detect a virus, stop stream immediately.
                                 if (result instanceof NodeClamError || (typeof result === 'object' && 'is_infected' in result && result.is_infected === true)) {
@@ -1125,7 +1128,8 @@ class NodeClam {
                             path = '<Unknown File Path!>';
                         }
 
-                        if (/OK$/.test(result)) {
+                        // eslint-disable-next-line no-control-regex
+                        if (/\s+OK(\u0000|[\r\n])$/.test(result)) {
                             if (self.settings.debug_mode) console.log(`${this.debug_label}: ${path} is OK!`);
                             good_files.push(path);
                         } else {
@@ -1450,7 +1454,7 @@ class NodeClam {
             // Execute the clam binary with the proper flags
             const local_scan = () => {
                 execFile(self.settings[self.scanner].path, self._build_clam_args(path), (err, stdout, stderr) => {
-                    const {is_infected, viruses} = self._process_result(stdout);
+                    const {is_infected, viruses} = self._process_result(stdout, path);
 
                     if (err) {
                         // Error code 1 means viruses were found...
@@ -1534,10 +1538,10 @@ class NodeClam {
                                 if (this.settings.debug_mode) console.log(`${this.debug_label}: Received response from remote clamd service.`);
                                 const response = Buffer.concat(chunks);
 
-                                const result = this._process_result(response.toString());
+                                const result = this._process_result(response.toString(), path);
                                 if (result instanceof Error) {
                                     // Fallback to local if that's an option
-                                    if (this.settings.clamdscan.local_fallback === true) return await local_scan();
+                                    if (this.settings.clamdscan.local_fallback === true) return local_scan();
                                     const err = new NodeClamError({path, err: result}, 'There was an issue scanning the path provided.');
                                     return (has_cb ? end_cb(err, [], []) : reject(err));
                                 }
@@ -1695,7 +1699,7 @@ class NodeClam {
                             return (has_cb ? cb(err, null) : reject(err));
                         } else {
                             if (this.settings.debug_mode) console.log(`${this.debug_label}: Raw Response:  ${response.toString('utf8')}`);
-                            const result = this._process_result(response.toString('utf8'));
+                            const result = this._process_result(response.toString('utf8'), null);
                             return (has_cb ? cb(null, result) : resolve(result));
                         }
                     });
