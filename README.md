@@ -6,7 +6,9 @@ Use Node JS to scan files on your server with ClamAV's clamscan/clamdscan binary
 
 # !!IMPORTANT!!
 
-If you are using a version prior to 0.8.2, please upgrade! There was a security vulnerability in previous versions that allows a malicious user to execute code on your server. Specific details on how the attack could be implemented will not be disclosed here. Please update to 0.8.2 or greater ASAP. No breaking changes are included, only the security patch.
+If you are using a version prior to 1.2.0, please upgrade! There was a security vulnerability in previous versions that can cause false negative in some edge cases. Specific details on how the attack could be implemented will not be disclosed here. Please update to 1.2.0 or greater ASAP. No breaking changes are included, only the security patch.
+
+All older versions in NPM have been deprecated.
 
 All other versions in NPM have been deprecated.
 
