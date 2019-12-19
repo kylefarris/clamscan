@@ -18,10 +18,12 @@ const bad_file_list = __dirname + '/bad_files_list.txt';
 const passthru_file = __dirname + '/output';
 const no_virus_url = 'https://raw.githubusercontent.com/kylefarris/clamscan/sockets/README.md';
 const fake_virus_url = 'https://secure.eicar.org/eicar_com.txt';
+const fake_virus_false_negatives = ['eicar: OK.exe', 'OK.exe', 'OK eicar.exe', ': OK.exe', 'eicar.OK', ' OK.exe', 'ok.exe', 'OK'].map(v => `${bad_scan_dir}/${v}`);
 
 const prequest = promisify(request);
 const fs_stat = promisify(fs.stat);
 const fs_readfile = promisify(fs.readFile);
+const fs_copyfile = promisify(fs.copyFile);
 
 chai.use(chaiAsPromised);
 
@@ -610,7 +612,7 @@ describe('is_infected', () => {
         });
 
         it('should respond with TRUE when non-archive file is infected', async () => {
-            const {body, statusCode} = await request(fake_virus_url);
+            const { body, statusCode } = await prequest(fake_virus_url);
             if (statusCode == 200 && body && typeof body === 'string') {
                 fs.writeFileSync(bad_scan_file, body);
                 try {
@@ -633,7 +635,7 @@ describe('is_infected', () => {
         });
 
         it('should respond with name of virus when file is infected', async () => {
-            const {body, statusCode} = await request(fake_virus_url);
+            const { body, statusCode } = await prequest(fake_virus_url);
             if (statusCode == 200 && body && typeof body === 'string') {
                 fs.writeFileSync(bad_scan_file, body);
                 try {
@@ -668,6 +670,43 @@ describe('is_infected', () => {
         //         throw e;
         //     }
         // });
+    });
+
+    describe('Edge Cases', () => {
+        it('should not provide false negatives in the event of a filename containing "OK"', async () => {
+            const { body, statusCode } = await prequest(fake_virus_url);
+            if (statusCode == 200 && body && typeof body === 'string') {
+                try {
+                    fs.writeFileSync(bad_scan_file, body);
+
+                    // Make copies of the test virus file and rename it to various possible false-negative names
+                    await Promise.all([fake_virus_false_negatives.map(v => fs_copyfile(bad_scan_file, v))]);
+
+                    // Get list of all files to scan
+                    const toScan = [].concat(fake_virus_false_negatives).concat([bad_scan_file]);
+                    // console.log('Going to scan: ', toScan);
+
+                    // Scan all the files
+                    for (const virus of toScan) {
+                        const { file, is_infected } = await clamscan.is_infected(virus);
+                        if (is_infected === false) console.log('Scanned: ', file);
+                        expect(is_infected).to.be.a('boolean');
+                        expect(is_infected).to.eql(true);
+                    }
+                    
+                    // eslint-disable-next-line no-useless-catch
+                } catch (err) {
+                    throw err;
+                } finally {
+                    if (fs.existsSync(bad_scan_file)) fs.unlinkSync(bad_scan_file);
+                    fake_virus_false_negatives.forEach(v => {
+                        if (fs.existsSync(v)) fs.unlinkSync(v);
+                    });
+                }
+            } else {
+                console.log('COULD NOT GET FILE TO SCAN!!!', statusCode, body);
+            }
+        });
     });
 });
 
@@ -1309,7 +1348,7 @@ describe('passthrough', () => {
 
         av.on('scan-complete', result => {
             check(done, () => {
-                expect(result).to.be.an('object').that.has.all.keys('is_infected', 'viruses');
+                expect(result).to.be.an('object').that.has.all.keys('is_infected', 'viruses', 'file', 'resultString');
                 if (fs.existsSync(passthru_file)) fs.unlinkSync(passthru_file);
             });
         });
@@ -1324,7 +1363,8 @@ describe('passthrough', () => {
 
         av.on('scan-complete', result => {
             check(done, () => {
-                const {is_infected, viruses} = result;
+                const { is_infected, viruses, resultString } = result;
+                if (is_infected === null) console.log(resultString);
                 expect(is_infected).to.be.a('boolean');
                 expect(is_infected).to.eql(true);
                 expect(viruses).to.be.an('array');
@@ -1343,7 +1383,8 @@ describe('passthrough', () => {
 
         av.on('scan-complete', result => {
             check(done, () => {
-                const {is_infected, viruses} = result;
+                const {is_infected, viruses, resultString} = result;
+                if (is_infected === null) console.log(resultString);
                 expect(is_infected).to.be.a('boolean');
                 expect(is_infected).to.eql(false);
                 expect(viruses).to.be.an('array');
