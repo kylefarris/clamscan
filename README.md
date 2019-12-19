@@ -10,8 +10,6 @@ If you are using a version prior to 1.2.0, please upgrade! There was a security 
 
 All older versions in NPM have been deprecated.
 
-All other versions in NPM have been deprecated.
-
 # Version 1.0.0 Information:
 
 If you are migrating from v0.8.5 or less to v1.0.0 or greater, please read the [release notes](https://github.com/kylefarris/clamscan/releases/tag/v1.0.0) as there are some breaking changes (but also some awesome new features!).
