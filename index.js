@@ -491,8 +491,8 @@ class NodeClam {
 
         try {
             await fs_access(path, fs.constants.R_OK);
-
-            const {stdout} = await cp_exec(version_cmds[scanner]);
+            version_cmds_exec = version_cmds[scanner].split(' ');
+            const {stdout} = await cp_execfile(version_cmds_exec[0], version_cmds_exec[2]);
             if (stdout.toString().match(/ClamAV/) === null) {
                 if (this.settings.debug_mode) console.log(`${this.debug_label}: Could not verify the ${scanner} binary.`);
                 return false;
