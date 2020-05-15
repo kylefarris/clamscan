@@ -687,7 +687,7 @@ class NodeClam {
                     if (this.settings.clamdscan.local_fallback === true) {
                         return local_fallback();
                     } else {
-                        return (has_cb ? cb(err, null) : resolve(err));
+                        return (has_cb ? cb(err, null) : reject(err));
                     }
                 }
             } else {
