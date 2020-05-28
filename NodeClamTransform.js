@@ -33,9 +33,11 @@ class NodeClamTransform extends Transform {
 
     _flush(cb) {
         if (this._debug_mode) console.log("node-clam: Received final data from stream.");
-        const size = Buffer.alloc(4);
-        size.writeInt32BE(0, 0);
-        this.push(size);
+        if (!this._readableState.ended) {
+            const size = Buffer.alloc(4);
+            size.writeInt32BE(0, 0);
+            this.push(size);
+        }
         cb();
     }
 }
