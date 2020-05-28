@@ -8,7 +8,8 @@
     "dietervds",
     "nicolaspeixoto",
     "urg <Patrick McAndrew>",
-    "SaltwaterC <Ștefan Rusu>"
+    "SaltwaterC <Ștefan Rusu>",
+    "Sjord <Sjoerd Langkemper>"
   ],
   "scripts": {
     "test": "make test"

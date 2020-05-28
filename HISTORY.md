@@ -301,3 +301,10 @@ This method is different than all the others in that it returns a PassthroughStr
     }
 })();
 ```
+
+##### 1.2.0
+
+#### SECURITY PATCH
+An important security patch was released in this version which fixes a bug causing false negatives in specific edge cases. Please upgrade immediately and only use this version from this point on.
+
+All older versions of this package have been deprecated on NPM. 
