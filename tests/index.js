@@ -19,6 +19,7 @@ const passthru_file = __dirname + '/output';
 const no_virus_url = 'https://raw.githubusercontent.com/kylefarris/clamscan/sockets/README.md';
 const fake_virus_url = 'https://secure.eicar.org/eicar_com.txt';
 const fake_virus_false_negatives = ['eicar: OK.exe', 'OK.exe', 'OK eicar.exe', ': OK.exe', 'eicar.OK', ' OK.exe', 'ok.exe', 'OK'].map(v => `${bad_scan_dir}/${v}`);
+const eicar_signature_rgx = /eicar/i;
 
 const prequest = promisify(request);
 const fs_stat = promisify(fs.stat);
@@ -469,8 +470,6 @@ describe('is_infected', () => {
                 if (!error && response.statusCode == 200) {
                     fs.writeFileSync(bad_scan_file, body);
 
-                    process.exit(1);
-
                     clamscan.is_infected(bad_scan_file, (err, file, is_infected) => {
                         check(done, () => {
                             expect(err).to.not.be.instanceof(Error);
@@ -508,7 +507,7 @@ describe('is_infected', () => {
                         check(done, () => {
                             expect(viruses).to.be.an('array');
                             expect(viruses).to.have.length(1);
-                            expect(viruses[0]).to.match(/^Eicar-Test-Signature/);
+                            expect(viruses[0]).to.match(eicar_signature_rgx);
 
                             if (fs.existsSync(bad_scan_file)) {
                                 fs.unlinkSync(bad_scan_file);
@@ -583,7 +582,7 @@ describe('is_infected', () => {
                 const {viruses} = result;
                 expect(viruses).to.be.an('array');
                 expect(viruses).to.have.length(1);
-                expect(viruses[0]).to.match(/^Eicar-Test-Signature/);
+                expect(viruses[0]).to.match(eicar_signature_rgx);
 
                 done();
             }).catch(err => {
@@ -644,7 +643,7 @@ describe('is_infected', () => {
                     const {viruses} = await clamscan.is_infected(bad_scan_file);
                     expect(viruses).to.be.an('array');
                     expect(viruses).to.have.length(1);
-                    expect(viruses[0]).to.match(/^Eicar-Test-Signature/);
+                    expect(viruses[0]).to.match(eicar_signature_rgx);
                 // eslint-disable-next-line no-useless-catch
                 } catch (err) {
                     throw err;
@@ -1034,7 +1033,7 @@ describe('scan_files', () => {
                             expect(viruses).to.not.be.empty;
                             expect(viruses).to.be.an('array');
                             expect(viruses).to.have.length(1);
-                            expect(viruses[0]).to.match(/^Eicar-Test-Signature/);
+                            expect(viruses[0]).to.match(eicar_signature_rgx);
 
                             if (fs.existsSync(bad_scan_file)) fs.unlinkSync(bad_scan_file);
                         });
@@ -1159,7 +1158,7 @@ describe('scan_dir', () => {
                         expect(viruses).to.not.be.empty;
                         expect(viruses).to.be.an('array');
                         expect(viruses).to.have.length(1);
-                        expect(viruses[0]).to.match(/^Eicar-Test-Signature/);
+                        expect(viruses[0]).to.match(eicar_signature_rgx);
 
                         if (fs.existsSync(bad_scan_file)) fs.unlinkSync(bad_scan_file);
                     });
@@ -1339,6 +1338,25 @@ describe('passthrough', () => {
 
     it('should be a function', () => {
         clamscan.passthrough.should.be.a('function');
+    });
+
+    it('should throw an error if scan host is unreachable', async () => {
+        const clamscan = await reset_clam({scan_log: null, clamdscan: {
+            socket: null,
+            host: '127.0.0.2',
+            port: 65535,
+        }});
+
+        const input = fs.createReadStream(good_scan_file);
+        const output = fs.createWriteStream(passthru_file);
+        const av = clamscan.passthrough();
+
+        input.pipe(av).pipe(output);
+
+        av.on('error', err => {
+            expect(err).to.be.instanceof(Error);
+            if (fs.existsSync(passthru_file)) fs.unlinkSync(passthru_file);
+        });
     });
 
     it('should fire a "scan-complete" event when the stream has been fully scanned and provide a result object that contains "is_infected" and "viruses" properties', done => {
