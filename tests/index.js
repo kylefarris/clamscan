@@ -144,7 +144,7 @@ describe('Initialized NodeClam module', () => {
                 active: false
             },
             clamdscan: {
-                socket: config.clamdscan.socket,
+                socket: process.env.NODE_ENV === 'travis' ? '/var/run/clamav/clamd.ctl' : config.clamdscan.socket,
                 host: config.clamdscan.host,
                 port: config.clamdscan.port,
                 path: config.clamdscan.path,
@@ -465,9 +465,11 @@ describe('is_infected', () => {
         });
 
         it('should respond with TRUE when non-archive file is infected', done => {
-            request(fake_virus_url, (error, response, body) => {
+            request({url: fake_virus_url, strictSSL: false }, (error, response, body) => {
                 if (!error && response.statusCode == 200) {
                     fs.writeFileSync(bad_scan_file, body);
+
+                    process.exit(1);
 
                     clamscan.is_infected(bad_scan_file, (err, file, is_infected) => {
                         check(done, () => {
@@ -498,7 +500,7 @@ describe('is_infected', () => {
         });
 
         it('should respond with name of virus when file is infected', done => {
-            request(fake_virus_url, (error, response, body) => {
+            request({url: fake_virus_url, strictSSL: false }, (error, response, body) => {
                 if (!error && response.statusCode == 200) {
                     fs.writeFileSync(bad_scan_file, body);
 
@@ -566,7 +568,7 @@ describe('is_infected', () => {
         });
 
         it('should respond with name of virus when file is infected', done => {
-            prequest(fake_virus_url).then(result => {
+            prequest({url: fake_virus_url, strictSSL: false }).then(result => {
                 const {body, statusCode} = result;
                 expect(body).to.be.a('string');
                 expect(statusCode).to.be.a('number');
@@ -612,7 +614,7 @@ describe('is_infected', () => {
         });
 
         it('should respond with TRUE when non-archive file is infected', async () => {
-            const { body, statusCode } = await prequest(fake_virus_url);
+            const { body, statusCode } = await prequest({url: fake_virus_url, strictSSL: false });
             if (statusCode == 200 && body && typeof body === 'string') {
                 fs.writeFileSync(bad_scan_file, body);
                 try {
@@ -635,7 +637,7 @@ describe('is_infected', () => {
         });
 
         it('should respond with name of virus when file is infected', async () => {
-            const { body, statusCode } = await prequest(fake_virus_url);
+            const { body, statusCode } = await prequest({url: fake_virus_url, strictSSL: false });
             if (statusCode == 200 && body && typeof body === 'string') {
                 fs.writeFileSync(bad_scan_file, body);
                 try {
@@ -674,7 +676,7 @@ describe('is_infected', () => {
 
     describe('Edge Cases', () => {
         it('should not provide false negatives in the event of a filename containing "OK"', async () => {
-            const { body, statusCode } = await prequest(fake_virus_url);
+            const { body, statusCode } = await prequest({url: fake_virus_url, strictSSL: false });
             if (statusCode == 200 && body && typeof body === 'string') {
                 try {
                     fs.writeFileSync(bad_scan_file, body);
@@ -1011,7 +1013,7 @@ describe('scan_files', () => {
         });
 
         it('should provide a list of viruses found if the any of the files in the list is infected', done => {
-            request(fake_virus_url, (error, response, body) => {
+            request({url: fake_virus_url, strictSSL: false }, (error, response, body) => {
                 if (!error && response.statusCode == 200) {
                     fs.writeFileSync(bad_scan_file, body);
 
@@ -1122,7 +1124,7 @@ describe('scan_dir', () => {
     });
 
     it('should supply bad_files array with scanned path when directory has infected files', done => {
-        request(fake_virus_url, (error, response, body) => {
+        request({url: fake_virus_url, strictSSL: false }, (error, response, body) => {
             if (!error && response.statusCode == 200) {
                 fs.writeFileSync(bad_scan_file, body);
 
@@ -1147,7 +1149,7 @@ describe('scan_dir', () => {
     });
 
     it('should supply an array with viruses found when directory has infected files', done => {
-        request(fake_virus_url, (error, response, body) => {
+        request({url: fake_virus_url, strictSSL: false }, (error, response, body) => {
             if (!error && response.statusCode == 200) {
                 fs.writeFileSync(bad_scan_file, body);
 
@@ -1247,7 +1249,7 @@ describe('scan_stream', () => {
             const passthrough = new PassThrough();
 
             // Fetch fake Eicar virus file from the internet and pipe it through to our scan_stream method
-            request.get(fake_virus_url).pipe(passthrough);
+            request.get({url: fake_virus_url, strictSSL: false }).pipe(passthrough);
 
             const {is_infected, viruses} = await clamscan.scan_stream(passthrough);
             expect(is_infected).to.be.a('boolean');
@@ -1306,7 +1308,7 @@ describe('scan_stream', () => {
 
         it('should set the `is_infected` reponse value to TRUE if stream IS infected.', done => {
             const passthrough = new PassThrough();
-            const source = request.get(fake_virus_url);
+            const source = request.get({url: fake_virus_url, strictSSL: false });
 
             // Fetch fake Eicar virus file and pipe it through to our scan screeam
             source.pipe(passthrough);
@@ -1340,7 +1342,7 @@ describe('passthrough', () => {
     });
 
     it('should fire a "scan-complete" event when the stream has been fully scanned and provide a result object that contains "is_infected" and "viruses" properties', done => {
-        const input = request.get(fake_virus_url);
+        const input = request.get({url: fake_virus_url, strictSSL: false });
         const output = fs.createWriteStream(passthru_file);
         const av = clamscan.passthrough();
 

@@ -201,7 +201,7 @@ class NodeClam {
                         if (this.settings.clamdscan.socket || this.settings.clamdscan.host) {
                             this.settings.clamdscan.local_fallback = false;
                         } else {
-                            const err = new NodeClamError('No valid & active virus scanning binaries are active and available and host/socket option provided!');
+                            const err = new NodeClamError('No valid & active virus scanning binaries are active and available and no host/socket option provided!');
                             return (has_cb ? cb(err, null) : reject(err));
                         }
                     }
@@ -491,7 +491,7 @@ class NodeClam {
 
         try {
             await fs_access(path, fs.constants.R_OK);
-            version_cmds_exec = version_cmds[scanner].split(' ');
+            const version_cmds_exec = version_cmds[scanner].split(' ');
             const {stdout} = await cp_execfile(version_cmds_exec[0], [version_cmds_exec[1]]);
             if (stdout.toString().match(/ClamAV/) === null) {
                 if (this.settings.debug_mode) console.log(`${this.debug_label}: Could not verify the ${scanner} binary.`);
@@ -499,7 +499,7 @@ class NodeClam {
             }
             return true;
         } catch (err) {
-            if (this.settings.debug_mode) console.log(`${this.debug_label}: Could not verify the ${scanner} binary.`);
+            if (this.settings.debug_mode) console.log(`${this.debug_label}: Could not verify the ${scanner} binary.`, err);
             return false;
         }
     }
