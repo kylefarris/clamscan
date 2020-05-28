@@ -302,9 +302,13 @@ This method is different than all the others in that it returns a PassthroughStr
 })();
 ```
 
-##### 1.2.0
+## 1.2.0
 
-#### SECURITY PATCH
+### SECURITY PATCH
 An important security patch was released in this version which fixes a bug causing false negatives in specific edge cases. Please upgrade immediately and only use this version from this point on.
 
-All older versions of this package have been deprecated on NPM. 
+All older versions of this package have been deprecated on NPM.
+
+## 1.3.0
+
+This just has some bug fixes and updates to dependencies. Technically, a new `'timeout'` event was added to the `passthrough` stream method, but, its not fully fleshed out and doesn't seem to work so it will remain undocumented for now.

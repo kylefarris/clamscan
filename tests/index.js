@@ -145,7 +145,7 @@ describe('Initialized NodeClam module', () => {
                 active: false
             },
             clamdscan: {
-                socket: process.env.NODE_ENV === 'travis' ? '/var/run/clamav/clamd.ctl' : config.clamdscan.socket,
+                socket: config.clamdscan.socket,
                 host: config.clamdscan.host,
                 port: config.clamdscan.port,
                 path: config.clamdscan.path,

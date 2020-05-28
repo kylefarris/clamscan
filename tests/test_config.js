@@ -11,7 +11,7 @@ const which = bin => {
     return '';
 };
 
-module.exports = {
+const config = {
     remove_infected: false,                         // don't change
     quarantine_infected: __dirname + '/infected',   // required for testing
     //scan_log: __dirname + '/clamscan-log',        // not required
@@ -28,3 +28,8 @@ module.exports = {
     },
     debug_mode: false,
 };
+
+// Force specific socket when on travis CI.
+if (process.env.CI) config.clamdscan.socket = '/var/run/clamav/clamd.ctl';
+
+module.exports = config;
