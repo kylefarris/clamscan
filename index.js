@@ -647,9 +647,8 @@ class NodeClam {
         return new Promise(async (resolve, reject) => {
             // Function for falling back to running a scan locally via a child process
             const local_fallback = async () => {
-                // const command = `${self.settings[self.scanner].path} ${self._build_clam_args('--version').join(' ')}`;
                 const args = self._build_clam_args('--version');
-                
+
                 if (self.settings.debug_mode)
                     console.log(`${this.debug_label}: Configured clam command: ${self.settings[self.scanner].path}`, args.join(' '));
 
