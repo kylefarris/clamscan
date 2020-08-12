@@ -568,7 +568,8 @@ class NodeClam {
                     return (has_cb ? cb(err, null) : reject(err));
                 });
             } catch (err) {
-                return (has_cb ? cb(err, false) : resolve(err));
+                if (this.settings.debug_mode) console.log(`${this.debug_label}: Stupid issue...`, err);
+                return (has_cb ? cb(err, false) : reject(err));
             }
         });
     }
