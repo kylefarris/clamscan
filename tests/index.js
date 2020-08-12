@@ -16,8 +16,8 @@ const bad_scan_dir = __dirname + '/bad_scan_dir';
 const bad_scan_file = `${bad_scan_dir}/bad_file_1.txt`;
 const bad_file_list = __dirname + '/bad_files_list.txt';
 const passthru_file = __dirname + '/output';
-const no_virus_url = 'https://raw.githubusercontent.com/kylefarris/clamscan/sockets/README.md';
-const fake_virus_url = 'https://secure.eicar.org/eicar_com.txt';
+const no_virus_url = 'https://raw.githubusercontent.com/kylefarris/clamscan/master/README.md';
+const fake_virus_url = 'https://secure.eicar.org/eicar.com.txt';
 const fake_virus_false_negatives = ['eicar: OK.exe', 'OK.exe', 'OK eicar.exe', ': OK.exe', 'eicar.OK', ' OK.exe', 'ok.exe', 'OK'].map(v => `${bad_scan_dir}/${v}`);
 const eicar_signature_rgx = /eicar/i;
 
@@ -1341,22 +1341,26 @@ describe('passthrough', () => {
     });
 
     it('should throw an error if scan host is unreachable', async () => {
-        const clamscan = await reset_clam({scan_log: null, clamdscan: {
-            socket: null,
-            host: '127.0.0.2',
-            port: 65535,
-        }});
+        try {
+            const clamscan = await reset_clam({ scan_log: null, clamdscan: {
+                socket: null,
+                host: '127.0.0.2',
+                port: 65535,
+            }});
 
-        const input = fs.createReadStream(good_scan_file);
-        const output = fs.createWriteStream(passthru_file);
-        const av = clamscan.passthrough();
+            const input = fs.createReadStream(good_scan_file);
+            const output = fs.createWriteStream(passthru_file);
+            const av = clamscan.passthrough();
 
-        input.pipe(av).pipe(output);
+            input.pipe(av).pipe(output);
 
-        av.on('error', err => {
+            av.on('error', err => {
+                expect(err).to.be.instanceof(Error);
+                if (fs.existsSync(passthru_file)) fs.unlinkSync(passthru_file);
+            });
+        } catch (err) {
             expect(err).to.be.instanceof(Error);
-            if (fs.existsSync(passthru_file)) fs.unlinkSync(passthru_file);
-        });
+        }
     });
 
     it('should fire a "scan-complete" event when the stream has been fully scanned and provide a result object that contains "is_infected" and "viruses" properties', done => {
