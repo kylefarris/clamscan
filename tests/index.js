@@ -1187,6 +1187,12 @@ describe('scan_stream', () => {
         return rs;
     };
 
+    const get_bad_stream = () => {
+        const passthrough = new PassThrough();
+        request.get({ url: fake_virus_url, strictSSL: false }).pipe(passthrough);
+        return passthrough;
+    }
+
     it('should exist', () => {
         should.exist(clamscan.scan_stream);
     });
@@ -1197,7 +1203,8 @@ describe('scan_stream', () => {
 
     it('should throw an error if a stream is not provided to first parameter and no callback is supplied.', done => {
         Promise.all([
-            expect(clamscan.scan_stream(get_good_stream()), 'stream provided').to.not.be.rejectedWith(Error),
+            expect(clamscan.scan_stream(get_good_stream()), 'good stream provided').to.not.be.rejectedWith(Error),
+            expect(clamscan.scan_stream(get_bad_stream()), 'bad stream provided').to.not.be.rejectedWith(Error),
             expect(clamscan.scan_stream(),                  'nothing provided').to.be.rejectedWith(Error),
             expect(clamscan.scan_stream(undefined),         'undefined provided').to.be.rejectedWith(Error),
             expect(clamscan.scan_stream(null),              'null provided').to.be.rejectedWith(Error),
@@ -1219,7 +1226,7 @@ describe('scan_stream', () => {
             clamscan.scan_stream(null).should.be.rejectedWith(Error).notify(done);
         });
 
-        it('should throw PromiseRejection with Error when first parameter IS a valid stream.', done => {
+        it('should not throw PromiseRejection with Error when first parameter IS a valid stream.', done => {
             clamscan.scan_stream(get_good_stream()).should.not.be.rejectedWith(Error).notify(done);
         });
 
@@ -1245,16 +1252,53 @@ describe('scan_stream', () => {
         });
 
         it('should set the `is_infected` reponse value to TRUE if stream IS infected.', async () => {
-            const passthrough = new PassThrough();
-
-            // Fetch fake Eicar virus file from the internet and pipe it through to our scan_stream method
-            request.get({url: fake_virus_url, strictSSL: false }).pipe(passthrough);
-
-            const {is_infected, viruses} = await clamscan.scan_stream(passthrough);
+            const { is_infected, viruses } = await clamscan.scan_stream(get_bad_stream());
             expect(is_infected).to.be.a('boolean');
             expect(is_infected).to.eql(true);
             expect(viruses).to.be.an('array');
             expect(viruses).to.have.length(1);
+        });
+
+        it('should not fail when run within a Promise.all()', async () => {
+            clamscan = await reset_clam();
+
+            const [result1, result2] = await Promise.all([
+                clamscan.scan_stream(get_good_stream()),
+                clamscan.scan_stream(get_bad_stream()),
+            ]);
+
+            expect(result1.is_infected).to.be.a('boolean');
+            expect(result1.is_infected).to.eql(false);
+            expect(result1.viruses).to.be.an('array');
+            expect(result1.viruses).to.have.length(0);
+
+            expect(result2.is_infected).to.be.a('boolean');
+            expect(result2.is_infected).to.eql(true);
+            expect(result2.viruses).to.be.an('array');
+            expect(result2.viruses).to.have.length(1);
+        });
+
+        it('should not fail when run within a weird Promise.all() (issue #59)', async () => {
+            clamscan = await reset_clam();
+
+            const items = [get_good_stream(), get_bad_stream()];
+
+            await Promise.all(
+                items.map(async (v,i) => {
+                    const {is_infected, viruses} = await clamscan.scan_stream(v);
+                    if (i === 0) {
+                        expect(is_infected).to.be.a('boolean');
+                        expect(is_infected).to.eql(false);
+                        expect(viruses).to.be.an('array');
+                        expect(viruses).to.have.length(0);
+                    } else {
+                        expect(is_infected).to.be.a('boolean');
+                        expect(is_infected).to.eql(true);
+                        expect(viruses).to.be.an('array');
+                        expect(viruses).to.have.length(1);
+                    }
+                })
+            );
         });
     });
 
