@@ -110,7 +110,7 @@ const ClamScan = new NodeClam().init({
     remove_infected: false, // If true, removes infected files
     quarantine_infected: false, // False: Don't quarantine, Path: Moves files to this place.
     scan_log: null, // Path to a writeable log file to write scan results into
-    debug_mode: false // Whether or not to log info/debug/error msgs to the console
+    debug_mode: false, // Whether or not to log info/debug/error msgs to the console
     file_list: null, // path to file containing list of files to scan (for scan_files method)
     scan_recursively: true, // If true, deep scan folders recursively
     clamscan: {
@@ -129,7 +129,7 @@ const ClamScan = new NodeClam().init({
         config_file: null, // Specify config file if it's in an unusual place
         multiscan: true, // Scan using all available cores! Yay!
         reload_db: false, // If true, will re-load the DB on every call (slow)
-        active: true // If true, this module will consider using the clamdscan binary
+        active: true, // If true, this module will consider using the clamdscan binary
         bypass_test: false, // Check to see if socket is available when applicable
     },
     preference: 'clamdscan' // If clamdscan is found and active, it will be used by default
@@ -144,7 +144,7 @@ const ClamScan = new NodeClam().init({
     remove_infected: true, // Removes files if they are infected
     quarantine_infected: '~/infected/', // Move file here. remove_infected must be FALSE, though.
     scan_log: '/var/log/node-clam', // You're a detail-oriented security professional.
-    debug_mode: true // This will put some debug info in your js console
+    debug_mode: true, // This will put some debug info in your js console
     file_list: '/home/webuser/scan_files.txt', // path to file containing list of files to scan
     scan_recursively: false, // Choosing false here will save some CPU cycles
     clamscan: {
