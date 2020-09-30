@@ -1,7 +1,7 @@
 /* eslint-disable no-async-promise-executor */
 /*!
  * Node - Clam
- * Copyright(c) 2013-2018 Kyle Farris <kyle@chomponllc.com>
+ * Copyright(c) 2013-2020 Kyle Farris <kyle@chomponllc.com>
  * MIT Licensed
  */
 
