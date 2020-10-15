@@ -538,12 +538,7 @@ This method allows you to scan a binary stream. **NOTE**: This method will only 
 
 - Promise
 
-  - Promise resolution returns: `result` (object):
-
-    - `good_files` (array) List of the full paths to all files that are _clean_.
-    - `bad_files` (array) List of the full paths to all files that are _infected_.
-    - `errors` (object) Per-file errors keyed by the filename in which the error happened. (ex. `{'foo.txt': Error}`)
-    - `viruses` (array) List of all the viruses found (feature request: associate to the bad files).
+  - Promise resolution returns: `is_infected` (boolean)
 
 ### Examples
 
