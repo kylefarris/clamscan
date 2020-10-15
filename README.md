@@ -538,7 +538,11 @@ This method allows you to scan a binary stream. **NOTE**: This method will only 
 
 - Promise
 
-  - Promise resolution returns: `is_infected` (boolean)
+  - Promise resolution returns: `result` (onject)
+
+    - `file` (string) **NULL** as no file path can be provided with the stream
+    - `is_infected` (boolean) **True**: File is infected; **False**: File is clean. **NULL**: Unable to scan.
+    - `viruses` (array) An array of any viruses found in the scanned file.
 
 ### Examples
 
@@ -572,7 +576,7 @@ clamscan.scan_stream(stream, (err, is_infected) => {
 **Promise Example:**
 
 ```javascript
-clamscan.scan_stream(stream).then(is_infected => {
+clamscan.scan_stream(stream).then(({is_infected}) => {
     if (is_infected) return console.log("Stream is infected! Booo!");
     console.log("Stream is not infected! Yay!");
 }).catch(err => {
