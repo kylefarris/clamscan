@@ -16,9 +16,10 @@ const bad_scan_dir = __dirname + '/bad_scan_dir';
 const bad_scan_file = `${bad_scan_dir}/bad_file_1.txt`;
 const bad_file_list = __dirname + '/bad_files_list.txt';
 const passthru_file = __dirname + '/output';
-const no_virus_url = 'https://raw.githubusercontent.com/kylefarris/clamscan/sockets/README.md';
-const fake_virus_url = 'https://secure.eicar.org/eicar_com.txt';
+const no_virus_url = 'https://raw.githubusercontent.com/kylefarris/clamscan/master/README.md';
+const fake_virus_url = 'https://secure.eicar.org/eicar.com.txt';
 const fake_virus_false_negatives = ['eicar: OK.exe', 'OK.exe', 'OK eicar.exe', ': OK.exe', 'eicar.OK', ' OK.exe', 'ok.exe', 'OK'].map(v => `${bad_scan_dir}/${v}`);
+const eicar_signature_rgx = /eicar/i;
 
 const prequest = promisify(request);
 const fs_stat = promisify(fs.stat);
@@ -465,7 +466,7 @@ describe('is_infected', () => {
         });
 
         it('should respond with TRUE when non-archive file is infected', done => {
-            request(fake_virus_url, (error, response, body) => {
+            request({url: fake_virus_url, strictSSL: false }, (error, response, body) => {
                 if (!error && response.statusCode == 200) {
                     fs.writeFileSync(bad_scan_file, body);
 
@@ -498,7 +499,7 @@ describe('is_infected', () => {
         });
 
         it('should respond with name of virus when file is infected', done => {
-            request(fake_virus_url, (error, response, body) => {
+            request({url: fake_virus_url, strictSSL: false }, (error, response, body) => {
                 if (!error && response.statusCode == 200) {
                     fs.writeFileSync(bad_scan_file, body);
 
@@ -506,7 +507,7 @@ describe('is_infected', () => {
                         check(done, () => {
                             expect(viruses).to.be.an('array');
                             expect(viruses).to.have.length(1);
-                            expect(viruses[0]).to.match(/^Eicar-Test-Signature/);
+                            expect(viruses[0]).to.match(eicar_signature_rgx);
 
                             if (fs.existsSync(bad_scan_file)) {
                                 fs.unlinkSync(bad_scan_file);
@@ -566,7 +567,7 @@ describe('is_infected', () => {
         });
 
         it('should respond with name of virus when file is infected', done => {
-            prequest(fake_virus_url).then(result => {
+            prequest({url: fake_virus_url, strictSSL: false }).then(result => {
                 const {body, statusCode} = result;
                 expect(body).to.be.a('string');
                 expect(statusCode).to.be.a('number');
@@ -581,7 +582,7 @@ describe('is_infected', () => {
                 const {viruses} = result;
                 expect(viruses).to.be.an('array');
                 expect(viruses).to.have.length(1);
-                expect(viruses[0]).to.match(/^Eicar-Test-Signature/);
+                expect(viruses[0]).to.match(eicar_signature_rgx);
 
                 done();
             }).catch(err => {
@@ -612,7 +613,7 @@ describe('is_infected', () => {
         });
 
         it('should respond with TRUE when non-archive file is infected', async () => {
-            const { body, statusCode } = await prequest(fake_virus_url);
+            const { body, statusCode } = await prequest({url: fake_virus_url, strictSSL: false });
             if (statusCode == 200 && body && typeof body === 'string') {
                 fs.writeFileSync(bad_scan_file, body);
                 try {
@@ -635,14 +636,14 @@ describe('is_infected', () => {
         });
 
         it('should respond with name of virus when file is infected', async () => {
-            const { body, statusCode } = await prequest(fake_virus_url);
+            const { body, statusCode } = await prequest({url: fake_virus_url, strictSSL: false });
             if (statusCode == 200 && body && typeof body === 'string') {
                 fs.writeFileSync(bad_scan_file, body);
                 try {
                     const {viruses} = await clamscan.is_infected(bad_scan_file);
                     expect(viruses).to.be.an('array');
                     expect(viruses).to.have.length(1);
-                    expect(viruses[0]).to.match(/^Eicar-Test-Signature/);
+                    expect(viruses[0]).to.match(eicar_signature_rgx);
                 // eslint-disable-next-line no-useless-catch
                 } catch (err) {
                     throw err;
@@ -674,7 +675,7 @@ describe('is_infected', () => {
 
     describe('Edge Cases', () => {
         it('should not provide false negatives in the event of a filename containing "OK"', async () => {
-            const { body, statusCode } = await prequest(fake_virus_url);
+            const { body, statusCode } = await prequest({url: fake_virus_url, strictSSL: false });
             if (statusCode == 200 && body && typeof body === 'string') {
                 try {
                     fs.writeFileSync(bad_scan_file, body);
@@ -1011,7 +1012,7 @@ describe('scan_files', () => {
         });
 
         it('should provide a list of viruses found if the any of the files in the list is infected', done => {
-            request(fake_virus_url, (error, response, body) => {
+            request({url: fake_virus_url, strictSSL: false }, (error, response, body) => {
                 if (!error && response.statusCode == 200) {
                     fs.writeFileSync(bad_scan_file, body);
 
@@ -1032,7 +1033,7 @@ describe('scan_files', () => {
                             expect(viruses).to.not.be.empty;
                             expect(viruses).to.be.an('array');
                             expect(viruses).to.have.length(1);
-                            expect(viruses[0]).to.match(/^Eicar-Test-Signature/);
+                            expect(viruses[0]).to.match(eicar_signature_rgx);
 
                             if (fs.existsSync(bad_scan_file)) fs.unlinkSync(bad_scan_file);
                         });
@@ -1122,7 +1123,7 @@ describe('scan_dir', () => {
     });
 
     it('should supply bad_files array with scanned path when directory has infected files', done => {
-        request(fake_virus_url, (error, response, body) => {
+        request({url: fake_virus_url, strictSSL: false }, (error, response, body) => {
             if (!error && response.statusCode == 200) {
                 fs.writeFileSync(bad_scan_file, body);
 
@@ -1147,7 +1148,7 @@ describe('scan_dir', () => {
     });
 
     it('should supply an array with viruses found when directory has infected files', done => {
-        request(fake_virus_url, (error, response, body) => {
+        request({url: fake_virus_url, strictSSL: false }, (error, response, body) => {
             if (!error && response.statusCode == 200) {
                 fs.writeFileSync(bad_scan_file, body);
 
@@ -1157,7 +1158,7 @@ describe('scan_dir', () => {
                         expect(viruses).to.not.be.empty;
                         expect(viruses).to.be.an('array');
                         expect(viruses).to.have.length(1);
-                        expect(viruses[0]).to.match(/^Eicar-Test-Signature/);
+                        expect(viruses[0]).to.match(eicar_signature_rgx);
 
                         if (fs.existsSync(bad_scan_file)) fs.unlinkSync(bad_scan_file);
                     });
@@ -1186,6 +1187,12 @@ describe('scan_stream', () => {
         return rs;
     };
 
+    const get_bad_stream = () => {
+        const passthrough = new PassThrough();
+        request.get({ url: fake_virus_url, strictSSL: false }).pipe(passthrough);
+        return passthrough;
+    }
+
     it('should exist', () => {
         should.exist(clamscan.scan_stream);
     });
@@ -1196,7 +1203,8 @@ describe('scan_stream', () => {
 
     it('should throw an error if a stream is not provided to first parameter and no callback is supplied.', done => {
         Promise.all([
-            expect(clamscan.scan_stream(get_good_stream()), 'stream provided').to.not.be.rejectedWith(Error),
+            expect(clamscan.scan_stream(get_good_stream()), 'good stream provided').to.not.be.rejectedWith(Error),
+            expect(clamscan.scan_stream(get_bad_stream()), 'bad stream provided').to.not.be.rejectedWith(Error),
             expect(clamscan.scan_stream(),                  'nothing provided').to.be.rejectedWith(Error),
             expect(clamscan.scan_stream(undefined),         'undefined provided').to.be.rejectedWith(Error),
             expect(clamscan.scan_stream(null),              'null provided').to.be.rejectedWith(Error),
@@ -1218,7 +1226,7 @@ describe('scan_stream', () => {
             clamscan.scan_stream(null).should.be.rejectedWith(Error).notify(done);
         });
 
-        it('should throw PromiseRejection with Error when first parameter IS a valid stream.', done => {
+        it('should not throw PromiseRejection with Error when first parameter IS a valid stream.', done => {
             clamscan.scan_stream(get_good_stream()).should.not.be.rejectedWith(Error).notify(done);
         });
 
@@ -1244,16 +1252,53 @@ describe('scan_stream', () => {
         });
 
         it('should set the `is_infected` reponse value to TRUE if stream IS infected.', async () => {
-            const passthrough = new PassThrough();
-
-            // Fetch fake Eicar virus file from the internet and pipe it through to our scan_stream method
-            request.get(fake_virus_url).pipe(passthrough);
-
-            const {is_infected, viruses} = await clamscan.scan_stream(passthrough);
+            const { is_infected, viruses } = await clamscan.scan_stream(get_bad_stream());
             expect(is_infected).to.be.a('boolean');
             expect(is_infected).to.eql(true);
             expect(viruses).to.be.an('array');
             expect(viruses).to.have.length(1);
+        });
+
+        it('should not fail when run within a Promise.all()', async () => {
+            clamscan = await reset_clam();
+
+            const [result1, result2] = await Promise.all([
+                clamscan.scan_stream(get_good_stream()),
+                clamscan.scan_stream(get_bad_stream()),
+            ]);
+
+            expect(result1.is_infected).to.be.a('boolean');
+            expect(result1.is_infected).to.eql(false);
+            expect(result1.viruses).to.be.an('array');
+            expect(result1.viruses).to.have.length(0);
+
+            expect(result2.is_infected).to.be.a('boolean');
+            expect(result2.is_infected).to.eql(true);
+            expect(result2.viruses).to.be.an('array');
+            expect(result2.viruses).to.have.length(1);
+        });
+
+        it('should not fail when run within a weird Promise.all() (issue #59)', async () => {
+            clamscan = await reset_clam();
+
+            const items = [get_good_stream(), get_bad_stream()];
+
+            await Promise.all(
+                items.map(async (v,i) => {
+                    const {is_infected, viruses} = await clamscan.scan_stream(v);
+                    if (i === 0) {
+                        expect(is_infected).to.be.a('boolean');
+                        expect(is_infected).to.eql(false);
+                        expect(viruses).to.be.an('array');
+                        expect(viruses).to.have.length(0);
+                    } else {
+                        expect(is_infected).to.be.a('boolean');
+                        expect(is_infected).to.eql(true);
+                        expect(viruses).to.be.an('array');
+                        expect(viruses).to.have.length(1);
+                    }
+                })
+            );
         });
     });
 
@@ -1306,7 +1351,7 @@ describe('scan_stream', () => {
 
         it('should set the `is_infected` reponse value to TRUE if stream IS infected.', done => {
             const passthrough = new PassThrough();
-            const source = request.get(fake_virus_url);
+            const source = request.get({url: fake_virus_url, strictSSL: false });
 
             // Fetch fake Eicar virus file and pipe it through to our scan screeam
             source.pipe(passthrough);
@@ -1339,8 +1384,31 @@ describe('passthrough', () => {
         clamscan.passthrough.should.be.a('function');
     });
 
+    it('should throw an error if scan host is unreachable', async () => {
+        try {
+            const clamscan = await reset_clam({ scan_log: null, clamdscan: {
+                socket: null,
+                host: '127.0.0.2',
+                port: 65535,
+            }});
+
+            const input = fs.createReadStream(good_scan_file);
+            const output = fs.createWriteStream(passthru_file);
+            const av = clamscan.passthrough();
+
+            input.pipe(av).pipe(output);
+
+            av.on('error', err => {
+                expect(err).to.be.instanceof(Error);
+                if (fs.existsSync(passthru_file)) fs.unlinkSync(passthru_file);
+            });
+        } catch (err) {
+            expect(err).to.be.instanceof(Error);
+        }
+    });
+
     it('should fire a "scan-complete" event when the stream has been fully scanned and provide a result object that contains "is_infected" and "viruses" properties', done => {
-        const input = request.get(fake_virus_url);
+        const input = request.get({url: fake_virus_url, strictSSL: false });
         const output = fs.createWriteStream(passthru_file);
         const av = clamscan.passthrough();
 

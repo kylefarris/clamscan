@@ -1,7 +1,7 @@
 /* eslint-disable no-async-promise-executor */
 /*!
  * Node - Clam
- * Copyright(c) 2013-2018 Kyle Farris <kyle@chomponllc.com>
+ * Copyright(c) 2013-2020 Kyle Farris <kyle@chomponllc.com>
  * MIT Licensed
  */
 
@@ -201,7 +201,7 @@ class NodeClam {
                         if (this.settings.clamdscan.socket || this.settings.clamdscan.host) {
                             this.settings.clamdscan.local_fallback = false;
                         } else {
-                            const err = new NodeClamError('No valid & active virus scanning binaries are active and available and host/socket option provided!');
+                            const err = new NodeClamError('No valid & active virus scanning binaries are active and available and no host/socket option provided!');
                             return (has_cb ? cb(err, null) : reject(err));
                         }
                     }
@@ -263,7 +263,7 @@ class NodeClam {
                     console.log(`${this.debug_label}: Initially testing socket/tcp connection to clamscan server.`);
                 try {
                     await this._ping();
-                    if (this.settings.debug_mode) console.log(`${this.debug_label}: Established connection to clamscan server for testing!`);
+                    if (this.settings.debug_mode) console.log(`${this.debug_label}: Established connection to clamscan server!`);
                 } catch (err) {
                     return (has_cb ? cb(err, null) : reject(err));
                 }
@@ -416,19 +416,22 @@ class NodeClam {
             // Create a new Socket connection to Unix socket or remote server (in that order)
             let client;
 
+            // Setup socket connection timeout (defualt: 20 seconds).
+            const timeout = this.settings.clamdscan.timeout ? this.settings.clamdscan.timeout : 20000;
+
             // The fastest option is a local Unix socket
             if (this.settings.clamdscan.socket)
-                client = net.createConnection({path: this.settings.clamdscan.socket});
+                client = net.createConnection({path: this.settings.clamdscan.socket, timeout});
 
             // If a port is specified, we're going to be connecting via TCP
             else if (this.settings.clamdscan.port) {
                 // If a host is specified (usually for a remote host)
                 if (this.settings.clamdscan.host) {
-                    client = net.createConnection({host: this.settings.clamdscan.host, port: this.settings.clamdscan.port});
+                    client = net.createConnection({host: this.settings.clamdscan.host, port: this.settings.clamdscan.port, timeout});
                 }
                 // Host can be ignored since the default is `localhost`
                 else {
-                    client = net.createConnection({port: this.settings.clamdscan.port});
+                    client = net.createConnection({port: this.settings.clamdscan.port, timeout});
                 }
             }
 
@@ -459,13 +462,15 @@ class NodeClam {
                     return resolve(client);
                 })
                 .on('timeout', () => {
-                    if (this.settings.debug_mode) console.log(`${this.debug_label}: Socket connection timed out.`);
+                    if (this.settings.debug_mode) console.log(`${this.debug_label}: Socket/Host connection timed out.`);
+                    reject(new Error('Connection to host has timed out.'));
                     client.end();
                 })
                 .on('close', () => {
-                    if (this.settings.debug_mode) console.log(`${this.debug_label}: Socket connection closed.`);
+                    if (this.settings.debug_mode) console.log(`${this.debug_label}: Socket/Host connection closed.`);
                 })
                 .on('error', (e) => {
+                    if (this.settings.debug_mode) console.error(`${this.debug_label}: Socket/Host connection failed:`, e);
                     reject(e);
                 });
         });
@@ -485,21 +490,20 @@ class NodeClam {
         }
 
         const version_cmds = {
-            clamdscan: `${path} --version`,
-            clamscan: `${path} --version`,
+            clamdscan: `--version`,
+            clamscan:  `--version`,
         };
 
         try {
             await fs_access(path, fs.constants.R_OK);
-            version_cmds_exec = version_cmds[scanner].split(' ');
-            const {stdout} = await cp_execfile(version_cmds_exec[0], [version_cmds_exec[1]]);
+            const {stdout} = await cp_execfile(path, [version_cmds[scanner]]);
             if (stdout.toString().match(/ClamAV/) === null) {
                 if (this.settings.debug_mode) console.log(`${this.debug_label}: Could not verify the ${scanner} binary.`);
                 return false;
             }
             return true;
         } catch (err) {
-            if (this.settings.debug_mode) console.log(`${this.debug_label}: Could not verify the ${scanner} binary.`);
+            if (this.settings.debug_mode) console.log(`${this.debug_label}: Could not verify the ${scanner} binary.`, err);
             return false;
         }
     }
@@ -549,7 +553,7 @@ class NodeClam {
             try {
                 const client = await this._init_socket('test_availability');
 
-                if (this.settings.debug_mode) console.log(`${this.debug_label}: Established connection to clamscan server for testing!`);
+                if (this.settings.debug_mode) console.log(`${this.debug_label}: Established connection to clamscan server!`);
 
                 client.write('PING');
                 client.on('data', data => {
@@ -563,7 +567,7 @@ class NodeClam {
                     return (has_cb ? cb(err, null) : reject(err));
                 });
             } catch (err) {
-                return (has_cb ? cb(err, false) : resolve(err));
+                return (has_cb ? cb(err, false) : reject(err));
             }
         });
     }
@@ -642,15 +646,14 @@ class NodeClam {
         return new Promise(async (resolve, reject) => {
             // Function for falling back to running a scan locally via a child process
             const local_fallback = async () => {
-                const command = `${self.settings[self.scanner].path} ${self._build_clam_args('--version').join(' ')}`;
+                const args = self._build_clam_args('--version');
 
-                if (self.settings.debug_mode) {
-                    console.log(`${this.debug_label}: Configured clam command: ${command}`);
-                }
+                if (self.settings.debug_mode)
+                    console.log(`${this.debug_label}: Configured clam command: ${self.settings[self.scanner].path}`, args.join(' '));
 
                 // Execute the clam binary with the proper flags
                 try {
-                    const {stdout, stderr} = await cp_execfile(command);
+                    const { stdout, stderr } = await cp_execfile(`${self.settings[self.scanner].path}`, args);
 
                     if (stderr) {
                         const err = new NodeClamError({stderr, file: null}, 'ClamAV responded with an unexpected response when requesting version.');
@@ -687,7 +690,7 @@ class NodeClam {
                     if (this.settings.clamdscan.local_fallback === true) {
                         return local_fallback();
                     } else {
-                        return (has_cb ? cb(err, null) : resolve(err));
+                        return (has_cb ? cb(err, null) : reject(err));
                     }
                 }
             } else {
@@ -983,6 +986,11 @@ class NodeClam {
                                     this.emit('scan-complete', result);
                                 }
                             })
+                            // If connection timesout.
+                            .on('timeout', () => {
+                                this.emit('timeout', new Error('Connection to host/socket has timed out'));
+                                if (me.settings.debug_mode) console.log(`${me.debug_label}: Connection to host/socket has timed out`);
+                            })
                             // When the ClamAV socket is ready to receive packets (this will probably never fire here)
                             .on('ready', () => {
                                 if (me.settings.debug_mode) console.log(`${me.debug_label}: ClamAV socket ready to receive`);
@@ -1029,7 +1037,8 @@ class NodeClam {
                         do_transform();
                     } catch (err) {
                         // If there's an issue connecting to the ClamAV socket, this is where that's handled
-                        console.error(`${me.debug_label}: Error initiating socket to ClamAV: `, err);
+                        if (me.settings.debug_mode) console.error(`${me.debug_label}: Error initiating socket to ClamAV: `, err);
+                        handle_error(err);
                     }
                 } else {
                     //if (me.settings.debug_mode) console.log(`${me.debug_label}: Doing transform: ${++counter}`);
