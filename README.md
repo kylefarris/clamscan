@@ -538,7 +538,7 @@ This method allows you to scan a binary stream. **NOTE**: This method will only 
 
 - Promise
 
-  - Promise resolution returns: `result` (onject)
+  - Promise resolution returns: `result` (object):
 
     - `file` (string) **NULL** as no file path can be provided with the stream
     - `is_infected` (boolean) **True**: File is infected; **False**: File is clean. **NULL**: Unable to scan.
