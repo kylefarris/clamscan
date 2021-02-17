@@ -24,7 +24,7 @@ const config = {
         port: 3310,                                 // required for testing (change for your system) - can be set to null
         path: which('clamdscan'),                   // required for testing
         timeout: 1000,
-        // config_file: '/etc/clamd.d/scan.conf'    // set if required
+        // config_file: '/etc/clamd.d/scan.conf'     // set if required
     },
     debug_mode: false,
 };
