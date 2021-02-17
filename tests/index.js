@@ -259,22 +259,14 @@ describe('Initialized NodeClam module', () => {
          * 
          * NodeClam.init should execute successfully using the custom config file only.
          */
-        await expect(reset_clam({
-            preference: 'clamdscan',
-            clamdscan: {
-                active: true,
-                config_file: 'tests/clamd.conf',
-            }
-        })).not.to.be.rejected;
-
-        const clamWithMissingConfigFile = await reset_clam({
+        const clamscan = await reset_clam({
             preference: 'clamdscan',
             clamdscan: {
                 active: true,
                 config_file: 'tests/clamd.conf',
             }
         });
-        expect(clamWithMissingConfigFile.scanner).to.eq('clamdscan'); // Verify that the scanner did not fall back to another binary
+        expect(clamscan.scanner).to.eq('clamdscan'); // Verify that the scanner did not fall back to another binary
     });
 });
 
