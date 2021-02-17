@@ -19,12 +19,12 @@ const config = {
         path: which('clamscan'),                    // required for testing
     },
     clamdscan: {
-        socket: '/var/run/clamd.scan/clamd.sock',   // required for testing (change for your system e.g. '/var/run/clamd.scan/clamd.sock') - can be set to null
+        socket: '/tmp/clamd.scan/clamd.sock',   // required for testing (change for your system e.g. '/var/run/clamd.scan/clamd.sock') - can be set to null
         host: '127.0.0.1',                          // required for testing (change for your system) - can be set to null
         port: 3310,                                 // required for testing (change for your system) - can be set to null
         path: which('clamdscan'),                   // required for testing
         timeout: 1000,
-        // config_file: '/etc/clamd.d/scan.conf'     // set if required
+        config_file: '/tmp/clamd.d/clamd.conf'    // set if required
     },
     debug_mode: false,
 };

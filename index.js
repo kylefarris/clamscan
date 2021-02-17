@@ -483,20 +483,24 @@ class NodeClam {
     // @return  Promise
     // ****************************************************************************
     async _is_clamav_binary(scanner) {
-        const path = this.settings[scanner].path || null;
+        const { path = null, config_file = null } = this.settings[scanner];
         if (!path) {
             if (this.settings.debug_mode) console.log(`${this.debug_label}: Could not determine path for clamav binary.`);
             return false;
         }
 
         const version_cmds = {
-            clamdscan: `--version`,
-            clamscan:  `--version`,
+            clamdscan: [`--version`],
+            clamscan:  [`--version`],
         };
+
+        if (config_file) {
+            version_cmds[scanner].push(`--config-file=${config_file}`);
+        }
 
         try {
             await fs_access(path, fs.constants.R_OK);
-            const {stdout} = await cp_execfile(path, [version_cmds[scanner]]);
+            const {stdout} = await cp_execfile(path, version_cmds[scanner]);
             if (stdout.toString().match(/ClamAV/) === null) {
                 if (this.settings.debug_mode) console.log(`${this.debug_label}: Could not verify the ${scanner} binary.`);
                 return false;
