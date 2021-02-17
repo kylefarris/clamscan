@@ -273,7 +273,7 @@ describe('Initialized NodeClam module', () => {
                 config_file: 'tests/clamd.conf',
             }
         });
-        expect(clamWithMissingConfigFile.scanner).to.eq('clamdscan'); // Ensure that the scanner did not fall back to another binary
+        expect(clamWithMissingConfigFile.scanner).to.eq('clamdscan'); // Verify that the scanner did not fall back to another binary
     });
 });
 
