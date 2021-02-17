@@ -254,7 +254,8 @@ describe('Initialized NodeClam module', () => {
          * is *not* available. This file may reside at 
          *   ../etc/clamav/clamd.conf
          * relative to the clamdscan executable. Making this file unavailable can be as simple as
-         * renaming it.
+         * renaming it. Only if this file is unavailable will this test be meaningful. If present,
+         * NodeClam.init will fall back to using the clamscan binary and the default config file.
          * 
          * NodeClam.init should execute successfully using the custom config file only.
          */
