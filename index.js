@@ -6,6 +6,7 @@
  */
 
 // Module dependencies.
+const EventEmitter = require('events');
 const os = require('os');
 const util = require('util');
 const net = require('net');
@@ -66,8 +67,9 @@ class NodeClamError extends Error {
 // -----
 // @param   Object  options     Key => Value pairs to override default settings
 // ****************************************************************************
-class NodeClam {
+class NodeClam extends EventEmitter {
     constructor() {
+        super();
         this.initialized = false;
         this.debug_label = 'node-clam';
         this.default_scanner = 'clamdscan';
@@ -616,6 +618,16 @@ class NodeClam {
                 if (this.settings.debug_mode) console.log(`${this.debug_label}: File may be INFECTED!`);
             }
             return new NodeClamError({error}, `An error occurred while scanning the piped-through stream: ${error}`);
+        }
+
+        if (result === 'COMMAND READ TIMED OUT') {
+            this.emit('timeout', new Error('Scanning on remote host/socket has timed out!'));
+            if (this.settings.debug_mode) {
+                if (this.settings.debug_mode) console.log(`${this.debug_label}: Scanning file has timed out. Message:`, result);
+                if (this.settings.debug_mode) console.log(`${this.debug_label}: File may be INFECTED!`);
+            }
+            const error = result;
+            return new NodeClamError({error}, `A timeout occurred while scanning the piped-through stream: ${result}`);
         }
 
         if (this.settings.debug_mode) {
