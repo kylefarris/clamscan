@@ -18,7 +18,6 @@
     "type": "git",
     "url": "git@github.com:kylefarris/clamscan.git"
   },
-  "dependencies": {},
   "keywords": [
     "clamav",
     "virus",
