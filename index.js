@@ -415,7 +415,7 @@ class NodeClam {
             // Create a new Socket connection to Unix socket or remote server (in that order)
             let client;
 
-            // Setup socket connection timeout (defualt: 20 seconds).
+            // Setup socket connection timeout (default: 20 seconds).
             const timeout = this.settings.clamdscan.timeout ? this.settings.clamdscan.timeout : 20000;
 
             // The fastest option is a local Unix socket

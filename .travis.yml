@@ -1,9 +1,13 @@
-dist: trusty
+dist: xenial
 language: node_js
 node_js:
   - "10.0"
   - "11.0"
   - "12.0"
+  - "13.0"
+  - "14.0"
+  - "15.0"
+  - "16.0"
 before_install:
   - sudo apt-get update
   - sudo apt-get install clamav clamav-daemon
