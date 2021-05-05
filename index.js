@@ -1003,7 +1003,7 @@ class NodeClam {
                         })
                             // When the ClamAV socket connection ends (receives chunk)
                             .on('end', () => {
-                                this._clamav_socket();
+                                this._clamav_socket.end();
                                 if (me.settings.debug_mode) console.log(`${me.debug_label}: ClamAV socket has received the last chunk!`);
                                 // Process the collected chunks
                                 const response = Buffer.concat(this._clamav_response_chunks);
