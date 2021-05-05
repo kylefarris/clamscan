@@ -11,5 +11,6 @@ node_js:
 before_install:
   - sudo apt-get update
   - sudo apt-get install ntp clamav clamav-daemon
+  - sleep 60
   - sudo systemctl restart clamav-freshclam
   - sudo systemctl restart clamav-daemon
