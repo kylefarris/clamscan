@@ -1456,19 +1456,21 @@ describe('passthrough', () => {
         });
     });
 
-    it('should handle a 0-byte file', () => {
-        const input = fs.createReadStream(empty_file);
-        const output = fs.createWriteStream(passthru_file);
-        const av = clamscan.passthrough();
+    if (!process.env.CI) {
+        it('should handle a 0-byte file', () => {
+            const input = fs.createReadStream(empty_file);
+            const output = fs.createWriteStream(passthru_file);
+            const av = clamscan.passthrough();
 
-        input.pipe(av).pipe(output);
+            input.pipe(av).pipe(output);
 
-        output.on('finish', () => {
-            const orig_file = fs.readFileSync(empty_file);
-            const out_file = fs.readFileSync(passthru_file);
-            if (fs.existsSync(passthru_file)) fs.unlinkSync(passthru_file);
+            output.on('finish', () => {
+                const orig_file = fs.readFileSync(empty_file);
+                const out_file = fs.readFileSync(passthru_file);
+                if (fs.existsSync(passthru_file)) fs.unlinkSync(passthru_file);
 
-            expect(orig_file).to.eql(out_file);
+                expect(orig_file).to.eql(out_file);
+            });
         });
-    });
+    }
 });
