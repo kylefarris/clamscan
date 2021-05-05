@@ -1,12 +1,12 @@
 # .github/workflows/build.yml
 name: Clamscan Test Suite
-on: [push, pull_request]
+on: [pull_request]
 jobs:
   test:
     runs-on: ubuntu-18.04
     strategy:
       matrix:
-        node-version: [10,11,12,13,14,15,16]
+        node-version: [12,13,14,15,16]
     steps:
       - name: Update Apt
         run: sudo apt-get update

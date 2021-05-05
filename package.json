@@ -9,7 +9,8 @@
     "nicolaspeixoto",
     "urg <Patrick McAndrew>",
     "SaltwaterC <Ștefan Rusu>",
-    "Sjord <Sjoerd Langkemper>"
+    "Sjord <Sjoerd Langkemper>",
+    "chris-maclean <Christopher Maclean>"
   ],
   "scripts": {
     "test": "make test"
