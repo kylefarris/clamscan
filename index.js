@@ -261,7 +261,8 @@ class NodeClam {
                 if (this.settings.debug_mode)
                     console.log(`${this.debug_label}: Initially testing socket/tcp connection to clamscan server.`);
                 try {
-                    await this._ping();
+                    const client = await this._ping();
+                    client.end();
                     if (this.settings.debug_mode) console.log(`${this.debug_label}: Established connection to clamscan server!`);
                 } catch (err) {
                     return (has_cb ? cb(err, null) : reject(err));
@@ -408,10 +409,14 @@ class NodeClam {
     // ****************************************************************************
     // Create socket connection to a remote (or local) clamav daemon.
     // -----
+    // @private
+    // @param String label - The 
     // @return  Promise
     // ****************************************************************************
-    _init_socket() {
+    _init_socket(label='') {
         return new Promise((resolve, reject) => {
+            if (this.settings.debug_mode) console.log(`${this.debug_label}: Attempting to establish socket/TCP connection for "${label}"`);
+
             // Create a new Socket connection to Unix socket or remote server (in that order)
             let client;
 
@@ -548,9 +553,12 @@ class NodeClam {
         // Making things simpler
         if (cb && typeof cb === 'function') has_cb = true;
 
+        // Setup the socket client variable
+        let client;
+
         return new Promise(async (resolve, reject) => {
             try {
-                const client = await this._init_socket('test_availability');
+                client = await this._init_socket('_ping');
 
                 if (this.settings.debug_mode) console.log(`${this.debug_label}: Established connection to clamscan server!`);
 
@@ -687,17 +695,21 @@ class NodeClam {
             // If user wants to connect via socket or TCP...
             if (this.scanner === 'clamdscan' && (this.settings.clamdscan.socket || this.settings.clamdscan.host)) {
                 const chunks = [];
+                let client;
 
                 try {
-                    const client = await this._init_socket();
+                    client = await this._init_socket('get_version');
                     client.write('nVERSION\n');
                     // ClamAV is sending stuff to us
                     client.on('data', chunk => chunks.push(chunk));
                     client.on('end', () => {
                         const response = Buffer.concat(chunks);
+                        client.end();
                         return (has_cb ? cb(null, response.toString()) : resolve(response.toString()));
                     });
                 } catch (err) {
+                    if (client && 'readyState' in client && client.readyState) client.end();
+
                     if (this.settings.clamdscan.local_fallback === true) {
                         return local_fallback();
                     } else {
@@ -819,8 +831,10 @@ class NodeClam {
                 // console.log("Yep");
                 // Scan using local unix domain socket (much simpler/faster process--especially with MULTISCAN enabled)
                 if (this.settings.clamdscan.socket) {
+                    let client;
+
                     try {
-                        const client = await this._init_socket('is_infected');
+                        client = await this._init_socket('is_infected');
                         if (this.settings.debug_mode) console.log(`${this.debug_label}: scanning with local domain socket now.`);
 
                         if (this.settings.clamdscan.multiscan === true) {
@@ -835,11 +849,17 @@ class NodeClam {
                             if (this.settings.debug_mode) console.log(`${this.debug_label}: Received response from remote clamd service.`);
                             try {
                                 const result = this._process_result(data.toString(), file);
-                                if (result instanceof Error) throw result;
+                                if (result instanceof Error) {
+                                    client.end();
+                                    throw result;
+                                }
 
+                                client.end();
                                 const {is_infected, viruses} = result;
                                 return (has_cb ? cb(null, file, is_infected, viruses) : resolve({file, is_infected, viruses}));
                             } catch (err) {
+                                client.end();
+
                                 // Fallback to local if that's an option
                                 if (this.settings.clamdscan.local_fallback === true) return await local_scan();
 
@@ -847,6 +867,8 @@ class NodeClam {
                             }
                         });
                     } catch (err) {
+                        if (client && 'readyState' in client && client.readyState) client.end();
+
                         // Fallback to local if that's an option
                         if (this.settings.clamdscan.local_fallback === true) return await local_scan();
 
@@ -939,6 +961,7 @@ class NodeClam {
                     this._fork_stream.unpipe();
                     this._fork_stream.destroy();
                     this._clamav_transform.destroy();
+                    this._clamav_socket.end();
                     clear_scan_benchmark();
 
                     // Finding an infected file isn't really an error...
@@ -976,9 +999,11 @@ class NodeClam {
                         // When the CLamAV socket connection is closed (could be after 'end' or because of an error)...
                         this._clamav_socket.on('close', hadError => {
                             if (me.settings.debug_mode) console.log(`${me.debug_label}: ClamAV socket has been closed! Because of Error:`, hadError);
+                            this._clamav_socket.end();
                         })
                             // When the ClamAV socket connection ends (receives chunk)
                             .on('end', () => {
+                                this._clamav_socket();
                                 if (me.settings.debug_mode) console.log(`${me.debug_label}: ClamAV socket has received the last chunk!`);
                                 // Process the collected chunks
                                 const response = Buffer.concat(this._clamav_response_chunks);
@@ -997,12 +1022,14 @@ class NodeClam {
                                 // We don't want to to double-emit this message.
                                 if (_scan_complete === false) {
                                     _scan_complete = true;
+                                    this._clamav_socket.end();
                                     this.emit('scan-complete', result);
                                 }
                             })
                             // If connection timesout.
                             .on('timeout', () => {
                                 this.emit('timeout', new Error('Connection to host/socket has timed out'));
+                                this._clamav_socket.end();
                                 if (me.settings.debug_mode) console.log(`${me.debug_label}: Connection to host/socket has timed out`);
                             })
                             // When the ClamAV socket is ready to receive packets (this will probably never fire here)
@@ -1065,6 +1092,11 @@ class NodeClam {
                         // Handle the chunk
                         do_transform();
                     } catch (err) {
+                        // Close socket if it's currently valid
+                        if (this._clamav_socket && 'readyState' in this._clamav_socket && this._clamav_socket.readyState) {
+                            this._clamav_socket.end();
+                        }
+
                         // If there's an issue connecting to the ClamAV socket, this is where that's handled
                         if (me.settings.debug_mode) console.error(`${me.debug_label}: Error initiating socket to ClamAV: `, err);
                         handle_error(err);
@@ -1549,8 +1581,10 @@ class NodeClam {
                 // Scan locally via socket (either TCP or Unix socket)
                 // This is much simpler/faster process--potentially even more with MULTISCAN enabled)
                 if (this.settings.clamdscan.socket || (this.settings.clamdscan.port && this._is_localhost())) {
+                    let client;
+
                     try {
-                        const client = await this._init_socket();
+                        client = await this._init_socket('scan_dir');
                         if (this.settings.debug_mode) console.log(`${this.debug_label}: scanning path with local domain socket now.`);
 
                         if (this.settings.clamdscan.multiscan === true) {
@@ -1583,6 +1617,9 @@ class NodeClam {
                                     const err = new NodeClamError({path, err: result}, 'There was an issue scanning the path provided.');
                                     return (has_cb ? end_cb(err, [], []) : reject(err));
                                 }
+
+                                // Fully close up the client
+                                client.end();
 
                                 const {is_infected, viruses} = result;
                                 const good_files = (is_infected ? [] : [path]);
@@ -1678,6 +1715,9 @@ class NodeClam {
                 return (has_cb ? cb(err, null) : reject(err));
             }
 
+            // Create socket variable
+            let socket;
+            
             // Get a socket client
             try {
                 // Get an instance of our stream tranform that coddles
@@ -1685,7 +1725,7 @@ class NodeClam {
                 const transform = new NodeClamTransform({}, this.settings.debug_mode);
 
                 // Get a socket
-                const socket = await this._init_socket();
+                socket = await this._init_socket('scan_stream');
 
                 // Pipe the stream through our transform and into the ClamAV socket
                 stream.pipe(transform).pipe(socket);
@@ -1720,22 +1760,33 @@ class NodeClam {
                     })
 
                     .on('close', hadError => {
+                        socket.end();
                         if (this.settings.debug_mode) console.log(`${this.debug_label}: ClamAV socket has been closed!`, hadError);
                     })
 
                     .on('error', err => {
                         console.error(`${this.debug_label}: Error emitted from ClamAV socket: `, err);
+                        socket.end();
                         return (has_cb ? cb(err, null) : reject(err));
                     })
 
                     // ClamAV is done sending stuff to us
                     .on('end', () => {
                         if (this.settings.debug_mode) console.log(`${this.debug_label}: ClamAV is done scanning.`);
+                        // Fully close up the socket
+                        socket.end();
+
+                        // Concat all the response chunks into a single buffer
                         const response = Buffer.concat(chunks);
+
+                        // If the scan didn't finish, throw error
                         if (!finished) {
                             const err = new NodeClamError('Scan aborted. Reply from server: ' + response.toString('utf8'));
                             return (has_cb ? cb(err, null) : reject(err));
-                        } else {
+                        }
+
+                        // The scan finished
+                        else {
                             if (this.settings.debug_mode) console.log(`${this.debug_label}: Raw Response:  ${response.toString('utf8')}`);
                             const result = this._process_result(response.toString('utf8'), null);
                             return (has_cb ? cb(null, result) : resolve(result));
