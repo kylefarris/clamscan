@@ -1,6 +1,6 @@
 # NodeJS Clamscan Virus Scanning Utility
 
-[![NPM Version][npm-version-image]][npm-url] [![NPM Downloads][npm-downloads-image]][npm-url] [![Node.js Version][node-image]][node-url]
+[![NPM Version][npm-version-image]][npm-url] [![NPM Downloads][npm-downloads-image]][npm-url] [![Node.js Version][node-image]][node-url] [![Test Suite](https://github.com/kylefarris/clamscan/actions/workflows/test.yml/badge.svg)](https://github.com/kylefarris/clamscan/actions/workflows/test.yml)
 
 Use Node JS to scan files on your server with ClamAV's clamscan/clamdscan binary or via TCP to a remote server or local UNIX Domain socket. This is especially useful for scanning uploaded files provided by un-trusted sources.
 
