@@ -1,6 +1,10 @@
 # .github/workflows/build.yml
 name: Clamscan Test Suite
-on: [pull_request]
+on: 
+  pull_request:
+  push:
+    branches:
+      - master
 jobs:
   test:
     runs-on: ubuntu-18.04
