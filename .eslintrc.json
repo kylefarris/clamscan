@@ -1,36 +1,70 @@
 {
+    "parser": "babel-eslint",
     "env": {
-        "browser": true,
-        "commonjs": true,
-        "es6": true,
+        "browser": false,
         "node": true,
-        "mocha": true
+        "es6": true
     },
-    "extends": "eslint:recommended",
+    "extends": ["airbnb-base", "plugin:prettier/recommended", "plugin:chai-friendly/recommended"],
+    "plugins": ["prettier", "chai-friendly", "jsdoc"],
     "globals": {
         "Atomics": "readonly",
         "SharedArrayBuffer": "readonly"
     },
     "parserOptions": {
-        "ecmaVersion": 2018
+        "ecmaVersion": 2018,
+        "sourceType": "module"
     },
     "rules": {
-        "indent": [
-            "error",
-            4,
-            { "SwitchCase" : 1 }
+        "no-console": "off",
+        "no-param-reassign": "off",
+        "prettier/prettier": "error",
+        "class-methods-use-this": "off",
+        "require-jsdoc": "error",
+        "valid-jsdoc": "off",
+        "global-require": "warn",
+        "lines-between-class-members": "off",
+        "jsdoc/check-alignment": 1, // Recommended
+        "jsdoc/check-indentation": 1,
+        "jsdoc/check-param-names": 1, // Recommended
+        "jsdoc/check-syntax": 1,
+        "jsdoc/check-tag-names": [
+            "warn",
+            {
+                "definedTags": ["typicalname", "route", "authentication", "bodyparam", "routeparam"]
+            }
         ],
-        "linebreak-style": [
-            "error",
-            "unix"
-        ],
-        "quotes": [
-            "error",
-            "single"
-        ],
-        "semi": [
-            "error",
-            "always"
-        ]
+        "jsdoc/check-types": 1, // Recommended
+        "jsdoc/implements-on-classes": 1, // Recommended
+        "jsdoc/match-description": 1,
+        "jsdoc/newline-after-description": 1, // Recommended
+        "jsdoc/no-undefined-types": [
+            "warn",
+            {
+                "definedTypes": ["DELETE", "POST", "PATCH", "PUT", "GET"]
+            }
+        ], // Recommended
+        "jsdoc/require-description": 1,
+        "jsdoc/require-hyphen-before-param-description": 1,
+        "jsdoc/require-jsdoc": 1, // Recommended
+        "jsdoc/require-param": 1, // Recommended
+        "jsdoc/require-param-description": 1, // Recommended
+        "jsdoc/require-param-name": 1, // Recommended
+        "jsdoc/require-param-type": 1, // Recommended
+        "jsdoc/require-returns": 1, // Recommended
+        "jsdoc/require-returns-check": 1, // Recommended
+        "jsdoc/require-returns-description": 1, // Recommended
+        "jsdoc/require-returns-type": 1, // Recommended
+        "jsdoc/valid-types": 1 // Recommended
+    },
+    "settings": {
+        "jsdoc": {
+            "plugins": ["jsdoc-route-plugin"],
+            "structuredTags": {
+                "route": {
+                    "type": ["DELETE", "POST", "PATCH", "PUT", "GET"]
+                }
+            }
+        }
     }
 }
