@@ -356,11 +356,14 @@ describe('_ping', () => {
     it('should respond with a socket client (Promise API)', async () => {
         const client = await clamscan._ping();
         expect(client).to.be.an('object');
+        expect(client.readyState).to.eql('open');
         expect(client.writable).to.eql(true);
         expect(client.readable).to.eql(true);
         expect(client._hadError).to.eql(false);
         expect(client).to.respondTo('on');
         expect(client).to.not.respondTo('foobar');
+
+        client.end();
     });
 
     it('should respond with a socket client (Callback API)', done => {
