@@ -246,6 +246,27 @@ describe('Initialized NodeClam module', () => {
         clamscan.settings.scan_log = config.scan_log;
         expect(clamscan.settings.scan_log).to.be.eql(config.scan_log);
     });
+
+    it('should initialize successfully with a custom config file, even if the default config file does not exist', async () => {
+        /**
+         * For this test, the test runner needs to ensure that the default clamdscan configuration file
+         * is *not* available. This file may reside at 
+         *   ../etc/clamav/clamd.conf
+         * relative to the clamdscan executable. Making this file unavailable can be as simple as
+         * renaming it. Only if this file is unavailable will this test be meaningful. If present,
+         * NodeClam.init will fall back to using the clamscan binary and the default config file.
+         * 
+         * NodeClam.init should execute successfully using the custom config file only.
+         */
+        const clamscan = await reset_clam({
+            preference: 'clamdscan',
+            clamdscan: {
+                active: true,
+                config_file: 'tests/clamd.conf',
+            }
+        });
+        expect(clamscan.scanner).to.eq('clamdscan'); // Verify that the scanner did not fall back to another binary
+    });
 });
 
 describe('build_clam_flags', () => {
