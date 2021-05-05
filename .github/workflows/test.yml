@@ -20,5 +20,3 @@ jobs:
         run: npm install
       - name: Run tests
         run: npm test
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
