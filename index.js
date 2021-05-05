@@ -14,7 +14,7 @@ const node_path = require('path'); // renamed to prevent conflicts in `scan_dir`
 const child_process = require('child_process');
 const {PassThrough, Transform} = require('stream');
 const {promisify} = util;
-const {exec, execFile} = child_process;
+const {execFile} = child_process;
 
 // Enable these once the FS.promises API is no longer experimental
 // const fsPromises = require('fs').promises;
@@ -31,7 +31,6 @@ const fs_stat = promisify(fs.stat);
 const NodeClamTransform = require('./NodeClamTransform.js');
 
 // Convert some stuff to promises
-const cp_exec = promisify(exec);
 const cp_execfile = promisify(execFile);
 
 // ****************************************************************************
@@ -416,7 +415,7 @@ class NodeClam {
             // Create a new Socket connection to Unix socket or remote server (in that order)
             let client;
 
-            // Setup socket connection timeout (defualt: 20 seconds).
+            // Setup socket connection timeout (default: 20 seconds).
             const timeout = this.settings.clamdscan.timeout ? this.settings.clamdscan.timeout : 20000;
 
             // The fastest option is a local Unix socket
@@ -490,8 +489,8 @@ class NodeClam {
         }
 
         const version_cmds = {
-            clamdscan: `--version`,
-            clamscan:  `--version`,
+            clamdscan: '--version',
+            clamscan:  '--version',
         };
 
         try {
@@ -582,6 +581,8 @@ class NodeClam {
     // @return  Object      Object containing `is_infected` Boolean and `viruses` Array
     // ****************************************************************************
     _process_result(result, file=null) {
+        let timeout = false;
+
         if (typeof result !== 'string') {
             if (this.settings.debug_mode) console.log(`${this.debug_label}: Invalid stdout from scanner (not a string): `, result);
             throw new Error('Invalid result to process (not a string)');
@@ -592,7 +593,7 @@ class NodeClam {
         // eslint-disable-next-line no-control-regex
         if (/:\s+OK(\u0000|[\r\n])?$/.test(result)) {
             if (this.settings.debug_mode) console.log(`${this.debug_label}: File is OK!`);
-            return { is_infected: false, viruses: [], file, resultString: result };
+            return { is_infected: false, viruses: [], file, resultString: result, timeout };
         }
 
         // eslint-disable-next-line no-control-regex
@@ -606,7 +607,7 @@ class NodeClam {
             // eslint-disable-next-line no-control-regex
             const viruses = result.split(/(\u0000|[\r\n])/).map(v => /:\s+(.+)FOUND$/gm.test(v) ? v.replace(/(.+:\s+)(.+)FOUND/gm, '$2').trim() : null).filter(v => !!v);
 
-            return { is_infected: true, viruses, file, resultString: result };
+            return { is_infected: true, viruses, file, resultString: result, timeout };
         }
 
         if (/^(.+)ERROR/gm.test(result)) {
@@ -618,12 +619,22 @@ class NodeClam {
             return new NodeClamError({error}, `An error occurred while scanning the piped-through stream: ${error}`);
         }
 
+        // This will occur in the event of a timeout (rare)
+        if (result === 'COMMAND READ TIMED OUT') {
+            timeout = true;
+            if (this.settings.debug_mode) {
+                if (this.settings.debug_mode) console.log(`${this.debug_label}: Scanning file has timed out. Message: `, result);
+                if (this.settings.debug_mode) console.log(`${this.debug_label}: File may be INFECTED!`);
+            }
+            return { is_infected: null, viruses: [], file, resultString: result, timeout };
+        }
+
         if (this.settings.debug_mode) {
             if (this.settings.debug_mode) console.log(`${this.debug_label}: Error Response: `, result);
             if (this.settings.debug_mode) console.log(`${this.debug_label}: File may be INFECTED!`);
         }
 
-        return { is_infected: null, viruses: [], file, resultString: result };
+        return { is_infected: null, viruses: [], file, resultString: result, timeout };
     }
 
     // ****************************************************************************
@@ -922,7 +933,7 @@ class NodeClam {
                     }
                 };
 
-                // DRY method for handling errors when the arise from the
+                // DRY method for handling errors when they arise from the
                 // ClamAV Socket connection
                 const handle_error = (err, is_infected=null, result=null) => {
                     this._fork_stream.unpipe();
@@ -938,7 +949,7 @@ class NodeClam {
                         }
                         this.emit('stream-infected', result); // just another way to catch an infected stream
                     } else {
-                        this.emit('error', err);
+                        this.emit('error', err || new NodeClamError(result));
                     }
                 };
 
@@ -979,6 +990,9 @@ class NodeClam {
                                     clear_scan_benchmark();
                                 }
 
+                                // If the scan timed-out
+                                if (result.timeout === true) this.emit('timeout');
+
                                 // NOTE: "scan-complete" could be called by the `handle_error` method.
                                 // We don't want to to double-emit this message.
                                 if (_scan_complete === false) {
@@ -1014,13 +1028,28 @@ class NodeClam {
                                 const response = Buffer.concat(this._clamav_response_chunks);
                                 const result = me._process_result(response.toString(), null);
 
-                                // If there's an error supplied or if we detect a virus, stop stream immediately.
-                                if (result instanceof NodeClamError || (typeof result === 'object' && 'is_infected' in result && result.is_infected === true)) {
+                                // If there's an error supplied or if we detect a virus or timeout, stop stream immediately.
+                                if (
+                                    result instanceof NodeClamError || 
+                                    (
+                                        typeof result === 'object' && 
+                                        (
+                                            ('is_infected' in result && result.is_infected === true) ||
+                                            ('timeout' in result && result.timeout === true)
+                                        )
+                                    ) 
+                                ) {
                                     // If a virus is detected...
                                     if (typeof result === 'object' && 'is_infected' in result && result.is_infected === true) {
-                                        // handle_error(new NodeClamError(result, `Virus(es) found! ${'viruses' in result && Array.isArray(result.viruses) ? `Suspects: ${result.viruses.join(', ')}` : ''}`));
                                         handle_error(null, true, result);
                                     }
+
+                                    // If a timeout is detected...
+                                    else if (typeof result === 'object' && 'is_infected' in result && result.is_infected === true) {
+                                        this.emit('timeout');
+                                        handle_error(null, false, result);
+                                    }
+
                                     // If any other kind of error is detected...
                                     else {
                                         handle_error(result);
@@ -1061,7 +1090,7 @@ class NodeClam {
                     }, 1000);
                 }
 
-                // TODO: Investigate why this needs to be done in order
+                // @todo: Investigate why this needs to be done in order
                 // for the ClamAV socket to be closed (why NodeClamTransform's
                 // `_flush` method isn't getting called)
                 // If the incoming stream is empty, transform() won't have been called, so we won't

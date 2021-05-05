@@ -1,0 +1,32 @@
+# .github/workflows/build.yml
+name: Clamscan Test Suite
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-18.04
+    strategy:
+      matrix:
+        node-version: [10,11,12,13,14,15,16]
+    steps:
+      - name: Update Apt
+        run: sudo apt-get update
+      - name: Install ClamAV
+        run: sudo apt-get install clamav clamav-daemon
+      - name: Restart Freshclam
+        run: sudo systemctl restart clamav-freshclam
+      - name: Chill for 30 seconds
+        run: sleep 30
+      - name: Restart ClamD
+        run: sudo systemctl restart clamav-daemon
+      - name: Chill for 30 seconds again
+        run: sleep 30
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v2
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Install dependencies
+        run: npm install
+      - name: Run tests
+        run: npm test
