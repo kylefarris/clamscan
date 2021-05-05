@@ -1357,10 +1357,10 @@ describe('passthrough', () => {
             const av = clamscan.passthrough();
 
             input.pipe(av).pipe(output);
+            if (fs.existsSync(passthru_file)) fs.unlinkSync(passthru_file);
 
             av.on('error', err => {
                 expect(err).to.be.instanceof(Error);
-                if (fs.existsSync(passthru_file)) fs.unlinkSync(passthru_file);
             });
         } catch (err) {
             expect(err).to.be.instanceof(Error);
@@ -1373,11 +1373,11 @@ describe('passthrough', () => {
         const av = clamscan.passthrough();
 
         input.pipe(av).pipe(output);
+        if (fs.existsSync(passthru_file)) fs.unlinkSync(passthru_file);
 
         av.on('scan-complete', result => {
             check(done, () => {
                 expect(result).to.be.an('object').that.has.all.keys('is_infected', 'viruses', 'file', 'resultString', 'timeout');
-                if (fs.existsSync(passthru_file)) fs.unlinkSync(passthru_file);
             });
         });
     });
@@ -1388,6 +1388,7 @@ describe('passthrough', () => {
         const av = clamscan.passthrough();
 
         input.pipe(av).pipe(output);
+        if (fs.existsSync(passthru_file)) fs.unlinkSync(passthru_file);
 
         av.on('scan-complete', result => {
             check(done, () => {
@@ -1397,7 +1398,6 @@ describe('passthrough', () => {
                 expect(is_infected).to.eql(true);
                 expect(viruses).to.be.an('array');
                 expect(viruses).to.have.length(1);
-                if (fs.existsSync(passthru_file)) fs.unlinkSync(passthru_file);
             });
         });
     });
@@ -1408,6 +1408,7 @@ describe('passthrough', () => {
         const av = clamscan.passthrough();
 
         input.pipe(av).pipe(output);
+        if (fs.existsSync(passthru_file)) fs.unlinkSync(passthru_file);
 
         av.on('scan-complete', result => {
             check(done, () => {
@@ -1417,7 +1418,6 @@ describe('passthrough', () => {
                 expect(is_infected).to.eql(false);
                 expect(viruses).to.be.an('array');
                 expect(viruses).to.have.length(0);
-                if (fs.existsSync(passthru_file)) fs.unlinkSync(passthru_file);
             });
         });
     });
@@ -1431,8 +1431,8 @@ describe('passthrough', () => {
 
         output.on('finish', () => {
             Promise.all([
-                expect(fs_stat(passthru_file),          'get passthru file stats').to.not.be.rejectedWith(Error),
-                expect(fs_readfile(passthru_file),      'get passthru file').to.not.be.rejectedWith(Error),
+                expect(fs_stat(passthru_file), 'get passthru file stats').to.not.be.rejectedWith(Error),
+                expect(fs_readfile(passthru_file), 'get passthru file').to.not.be.rejectedWith(Error),
             ]).should.notify(() => {
                 if (fs.existsSync(passthru_file)) fs.unlinkSync(passthru_file);
                 done();
@@ -1450,9 +1450,9 @@ describe('passthrough', () => {
         output.on('finish', () => {
             const orig_file = fs.readFileSync(good_scan_file);
             const out_file = fs.readFileSync(passthru_file);
+            if (fs.existsSync(passthru_file)) fs.unlinkSync(passthru_file);
 
             expect(orig_file).to.eql(out_file);
-            if (fs.existsSync(passthru_file)) fs.unlinkSync(passthru_file);
         });
     });
 
@@ -1466,9 +1466,9 @@ describe('passthrough', () => {
         output.on('finish', () => {
             const orig_file = fs.readFileSync(empty_file);
             const out_file = fs.readFileSync(passthru_file);
+            if (fs.existsSync(passthru_file)) fs.unlinkSync(passthru_file);
 
             expect(orig_file).to.eql(out_file);
-            if (fs.existsSync(passthru_file)) fs.unlinkSync(passthru_file);
         });
     });
 });
