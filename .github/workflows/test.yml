@@ -10,6 +10,8 @@ jobs:
     steps:
       - name: Install ClamAV
         run: sudo apt-get update && sudo apt-get install clamav clamav-daemon && sudo systemctl restart clamav-freshclam clamav-daemon
+      - name: Why no socket
+        run: sudo cat /etc/clamav/clamd.conf
       - name: Checkout repository
         uses: actions/checkout@v2
       - name: Use Node.js ${{ matrix.node-version }}
