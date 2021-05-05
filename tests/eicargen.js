@@ -14,7 +14,11 @@ const eicarByteArray = [
 
 const eicarBuffer = Buffer.from(eicarByteArray);
 
-module.exports = {
+const EicarGen = {
     writeFile: () => fs.writeFileSync(bad_scan_file, eicarBuffer.toString()),
     getStream: () => Readable.from(eicarBuffer),
 };
+
+// EicarGen.writeFile();
+
+module.exports = EicarGen;
