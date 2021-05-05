@@ -9,7 +9,7 @@ jobs:
         node-version: [10,11,12,13,14,15,16]
     steps:
       - name: Install ClamAV
-        run: sudo apt-get update && sudo apt-get install clamav clamav-daemon && sudo systemctl restart clamav-freshclam clamav-daemon
+        run: sudo apt-get update && sudo apt-get install clamav clamav-daemon && sudo systemctl restart clamav-freshclam && sudo systemctl restart clamav-daemon
       - name: Why no socket
         run: sudo cat /etc/clamav/clamd.conf
       - name: Checkout repository
