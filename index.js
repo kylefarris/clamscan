@@ -1651,6 +1651,8 @@ class NodeClam {
                     // Make sure there are no dupes, falsy values, or non-strings... just because we can
                     allFiles = Array.from(new Set(allFiles.filter((v) => !!v))).filter((v) => typeof v === 'string');
 
+                    // console.log('All Files: ', allFiles);
+
                     // If file list is empty, return error
                     if (allFiles.length <= 0) {
                         const err = new NodeClamError('No valid files provided to scan!');
@@ -1739,7 +1741,7 @@ class NodeClam {
                         for (const i in chunkResults) {
                             const v = chunkResults[i];
                             // If the result is an error, add it to the error
-                            // object and skip adding this file to the `allFiles` array
+                            // object and skip adding this file to the `all_files` array
                             if (v instanceof Error) {
                                 errors[chunk[i]] = v;
                             } else if (v.isFile()) {
@@ -1751,6 +1753,7 @@ class NodeClam {
                                     const contents = (await fsReaddir(chunk[i], { withFileTypes: true }))
                                         .filter((x) => x.isFile())
                                         .map((x) => x.name.replace(rgx, `${v}/${x.name}`));
+
                                     allFiles = allFiles.concat(contents);
                                 } catch (e) {
                                     errors[chunk[i]] = e;
@@ -1763,7 +1766,7 @@ class NodeClam {
                     }
                 } else {
                     // Just scan all the files
-                    allFiles = files;
+                    allFiles = theFiles;
 
                     // Scan the files in the allFiles array
                     return finishScan();

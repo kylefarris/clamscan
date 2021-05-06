@@ -1,7 +1,7 @@
 const fs = require('fs');
 const { Readable } = require('stream');
 
-const badScanDir = `${__dirname}/badScanDir`;
+const badScanDir = `${__dirname}/bad_scan_dir`;
 const badScanFile = `${badScanDir}/bad_file_1.txt`;
 
 // prettier-ignore
