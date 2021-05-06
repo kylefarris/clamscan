@@ -19,6 +19,7 @@
         "no-console": "off",
         "no-param-reassign": "off",
         "prettier/prettier": "error",
+        "no-underscore-dangle": "off",
         "class-methods-use-this": "off",
         "require-jsdoc": "error",
         "valid-jsdoc": "off",
