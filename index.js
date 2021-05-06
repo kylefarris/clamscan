@@ -1,9 +1,12 @@
-/* eslint-disable no-underscore-dangle */
 /* eslint-disable no-async-promise-executor */
 /*!
  * Node - Clam
  * Copyright(c) 2013-2020 Kyle Farris <kyle@chomponllc.com>
  * MIT Licensed
+ */
+
+/**
+ * @typedef {require('stream').ReadableStream} ReadableStream
  */
 
 // Module dependencies.
@@ -14,7 +17,9 @@ const nodePath = require('path'); // renamed to prevent conflicts in `scanDir`
 const { promisify } = require('util');
 const { execFile } = require('child_process');
 const { PassThrough, Transform } = require('stream');
+const { Socket } = require('dgram');
 const NodeClamError = require('./lib/NodeClamError');
+const NodeClamTransform = require('./lib/NodeClamTransform.js');
 
 // Enable these once the FS.promises API is no longer experimental
 // const fsPromises = require('fs').promises;
@@ -27,8 +32,6 @@ const fsAccess = promisify(fs.access);
 const fsReadfile = promisify(fs.readFile);
 const fsReaddir = promisify(fs.readdir);
 const fsStat = promisify(fs.stat);
-
-const NodeClamTransform = require('./NodeClamTransform.js');
 
 // Convert some stuff to promises
 const cpExecFile = promisify(execFile);
@@ -67,7 +70,7 @@ class NodeClam {
                 host: false,
                 port: false,
                 timeout: 60000, // 60 seconds
-                localFallback: true,
+                local_fallback: true,
                 path: '/usr/bin/clamdscan',
                 config_file: null,
                 multiscan: true,
@@ -81,13 +84,67 @@ class NodeClam {
         this.settings = { ...this.defaults };
     }
 
-    // ****************************************************************************
-    // Initialize Method
-    // -----
-    // @param   Object      options     User options for the Clamscan module
-    // @param   Function    cb          (optional) Callback method
-    // @return  Promise                 If no callback is provided, a Promise is returned
-    // ****************************************************************************
+    /**
+     * Initialization method.
+     *
+     * @param {object} [options] - User options for the Clamscan module
+     * @param {boolean} [options.remove_infected=false] - If true, removes infected files when found
+     * @param {boolean|string} [options.quarantine_infected=false] - If not false, should be a string to a path to quarantine infected files
+     * @param {string} [options.scan_log=null] - Path to a writeable log file to write scan results into
+     * @param {boolean} [options.debug_mode=false] - If true, *a lot* of info will be spewed to the logs
+     * @param {string} [options.file_list=null] - Path to file containing list of files to scan (for `scanFiles` method)
+     * @param {boolean} [options.scan_recursively=true] - If true, deep scan folders recursively (for `scanDir` method)
+     * @param {object} [options.clamscan] - Options specific to the clamscan binary
+     * @param {string} [options.clamscan.path='/usr/bin/clamscan'] - Path to clamscan binary on your server
+     * @param {string} [options.clamscan.db=null] - Path to a custom virus definition database
+     * @param {boolean} [options.clamscan.scan_archives=true] - If true, scan archives (ex. zip, rar, tar, dmg, iso, etc...)
+     * @param {active} [options.clamscan.active=true] - If true, this module will consider using the clamscan binary
+     * @param {object} [options.clamdscan] - Options specific to the clamdscan binary
+     * @param {string} [options.clamdscan.socket=false] - Path to socket file for connecting via TCP
+     * @param {string} [options.clamdscan.host=false] - IP of host to connec to TCP interface
+     * @param {string} [options.clamdscan.port=false] - Port of host to use when connecting via TCP interface
+     * @param {number} [options.clamdscan.timeout=60000] - Timeout for scanning files
+     * @param {boolean} [options.clamdscan.local_fallback=false] - If false, do not fallback to a local binary-method of scanning
+     * @param {string} [options.clamdscan.path='/usr/bin/clamdscan'] - Path to the `clamdscan` binary on your server
+     * @param {string} [options.clamdscan.config_file=null] - Specify config file if it's in an usual place
+     * @param {boolean} [options.clamdscan.multiscan=true] - If true, scan using all available cores
+     * @param {boolean} [options.clamdscan.reload_db=false] - If true, will re-load the DB on ever call (slow)
+     * @param {boolean} [options.clamdscan.active=true] - If true, this module will consider using the `clamdscan` binary
+     * @param {boolean} [options.clamdscan.bypass_test=false] - If true, check to see if socket is avaliable
+     * @param {object} [options.preference='clamdscan'] - If preferred binary is found and active, it will be used by default
+     * @param {Function} [cb] - Callback method. Prototype: `(err, <instance of NodeClam>)`
+     * @returns {Promise<object>} An initated instance of NodeClam
+     * @example
+     * const NodeClam = require('clamscan');
+     * const ClamScan = new NodeClam().init({
+     *     remove_infected: false,
+     *     quarantine_infected: false,
+     *     scan_log: null,
+     *     debug_mode: false,
+     *     file_list: null,
+     *     scan_recursively: true,
+     *     clamscan: {
+     *         path: '/usr/bin/clamscan',
+     *         db: null,
+     *         scan_archives: true,
+     *         active: true
+     *     },
+     *     clamdscan: {
+     *         socket: false,
+     *         host: false,
+     *         port: false,
+     *         timeout: 60000,
+     *         local_fallback: false,
+     *         path: '/usr/bin/clamdscan',
+     *         config_file: null,
+     *         multiscan: true,
+     *         reload_db: false,
+     *         active: true,
+     *         bypass_test: false,
+     *     },
+     *     preference: 'clamdscan'
+     });
+     */
     async init(options = {}, cb) {
         let hasCb = false;
 
@@ -137,7 +194,7 @@ class NodeClam {
             ) {
                 // If no valid scanner is found (but a socket/host is), disable the fallback to a local CLI scanning method
                 if (this.settings.clamdscan.socket || this.settings.clamdscan.host) {
-                    this.settings.clamdscan.localFallback = false;
+                    this.settings.clamdscan.local_fallback = false;
                 } else {
                     const err = new NodeClamError(
                         'Invalid virus scanner preference defined and no valid host/socket option provided!'
@@ -194,7 +251,7 @@ class NodeClam {
                             return hasCb ? cb(err, null) : reject(err);
                         }
 
-                        this.settings.clamdscan.localFallback = false;
+                        this.settings.clamdscan.local_fallback = false;
                     }
                 }
             } catch (err) {
@@ -205,7 +262,7 @@ class NodeClam {
             if (
                 !this.settings.clamdscan.socket &&
                 !this.settings.clamdscan.host &&
-                ((this.settings.clamdscan.active === true && this.settings.clamdscan.localFallback === true) ||
+                ((this.settings.clamdscan.active === true && this.settings.clamdscan.local_fallback === true) ||
                     this.settings.clamscan.active === true) &&
                 this.settings.quarantine_infected
             ) {
@@ -241,7 +298,7 @@ class NodeClam {
             if (
                 ((!this.settings.clamdscan.socket && !this.settings.clamdscan.host) ||
                     ((this.settings.clamdscan.socket || this.settings.clamdscan.host) &&
-                        this.settings.clamdscan.localFallback === true &&
+                        this.settings.clamdscan.local_fallback === true &&
                         this.settings.clamdscan.active === true) ||
                     (this.settings.clamdscan.active === false && this.settings.clamscan.active === true) ||
                     this.preference) &&
@@ -291,11 +348,13 @@ class NodeClam {
         });
     }
 
-    // ****************************************************************************
-    // Allows one to create a new instances of clamscan with new options
-    // -----
-    //
-    // ****************************************************************************
+    /**
+     * Allows one to create a new instances of clamscan with new options.
+     *
+     * @param {object} [options] - Same options as the `init` method
+     * @param {Function} [cb] - What to do after reset (repsponds with reset instance of NodeClam)
+     * @returns {Promise<object>} A reset instance of NodeClam
+     */
     reset(options = {}, cb) {
         let hasCb = false;
 
@@ -327,6 +386,15 @@ class NodeClam {
     // @param    String|Array    item        The file(s) / directory(ies) to append to the args
     // @api        Private
     // *****************************************************************************
+    /**
+     * Builds out the args to pass to `execFile`.
+     *
+     * @private
+     * @param {string|Array} item - The file(s) / directory(ies) to append to the args
+     * @returns {string|Array} The string or array of arguments
+     * @example
+     * this._buildClamArgs('--version');
+     */
     _buildClamArgs(item) {
         let args = this.clam_flags.slice();
 
@@ -336,14 +404,17 @@ class NodeClam {
         return args;
     }
 
-    // *****************************************************************************
-    // Builds out the flags based on the configuration the user provided
-    // -----
-    // @access  Private
-    // @param   String  scanner     The scanner to use (clamscan or clamdscan)
-    // @param   Object  settings    The settings used to build the flags
-    // @return  String              The concatenated clamav flags
-    // *****************************************************************************
+    /**
+     * Builds out the flags based on the configuration the user provided.
+     *
+     * @private
+     * @param {string} scanner - The scanner to use (clamscan or clamdscan)
+     * @param {object} settings - The settings used to build the flags
+     * @returns {string} The concatenated clamav flags
+     * @example
+     * // Build clam flags
+     * this.clam_flags = this._buildClamFlags(this.scanner, this.settings);
+     */
     _buildClamFlags(scanner, settings) {
         const flagsArray = ['--no-summary'];
 
@@ -433,13 +504,15 @@ class NodeClam {
         return flagsArray;
     }
 
-    // ****************************************************************************
-    // Create socket connection to a remote (or local) clamav daemon.
-    // -----
-    // @private
-    // @param String label - The
-    // @return  Promise
-    // ****************************************************************************
+    /**
+     * Create socket connection to a remote(or local) clamav daemon.
+     *
+     * @private
+     * @param {string} [label] - A label you can provide for debugging
+     * @returns {Promise<Socket>} A Socket/TCP connection to ClamAV
+     * @example
+     * const client = this._initSocket('whatever');
+     */
     _initSocket(label = '') {
         return new Promise((resolve, reject) => {
             if (this.settings.debug_mode)
@@ -519,12 +592,18 @@ class NodeClam {
         });
     }
 
-    // ****************************************************************************
-    // Checks to see if a particular path contains a clamav binary
-    // -----
-    // @param   String      scanner     Scanner (clamscan or clamdscan) to check
-    // @return  Promise
-    // ****************************************************************************
+    /**
+     * Checks to see if a particular binary is a clamav binary. The path for the
+     * binary must be specified in the NodeClam config at `init`. If you have a
+     * config file in an unusual place, make sure you specify that in `init` configs
+     * as well.
+     *
+     * @private
+     * @param {string} scanner - The ClamAV scanner (clamscan or clamdscan) to verify
+     * @returns {Promise<boolean>} True if binary is a ClamAV binary, false if not.
+     * @example
+     * const clamscanIsGood = this._isClamavBinary('clamscan');
+     */
     async _isClamavBinary(scanner) {
         const { path = null, config_file: configFile = null } = this.settings[scanner];
         if (!path) {
@@ -558,37 +637,45 @@ class NodeClam {
         }
     }
 
-    // ****************************************************************************
-    // Really basic method to check if the configured `host` is actually the localhost
-    // machine. It's not flawless but a decently acurate check for our purposes.
-    // -----
-    // @access  Private
-    // @return  Boolean         TRUE: Is localhost; FALSE: is not localhost.
-    // ****************************************************************************
+    /**
+     * Really basic method to check if the configured `host` is actually the localhost
+     * machine. It's not flawless but a decently acurate check for our purposes.
+     *
+     * @private
+     * @returns {boolean} Returns `true` if the clamdscan host is local, `false` if not.
+     * @example
+     * const isLocal = this._isLocalHost();
+     */
     _isLocalHost() {
         return ['127.0.0.1', 'localhost', os.hostname()].includes(this.settings.clamdscan.host);
     }
 
-    // ****************************************************************************
-    // Test to see if ab object is a readable stream.
-    // -----
-    // @access  Private
-    // @param   Object  obj     Object to test "streaminess"
-    // @return  Boolean         TRUE: Is stream; FALSE: is not stream.
-    // ****************************************************************************
+    /**
+     * Test to see if ab object is a readable stream.
+     *
+     * @private
+     * @param {object} obj - Object to test "streaminess" of
+     * @returns {boolean} Returns `true` if provided object is a stream; `false` if not.
+     * @example
+     * // Yay!
+     * const isStream = this._isReadableStream(someStream);
+     *
+     * // Nay!
+     * const isString = this._isReadableString('foobar');
+     */
     _isReadableStream(obj) {
         if (!obj || typeof obj !== 'object') return false;
         return typeof obj.pipe === 'function' && typeof obj._readableState === 'object';
     }
 
-    // ****************************************************************************
-    // Quick check to see if the remote/local socket is working. Callback/Resolve
-    // response is an instance to a ClamAV socket client.
-    // -----
-    // @access  Private
-    // @param   Function    cb      (optional) What to do after the ping
-    // @return  Promise
-    // ****************************************************************************
+    /**
+     * Quick check to see if the remote/local socket is working. Callback/Resolve
+     * response is an instance to a ClamAV socket client.
+     *
+     * @private
+     * @param {Function} [cb] - What to do after the ping
+     * @returns {Promise<object>} A copy of the Socket/TCP client
+     */
     _ping(cb) {
         let hasCb = false;
 
@@ -630,15 +717,20 @@ class NodeClam {
         });
     }
 
-    // ****************************************************************************
-    // This is what actually processes the response from clamav
-    // -----
-    // @access  Private
-    // -----
-    // @param   String      result      The ClamAV result to process and interpret
-    // @param   String      file        The name of the file/path that was scanned
-    // @return  Object      Object containing `isInfected` Boolean and `viruses` Array
-    // ****************************************************************************
+    /**
+     * This is what actually processes the response from clamav.
+     *
+     * @private
+     * @param {string} result - The ClamAV result to process and interpret
+     * @param {string} [file=null] - The name of the file/path that was scanned
+     * @returns {object} Contains `isInfected` boolean and `viruses` array
+     * @example
+     * const args = this._buildClamArgs('/some/file/here');
+     * execFile(this.settings[this.scanner].path, args, (err, stdout, stderr) => {
+     *     const { isInfected, viruses } = this._processResult(stdout, file);
+     *     console.log('Infected? ', isInfected);
+     * });
+     */
     _processResult(result, file = null) {
         let timeout = false;
 
@@ -701,12 +793,23 @@ class NodeClam {
         return { isInfected: null, viruses: [], file, resultString: result, timeout };
     }
 
-    // ****************************************************************************
-    // Establish the clamav version of a local or remote clamav daemon
-    // -----
-    // @param   Function    cb  (optional) What to do when version is established
-    // @return  Promise
-    // ****************************************************************************
+    /**
+     * Establish the clamav version of a local or remote clamav daemon.
+     *
+     * @param {Function} [cb] - What to do when version is established
+     * @returns {Promise<string>} - The version of ClamAV that is being interfaced with
+     * @example
+     * // Callback example
+     * clamscan.getVersion((err, version) => {
+     *     if (err) return console.error(err);
+     *     console.log(`ClamAV Version: ${version}`);
+     * });
+     *
+     * // Promise example
+     * const clamscan = new NodeClam().init();
+     * const version = await clamscan.getVersion();
+     * console.log(`ClamAV Version: ${version}`);
+     */
     getVersion(cb) {
         const self = this;
         let hasCb = false;
@@ -771,7 +874,7 @@ class NodeClam {
                 } catch (err) {
                     if (client && 'readyState' in client && client.readyState) client.end();
 
-                    if (this.settings.clamdscan.localFallback === true) {
+                    if (this.settings.clamdscan.local_fallback === true) {
                         return localFallback();
                     }
                     return hasCb ? cb(err, null) : reject(err);
@@ -782,13 +885,35 @@ class NodeClam {
         });
     }
 
-    // ****************************************************************************
-    // Checks if a particular file is infected.
-    // -----
-    // @param   String      file    Path to the file to check
-    // @param   Function    cb      (optional) What to do after the scan
-    // @return  Promise
-    // ****************************************************************************
+    /**
+     * This method allows you to scan a single file. It supports a callback and Promise API.
+     * If no callback is supplied, a Promise will be returned. This method will likely
+     * be the most common use-case for this module.
+     *
+     * @param {string} file - Path to the file to check
+     * @param {Function} [cb] - What to do after the scan
+     * @returns {Promise<object>} Object like: `{ file: String, isInfected: Boolean, viruses: Array }`
+     * @example
+     * // Callback Example
+     * clamscan.isInfected('/a/picture/for_example.jpg', (err, file, isInfected, viruses) => {
+     *     if (err) return console.error(err);
+     *
+     *     if (isInfected) {
+     *         console.log(`${file} is infected with ${viruses.join(', ')}.`);
+     *     }
+     * });
+     *
+     * // Promise Example
+     * clamscan.isInfected('/a/picture/for_example.jpg').then(result => {
+     *     const {file, isInfected, viruses} =  result;
+     *     if (isInfected) console.log(`${file} is infected with ${viruses.join(', ')}.`);
+     * }).then(err => {
+     *     console.error(err);
+     * });
+     *
+     * // Async/Await Example
+     * const {file, isInfected, viruses} = await clamscan.isInfected('/a/picture/for_example.jpg');
+     */
     isInfected(file = '', cb) {
         const self = this;
         let hasCb = false;
@@ -938,7 +1063,7 @@ class NodeClam {
                                 client.end();
 
                                 // Fallback to local if that's an option
-                                if (this.settings.clamdscan.localFallback === true) return localScan();
+                                if (this.settings.clamdscan.local_fallback === true) return localScan();
 
                                 return hasCb ? cb(err, file, null, []) : reject(err);
                             }
@@ -947,7 +1072,7 @@ class NodeClam {
                         if (client && 'readyState' in client && client.readyState) client.end();
 
                         // Fallback to local if that's an option
-                        if (this.settings.clamdscan.localFallback === true) return localScan();
+                        if (this.settings.clamdscan.local_fallback === true) return localScan();
 
                         return hasCb ? cb(err, file, null, []) : reject(err);
                     }
@@ -964,7 +1089,7 @@ class NodeClam {
                         return hasCb ? cb(null, file, isInfected, []) : resolve({ file, ...isInfected });
                     } catch (e) {
                         // Fallback to local if that's an option
-                        if (this.settings.clamdscan.localFallback === true) return await localScan();
+                        if (this.settings.clamdscan.local_fallback === true) return await localScan();
 
                         // Otherwise, fail
                         const err = new NodeClamError({ err: e, file }, 'Could not scan file via TCP or locally!');
@@ -987,14 +1112,59 @@ class NodeClam {
         });
     }
 
-    // ****************************************************************************
-    // This will return a Node Stream object that will allow a user to pass a stream
-    // THROUGH this module and on to something else whereby if a virus is detected
-    // mid-stream, the entire pipeline haults and an error event is emitted.
-    // -----
-    // @param   Stream  stream  A valid NodeJS stream object to pipe through ClamAV
-    // @return  Stream          A Transform stream
-    // ****************************************************************************
+    /**
+     * Returns a PassthroughStream object which allows you to
+     * pipe a ReadbleStream through it and on to another output. In the case of this
+     * implementation, it's actually forking the data to also
+     * go to ClamAV via TCP or Domain Sockets. Each data chunk is only passed on to
+     * the output if that chunk was successfully sent to and received by ClamAV.
+     * The PassthroughStream object returned from this method has a special event
+     * that is emitted when ClamAV finishes scanning the streamed data (`scan-complete`)
+     * so that you can decide if there's anything you need to do with the final output
+     * destination (ex. delete a file or S3 object).
+     *
+     * @returns {Transform} A Transform stream for piping a Readable stream into
+     * @example
+     * const NodeClam = require('clamscan');
+     *
+     * // You'll need to specify your socket or TCP connection info
+     * const clamscan = new NodeClam().init({
+     *     clamdscan: {
+     *         socket: '/var/run/clamd.scan/clamd.sock',
+     *         host: '127.0.0.1',
+     *         port: 3310,
+     *     }
+     * });
+     *
+     * // For example's sake, we're using the Axios module
+     * const request = require('axios');
+     *
+     * // Get a readable stream for a URL request
+     * const input = axios.get(some_url);
+     *
+     * // Create a writable stream to a local file
+     * const output = fs.createWriteStream(some_local_file);
+     *
+     * // Get instance of this module's PassthroughStream object
+     * const av = clamscan.passthrough();
+     *
+     * // Send output of RequestJS stream to ClamAV.
+     * // Send output of RequestJS to `some_local_file` if ClamAV receives data successfully
+     * input.pipe(av).pipe(output);
+     *
+     * // What happens when scan is completed
+     * av.on('scan-complete', result => {
+     *    const {isInfected, viruses} = result;
+     *    // Do stuff if you want
+     * });
+     *
+     * // What happens when data has been fully written to `output`
+     * output.on('finish', () => {
+     *     // Do stuff if you want
+     * });
+     *
+     * // NOTE: no errors (or other events) are being handled in this example but standard errors will be emitted according to NodeJS's Stream specifications
+     */
     passthrough() {
         const me = this;
         // A chunk counter for debugging
@@ -1232,22 +1402,62 @@ class NodeClam {
         });
     }
 
-    // ****************************************************************************
-    // Just an alias to `isInfected`
-    // ****************************************************************************
+    /**
+     * Just an alias to `isInfected`. See docs for that for usage examples.
+     *
+     * @param {string} file - Path to the file to check
+     * @param {Function} [cb] - What to do after the scan
+     * @returns {Promise<object>} Object like: `{ file: String, isInfected: Boolean, viruses: Array }`
+     */
     scanFile(file, cb) {
         return this.isInfected(file, cb);
     }
 
-    // ****************************************************************************
-    // Scans an array of files or paths. You must provide the full paths of the
-    // files and/or paths. Also enables the ability to scan a file list.
-    // -----
-    // @param   Array       files      A list of files or paths (full paths) to be scanned.
-    // @param   Function    endCb      What to do after the scan
-    // @param   Function    fileCb     What to do after each file has been scanned
-    // @return  Promise
-    // ****************************************************************************
+    /**
+     * Scans an array of files or paths. You must provide the full paths of the
+     * files and/or paths. Also enables the ability to scan a file list.
+     *
+     * This is essentially a wrapper for isInfected that simplifies the process
+     * of scanning many files or directories.
+     *
+     * **NOTE:** The only way to get per-file notifications is through the callback API.
+     *
+     * @param {Array} files - A list of files or paths (full paths) to be scanned
+     * @param {Function} [endCb] - What to do after the scan completes
+     * @param {Function} [fileCb] - What to do after each file has been scanned
+     * @returns {Promise<object>} Object like: `{ goodFiles: Array, badFiles: Array, errors: Object, viruses: Array }`
+     * @example
+     * // Callback Example
+     * const scanStatus = {
+     *     good: 0,
+     *     bad: 0
+     * };
+     * const files = [
+     *     '/path/to/file/1.jpg',
+     *     '/path/to/file/2.mov',
+     *     '/path/to/file/3.rb'
+     * ];
+     * clamscan.scanFiles(files, (err, goodFiles, badFiles, viruses) => {
+     *     if (err) return console.error(err);
+     *     if (badFiles.length > 0) {
+     *         console.log({
+     *             msg: `${goodFiles.length} files were OK. ${badFiles.length} were infected!`,
+     *             badFiles,
+     *             goodFiles,
+     *             viruses,
+     *         });
+     *     } else {
+     *         res.send({msg: "Everything looks good! No problems here!."});
+     *     }
+     * }, (err, file, isInfected, viruses) => {
+     *     ;(isInfected ? scanStatus.bad++ : scanStatus.good++);
+     *     console.log(`${file} is ${(isInfected ? `infected with ${viruses}` : 'ok')}.`);
+     *     console.log('Scan Status: ', `${(scanStatus.bad + scanStatus.good)}/${files.length}`);
+     * });
+     *
+     * // Async/Await method
+     * const {goodFiles, badFiles, errors, viruses} = await clamscan.scanFiles(files);
+     */
     scanFiles(files = [], endCb = null, fileCb = null) {
         const self = this;
         let hasCb = false;
@@ -1617,20 +1827,39 @@ class NodeClam {
         });
     }
 
-    // ****************************************************************************
-    // Scans an entire directory. Provides 3 params to end callback: Error, path
-    // scanned, and whether its infected or not. To scan multiple directories, pass
-    // them as an array to the `scanFiles` method.
-    // -----
-    // NOTE: While possible, it is NOT advisable to use the fileCb parameter when
-    // using the clamscan binary. Doing so with clamdscan is okay, however. This
-    // method also allows for non-recursive scanning with the clamdscan binary.
-    // -----
-    // @param   String      path        The directory to scan files of
-    // @param   Function    endCb      (optional) What to do when all files have been scanned
-    // @param   Function    fileCb     (optional) What to do after each file has been scanned
-    // @return  Promise
-    // ****************************************************************************
+    /**
+     * Scans an entire directory. Provides 3 params to end callback: Error, path
+     * scanned, and whether its infected or not. To scan multiple directories, pass
+     * them as an array to the `scanFiles` method.
+     *
+     * This obeys your recursive option even for `clamdscan` which does not have a native
+     * way to turn this feature off. If you have multiple paths, send them in an array
+     * to `scanFiles`.
+     *
+     * NOTE: While possible, it is NOT advisable to use the `fileCb` parameter when
+     * using the `clamscan` binary. Doing so with `clamdscan` is okay, however. This
+     * method also allows for non-recursive scanning with the clamdscan binary.
+     *
+     * @param {string} path - The directory to scan files of
+     * @param {Function} [endCb] - What to do when all files have been scanned
+     * @param {Function} [fileCb] - What to do after each file has been scanned
+     * @returns {Promise<object>} Object like: `{ path: String, isInfected: Boolean, goodFiles: Array, badFiles: Array, viruses: Array }`
+     * @example
+     * // Callback Method
+     * clamscan.scanDir('/some/path/to/scan', (err, goodFiles, badFiles, viruses) {
+     *     if (err) return console.error(err);
+     *
+     *     if (badFiles.length > 0) {
+     *         console.log(`${path} was infected. The offending files (${badFiles.join (', ')}) have been quarantined.`);
+     *         console.log(`Viruses Found: ${viruses.join(', ')}`);
+     *     } else {
+     *         console.log('Everything looks good! No problems here!.');
+     *     }
+     * });
+     *
+     * // Async/Await Method
+     * const {path, isInfected, goodFiles, badFiles, viruses} = await clamscan.scanDir('/some/path/to/scan');
+     */
     scanDir(path = '', endCb = null, fileCb = null) {
         const self = this;
         let hasCb = false;
@@ -1775,7 +2004,7 @@ class NodeClam {
                                 const result = this._processResult(response.toString(), path);
                                 if (result instanceof Error) {
                                     // Fallback to local if that's an option
-                                    if (this.settings.clamdscan.localFallback === true) return localScan();
+                                    if (this.settings.clamdscan.local_fallback === true) return localScan();
                                     const err = new NodeClamError(
                                         { path, err: result },
                                         'There was an issue scanning the path provided.'
@@ -1861,13 +2090,44 @@ class NodeClam {
         });
     }
 
-    // ****************************************************************************
-    // Scans a node Stream object
-    // -----
-    // @param   Stream      stream      The stream to scan
-    // @param   Function    callback    (optional) What to do when the socket responds with results
-    // @return  Promise
-    // ****************************************************************************
+    /**
+     * Allows you to scan a binary stream.
+     *
+     * **NOTE:** This method will only work if you've configured the module to allow the
+     * use of a TCP or UNIX Domain socket. In other words, this will not work if you only
+     * have access to a local ClamAV binary.
+     *
+     * @param {ReadableStream} stream - A readable stream to scan
+     * @param {Function} [cb] - What to do when the socket response with results
+     * @returns {Promise<object>} Object like: `{ file: String, isInfected: Boolean, viruses: Array }`
+     * @example
+     * const NodeClam = require('clamscan');
+     *
+     * // You'll need to specify your socket or TCP connection info
+     * const clamscan = new NodeClam().init({
+     *     clamdscan: {
+     *         socket: '/var/run/clamd.scan/clamd.sock',
+     *         host: '127.0.0.1',
+     *         port: 3310,
+     *     }
+     * });
+     * const Readable = require('stream').Readable;
+     * const rs = Readable();
+     *
+     * rs.push('foooooo');
+     * rs.push('barrrrr');
+     * rs.push(null);
+     *
+     * // Callback Example
+     * clamscan.scanStream(stream, (err, isInfected) => {
+     *     if (err) return console.error(err);
+     *     if (isInfected) return console.log('Stream is infected! Booo!');
+     *     console.log('Stream is not infected! Yay!');
+     * });
+     *
+     * // Async/Await Example
+     * const { isInfected, viruses } = await clamscan.scanStream(stream);
+     */
     scanStream(stream, cb) {
         let hasCb = false;
 
