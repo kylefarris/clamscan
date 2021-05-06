@@ -12,13 +12,13 @@ const should = chai.should();
 const { expect } = chai;
 const config = require('./test_config');
 
-const goodScanDir = `${__dirname}/goodScanDir`;
-const emptyFile = `${goodScanDir}/emptyFile.txt`;
+const goodScanDir = `${__dirname}/good_scan_dir`;
+const emptyFile = `${goodScanDir}/empty_file.txt`;
 const goodScanFile = `${goodScanDir}/good_file_1.txt`;
-const goodFileList = `${__dirname}/goodFiles_list.txt`;
-const badScanDir = `${__dirname}/badScanDir`;
+const goodFileList = `${__dirname}/good_files_list.txt`;
+const badScanDir = `${__dirname}/bad_scan_dir`;
 const badScanFile = `${badScanDir}/bad_file_1.txt`;
-const badFileList = `${__dirname}/badFiles_list.txt`;
+const badFileList = `${__dirname}/bad_files_list.txt`;
 const passthruFile = `${__dirname}/output`;
 const noVirusUrl = 'https://raw.githubusercontent.com/kylefarris/clamscan/master/README.md';
 const fakeVirusFalseNegatives = [
@@ -52,7 +52,7 @@ const check = (done, f) => {
 
 // Fix goodFiles list to have full paths
 const goodFileListContents = fs.readFileSync(goodFileList).toString();
-const modifiedGoodFileList = `${__dirname}/goodFiles_list_tmp.txt`;
+const modifiedGoodFileList = `${__dirname}/good_files_list_tmp.txt`;
 fs.writeFileSync(
     modifiedGoodFileList,
     goodFileListContents
@@ -302,7 +302,7 @@ describe('Initialized NodeClam module', () => {
     });
 });
 
-describe('build_clam_flags', () => {
+describe('_buildClamFlags', () => {
     let clamscan;
     beforeEach(async () => {
         clamscan = await resetClam();
@@ -330,28 +330,28 @@ describe('build_clam_flags', () => {
     });
 });
 
-describe('get_version', () => {
+describe('getVersion', () => {
     let clamscan;
     beforeEach(async () => {
         clamscan = await resetClam();
     });
 
     it('should exist', () => {
-        should.exist(clamscan.get_version);
+        should.exist(clamscan.getVersion);
     });
     it('should be a function', () => {
-        clamscan.get_version.should.be.a('function');
+        clamscan.getVersion.should.be.a('function');
     });
 
     it('should respond with some version (Promise API)', async () => {
-        const version = await clamscan.get_version();
+        const version = await clamscan.getVersion();
         expect(version).to.be.a('string');
         // This may not always be the case... so, it can be removed if necessary
         expect(version).to.match(/^ClamAV \d+\.\d+\.\d+\/\d+\//);
     });
 
     it('should respond with some version (Callback API)', (done) => {
-        clamscan.get_version((err, version) => {
+        clamscan.getVersion((err, version) => {
             check(done, () => {
                 expect(err).to.not.be.instanceof(Error);
                 expect(version).to.be.a('string');
@@ -466,7 +466,7 @@ describe('isInfected', () => {
     it('should require a string representing the path to a file to be scanned', (done) => {
         Promise.all([
             expect(clamscan.isInfected(goodScanFile), 'valid file').to.eventually.eql({
-                file: `${__dirname}/goodScanDir/good_file_1.txt`,
+                file: `${__dirname}/good_scan_dir/good_file_1.txt`,
                 isInfected: false,
                 viruses: [],
             }),
@@ -1059,7 +1059,7 @@ describe('scanFiles', () => {
             eicarGen.writeFile();
 
             clamscan.scanFiles(
-                [badScanFile, `${__dirname}/goodScanDir/good_file_1.txt`],
+                [badScanFile, `${__dirname}/good_scan_dir/good_file_1.txt`],
                 (err, goodFiles, badFiles, errorFiles, viruses) => {
                     check(done, () => {
                         expect(err).to.not.be.instanceof(Error);
