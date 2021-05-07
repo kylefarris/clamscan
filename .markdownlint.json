@@ -1,0 +1,10 @@
+{
+  "line-length": false,
+  "no-inline-html": {
+    "allowed_elements": [
+      "a"
+    ]
+  },
+  "MD025": false,
+  "MD024": false
+}

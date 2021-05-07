@@ -19,8 +19,8 @@ const which = (bin) => {
 };
 
 const config = {
-    remove_infected: false, // don't change
-    quarantine_infected: `${__dirname}/infected`, // required for testing
+    removeInfected: false, // don't change
+    quarantineInfected: `${__dirname}/infected`, // required for testing
     // scan_log: `${__dirname}/clamscan-log`, // not required
     clamscan: {
         path: which('clamscan'), // required for testing
