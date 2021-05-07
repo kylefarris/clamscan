@@ -103,12 +103,12 @@ describe('Initialized NodeClam module', () => {
     it('should have certain config properties defined', async () => {
         const clamscan = await resetClam();
 
-        expect(clamscan.defaults.remove_infected, 'remove_infected').to.not.be.undefined;
-        expect(clamscan.defaults.quarantine_infected, 'quarantine_infected').to.not.be.undefined;
-        expect(clamscan.defaults.scan_log, 'scan_log').to.not.be.undefined;
-        expect(clamscan.defaults.debug_mode, 'debug_mode').to.not.be.undefined;
-        expect(clamscan.defaults.file_list, 'file_list').to.not.be.undefined;
-        expect(clamscan.defaults.scan_recursively, 'scan_recursively').to.not.be.undefined;
+        expect(clamscan.defaults.removeInfected, 'removeInfected').to.not.be.undefined;
+        expect(clamscan.defaults.quarantineInfected, 'quarantineInfected').to.not.be.undefined;
+        expect(clamscan.defaults.scanLog, 'scanLog').to.not.be.undefined;
+        expect(clamscan.defaults.debugMode, 'debugMode').to.not.be.undefined;
+        expect(clamscan.defaults.fileList, 'fileList').to.not.be.undefined;
+        expect(clamscan.defaults.scanRecursively, 'scanRecursively').to.not.be.undefined;
         expect(clamscan.defaults.clamscan, 'clamscan').to.not.be.undefined;
         expect(clamscan.defaults.clamdscan, 'clamdscan').to.not.be.undefined;
         expect(clamscan.defaults.preference, 'preference').to.not.be.undefined;
@@ -116,12 +116,12 @@ describe('Initialized NodeClam module', () => {
 
     it('should have the proper global default values set', async () => {
         const clamscan = await resetClam();
-        expect(clamscan.defaults.remove_infected).to.eql(false);
-        expect(clamscan.defaults.quarantine_infected).to.eql(false);
-        expect(clamscan.defaults.scan_log).to.eql(null);
-        expect(clamscan.defaults.debug_mode).to.eql(false);
-        expect(clamscan.defaults.file_list).to.eql(null);
-        expect(clamscan.defaults.scan_recursively).to.eql(true);
+        expect(clamscan.defaults.removeInfected).to.eql(false);
+        expect(clamscan.defaults.quarantineInfected).to.eql(false);
+        expect(clamscan.defaults.scanLog).to.eql(null);
+        expect(clamscan.defaults.debugMode).to.eql(false);
+        expect(clamscan.defaults.fileList).to.eql(null);
+        expect(clamscan.defaults.scanRecursively).to.eql(true);
         expect(clamscan.defaults.preference).to.eql('clamdscan');
     });
 
@@ -129,7 +129,7 @@ describe('Initialized NodeClam module', () => {
         const clamscan = await resetClam();
         expect(clamscan.defaults.clamscan.path).to.eql('/usr/bin/clamscan');
         expect(clamscan.defaults.clamscan.db).to.eql(null);
-        expect(clamscan.defaults.clamscan.scan_archives).to.be.eql(true);
+        expect(clamscan.defaults.clamscan.scanArchives).to.be.eql(true);
         expect(clamscan.defaults.clamscan.active).to.eql(true);
     });
 
@@ -138,26 +138,26 @@ describe('Initialized NodeClam module', () => {
         expect(clamscan.defaults.clamdscan.socket).to.eql(false);
         expect(clamscan.defaults.clamdscan.host).to.eql(false);
         expect(clamscan.defaults.clamdscan.port).to.eql(false);
-        expect(clamscan.defaults.clamdscan.local_fallback).to.eql(true);
+        expect(clamscan.defaults.clamdscan.localFallback).to.eql(true);
         expect(clamscan.defaults.clamdscan.path).to.eql('/usr/bin/clamdscan');
-        expect(clamscan.defaults.clamdscan.config_file).to.eql(null);
+        expect(clamscan.defaults.clamdscan.configFile).to.eql(null);
         expect(clamscan.defaults.clamdscan.multiscan).to.be.eql(true);
-        expect(clamscan.defaults.clamdscan.reload_db).to.eql(false);
+        expect(clamscan.defaults.clamdscan.reloadDb).to.eql(false);
         expect(clamscan.defaults.clamdscan.active).to.eql(true);
     });
 
     it('should accept an options array and merge them with the object defaults', async () => {
         const clamscan = await resetClam({
-            remove_infected: true,
-            quarantine_infected: config.quarantine_infected,
-            scan_log: config.scan_log,
-            debug_mode: false,
-            file_list: `${__dirname}/files_list.txt`,
-            scan_recursively: true,
+            removeInfected: true,
+            quarantineInfected: config.quarantineInfected,
+            scanLog: config.scanLog,
+            debugMode: false,
+            fileList: `${__dirname}/files_list.txt`,
+            scanRecursively: true,
             clamscan: {
                 path: config.clamscan.path,
                 db: '/usr/bin/better_clam_db',
-                scan_archives: false,
+                scanArchives: false,
                 active: false,
             },
             clamdscan: {
@@ -165,30 +165,30 @@ describe('Initialized NodeClam module', () => {
                 host: config.clamdscan.host,
                 port: config.clamdscan.port,
                 path: config.clamdscan.path,
-                local_fallback: false,
-                config_file: config.clamdscan.config_file,
+                localFallback: false,
+                configFile: config.clamdscan.configFile,
                 multiscan: false,
-                reload_db: true,
+                reloadDb: true,
                 active: false,
                 timeout: 300000,
-                bypass_test: true,
+                bypassTest: true,
             },
             preference: 'clamscan',
         });
 
         // General
-        expect(clamscan.settings.remove_infected).to.eql(true);
-        expect(clamscan.settings.quarantine_infected).to.eql(config.quarantine_infected);
-        expect(clamscan.settings.scan_log).to.be.eql(config.scan_log);
-        expect(clamscan.settings.debug_mode).to.eql(false);
-        expect(clamscan.settings.file_list).to.eql(`${__dirname}/files_list.txt`);
-        expect(clamscan.settings.scan_recursively).to.eql(true);
+        expect(clamscan.settings.removeInfected).to.eql(true);
+        expect(clamscan.settings.quarantineInfected).to.eql(config.quarantineInfected);
+        expect(clamscan.settings.scanLog).to.be.eql(config.scanLog);
+        expect(clamscan.settings.debugMode).to.eql(false);
+        expect(clamscan.settings.fileList).to.eql(`${__dirname}/files_list.txt`);
+        expect(clamscan.settings.scanRecursively).to.eql(true);
         expect(clamscan.settings.preference).to.eql('clamscan');
 
         // clamscan
         expect(clamscan.settings.clamscan.path).to.eql(config.clamscan.path);
         expect(clamscan.settings.clamscan.db).to.eql('/usr/bin/better_clam_db');
-        expect(clamscan.settings.clamscan.scan_archives).to.be.eql(false);
+        expect(clamscan.settings.clamscan.scanArchives).to.be.eql(false);
         expect(clamscan.settings.clamscan.active).to.eql(false);
 
         // clamdscan
@@ -196,13 +196,13 @@ describe('Initialized NodeClam module', () => {
         expect(clamscan.settings.clamdscan.host).to.eql(config.clamdscan.host);
         expect(clamscan.settings.clamdscan.port).to.eql(config.clamdscan.port);
         expect(clamscan.settings.clamdscan.path).to.eql(config.clamdscan.path);
-        expect(clamscan.settings.clamdscan.local_fallback).to.eql(false);
-        expect(clamscan.settings.clamdscan.config_file).to.eql(config.clamdscan.config_file);
+        expect(clamscan.settings.clamdscan.localFallback).to.eql(false);
+        expect(clamscan.settings.clamdscan.configFile).to.eql(config.clamdscan.configFile);
         expect(clamscan.settings.clamdscan.multiscan).to.be.eql(false);
-        expect(clamscan.settings.clamdscan.reload_db).to.eql(true);
+        expect(clamscan.settings.clamdscan.reloadDb).to.eql(true);
         expect(clamscan.settings.clamdscan.active).to.eql(false);
         expect(clamscan.settings.clamdscan.timeout).to.eql(300000);
-        expect(clamscan.settings.clamdscan.bypass_test).to.eql(true);
+        expect(clamscan.settings.clamdscan.bypassTest).to.eql(true);
     });
 
     it('should failover to alternate scanner if preferred scanner is inactive', async () => {
@@ -210,11 +210,11 @@ describe('Initialized NodeClam module', () => {
         expect(clamscan.scanner).to.eql('clamscan');
     });
 
-    it('should fail if an invalid scanner preference is supplied when socket or host is not specified and local_fallback is not false', () => {
+    it('should fail if an invalid scanner preference is supplied when socket or host is not specified and localFallback is not false', () => {
         expect(resetClam({ preference: 'clamscan' }), 'valid scanner').to.not.be.rejectedWith(Error);
         expect(resetClam({ preference: 'badscanner' }), 'invalid scanner').to.not.be.rejectedWith(Error);
         expect(
-            resetClam({ clamdscan: { local_fallback: true, socket: false, host: false }, preference: 'badscanner' }),
+            resetClam({ clamdscan: { localFallback: true, socket: false, host: false }, preference: 'badscanner' }),
             'invalid scanner - no socket or host for local fallback'
         ).to.be.rejectedWith(Error);
     });
@@ -224,7 +224,7 @@ describe('Initialized NodeClam module', () => {
             ...config.clamdscan,
             path: `${__dirname}/should/not/exist`,
             active: true,
-            local_fallback: true,
+            localFallback: true,
             socket: false,
             host: false,
         };
@@ -238,17 +238,17 @@ describe('Initialized NodeClam module', () => {
         const clamdScanOptions = {
             ...config.clamdscan,
             active: true,
-            local_fallback: true,
+            localFallback: true,
             socket: false,
             host: false,
         };
         const clamscanOptions = { ...config.clamscan, active: true };
         const options = { ...config, clamdscan: clamdScanOptions, clamscan: clamscanOptions, funky: true };
 
-        options.quarantine_infected = `${__dirname}/should/not/exist`;
+        options.quarantineInfected = `${__dirname}/should/not/exist`;
         expect(resetClam(options), 'bad quarantine path').to.be.rejectedWith(Error);
 
-        options.quarantine_infected = `${__dirname}/infected`;
+        options.quarantineInfected = `${__dirname}/infected`;
         expect(resetClam(options), 'good quarantine path').to.not.be.rejectedWith(Error);
     });
 
@@ -262,22 +262,22 @@ describe('Initialized NodeClam module', () => {
         expect(clamscan.settings.clamscan.db).to.be.null;
     });
 
-    it('should set scan_log to null if specified scan_log is not found', async () => {
-        const options = { ...config, scan_log: `${__dirname}/should/not/exist` };
+    it('should set scanLog to null if specified scanLog is not found', async () => {
+        const options = { ...config, scanLog: `${__dirname}/should/not/exist` };
 
         const clamscan = await resetClam(options);
-        expect(clamscan.settings.scan_log).to.be.null;
+        expect(clamscan.settings.scanLog).to.be.null;
     });
 
     it('should be able have configuration settings changed after instantiation', async () => {
-        expect(resetClam({ scan_log: null })).to.not.be.rejectedWith(Error);
+        expect(resetClam({ scanLog: null })).to.not.be.rejectedWith(Error);
 
-        const clamscan = await resetClam({ scan_log: null });
+        const clamscan = await resetClam({ scanLog: null });
 
-        expect(clamscan.settings.scan_log).to.be.null;
+        expect(clamscan.settings.scanLog).to.be.null;
 
-        clamscan.settings.scan_log = config.scan_log;
-        expect(clamscan.settings.scan_log).to.be.eql(config.scan_log);
+        clamscan.settings.scanLog = config.scanLog;
+        expect(clamscan.settings.scanLog).to.be.eql(config.scanLog);
     });
 
     it('should initialize successfully with a custom config file, even if the default config file does not exist', async () => {
@@ -295,7 +295,7 @@ describe('Initialized NodeClam module', () => {
             preference: 'clamdscan',
             clamdscan: {
                 active: true,
-                config_file: 'tests/clamd.conf',
+                configFile: 'tests/clamd.conf',
             },
         });
         expect(clamscan.scanner).to.eq('clamdscan'); // Verify that the scanner did not fall back to another binary
@@ -309,8 +309,8 @@ describe('_buildClamFlags', () => {
     });
 
     it('should build an array', () => {
-        expect(clamscan.clam_flags).to.not.be.undefined;
-        expect(clamscan.clam_flags).to.be.an('array');
+        expect(clamscan.clamFlags).to.not.be.undefined;
+        expect(clamscan.clamFlags).to.be.an('array');
     });
 
     it('should build a series of flags', () => {
@@ -318,14 +318,14 @@ describe('_buildClamFlags', () => {
             const flags = [
                 '--no-summary',
                 '--fdpass',
-                config.clamdscan.config_file ? `--config-file=${config.clamdscan.config_file}` : null,
+                config.clamdscan.configFile ? `--config-file=${config.clamdscan.configFile}` : null,
                 '--multiscan',
-                `--move=${config.quarantine_infected}`,
-                config.scan_log ? `--log=${config.scan_log}` : null,
+                `--move=${config.quarantineInfected}`,
+                config.scanLog ? `--log=${config.scanLog}` : null,
             ].filter((v) => !!v);
-            clamscan.clam_flags.should.be.eql(flags);
+            clamscan.clamFlags.should.be.eql(flags);
         } else {
-            clamscan.clam_flags.should.be.eql(['--no-summary', `--log=${config.scan_log}`]);
+            clamscan.clamFlags.should.be.eql(['--no-summary', `--log=${config.scanLog}`]);
         }
     });
 });
@@ -719,14 +719,12 @@ describe('isInfected', () => {
 
                 // Get list of all files to scan
                 const toScan = [].concat(fakeVirusFalseNegatives).concat([badScanFile]);
-                // console.log('Going to scan: ', toScan);
 
                 // Scan all the files
                 // eslint-disable-next-line no-restricted-syntax
                 for (const virus of toScan) {
                     // eslint-disable-next-line no-await-in-loop
-                    const { file, isInfected } = await clamscan.isInfected(virus);
-                    if (isInfected === false) console.log('Scanned: ', file, isInfected);
+                    const { isInfected } = await clamscan.isInfected(virus);
                     expect(isInfected).to.be.a('boolean');
                     expect(isInfected).to.eql(true);
                 }
@@ -804,7 +802,7 @@ describe('scanFile', () => {
 describe('scanFiles', () => {
     let clamscan;
     beforeEach(async () => {
-        clamscan = await resetClam({ scan_log: null });
+        clamscan = await resetClam({ scanLog: null });
     });
 
     it('should exist', () => {
@@ -970,8 +968,8 @@ describe('scanFiles', () => {
             });
         });
 
-        it('should NOT return error to the "err" parameter of the "end_cb" callback if nothing is provided as first parameter but file_list is configured in settings', (done) => {
-            clamscan.settings.file_list = modifiedGoodFileList;
+        it('should NOT return error to the "err" parameter of the "end_cb" callback if nothing is provided as first parameter but fileList is configured in settings', (done) => {
+            clamscan.settings.fileList = modifiedGoodFileList;
             clamscan.scanFiles(undefined, (err, goodFiles, badFiles) => {
                 check(done, () => {
                     expect(err).to.not.be.instanceof(Error);
@@ -982,8 +980,8 @@ describe('scanFiles', () => {
             });
         });
 
-        it('should return error to the "err" parameter of the "end_cb" callback if nothing is provided as first parameter and file_list is configured in settings but has inaccessible files', (done) => {
-            clamscan.settings.file_list = badFileList;
+        it('should return error to the "err" parameter of the "end_cb" callback if nothing is provided as first parameter and fileList is configured in settings but has inaccessible files', (done) => {
+            clamscan.settings.fileList = badFileList;
             clamscan.scanFiles(undefined, (err, goodFiles, badFiles, errorFiles) => {
                 check(done, () => {
                     expect(err).to.not.be.instanceof(Error);
@@ -996,8 +994,8 @@ describe('scanFiles', () => {
             });
         });
 
-        it('should NOT return error to the "err" parameter of the "end_cb" callback if FALSE is provided as first parameter but file_list is configured in settings', (done) => {
-            clamscan.settings.file_list = modifiedGoodFileList;
+        it('should NOT return error to the "err" parameter of the "end_cb" callback if FALSE is provided as first parameter but fileList is configured in settings', (done) => {
+            clamscan.settings.fileList = modifiedGoodFileList;
             clamscan.scanFiles(false, (err, goodFiles, badFiles) => {
                 check(done, () => {
                     expect(err).to.not.be.instanceof(Error);
@@ -1008,8 +1006,8 @@ describe('scanFiles', () => {
             });
         });
 
-        it('should NOT return error to the "err" parameter of the "end_cb" callback if NaN is provided as first parameter but file_list is configured in settings', (done) => {
-            clamscan.settings.file_list = modifiedGoodFileList;
+        it('should NOT return error to the "err" parameter of the "end_cb" callback if NaN is provided as first parameter but fileList is configured in settings', (done) => {
+            clamscan.settings.fileList = modifiedGoodFileList;
             clamscan.scanFiles(NaN, (err, goodFiles, badFiles) => {
                 check(done, () => {
                     expect(err).to.not.be.instanceof(Error);
@@ -1020,8 +1018,8 @@ describe('scanFiles', () => {
             });
         });
 
-        it('should NOT return error to the "err" parameter of the "end_cb" callback if NULL is provided as first parameter but file_list is configured in settings', (done) => {
-            clamscan.settings.file_list = modifiedGoodFileList;
+        it('should NOT return error to the "err" parameter of the "end_cb" callback if NULL is provided as first parameter but fileList is configured in settings', (done) => {
+            clamscan.settings.fileList = modifiedGoodFileList;
             clamscan.scanFiles(null, (err, goodFiles, badFiles) => {
                 check(done, () => {
                     expect(err).to.not.be.instanceof(Error);
@@ -1032,8 +1030,8 @@ describe('scanFiles', () => {
             });
         });
 
-        it('should NOT return error to the "err" parameter of the "end_cb" callback if an empty string is provided as first parameter but file_list is configured in settings', (done) => {
-            clamscan.settings.file_list = modifiedGoodFileList;
+        it('should NOT return error to the "err" parameter of the "end_cb" callback if an empty string is provided as first parameter but fileList is configured in settings', (done) => {
+            clamscan.settings.fileList = modifiedGoodFileList;
             clamscan.scanFiles('', (err, goodFiles, badFiles) => {
                 check(done, () => {
                     expect(err).to.not.be.instanceof(Error);
@@ -1206,7 +1204,7 @@ describe('scanDir', () => {
 describe('scanStream', () => {
     let clamscan;
     before(async () => {
-        clamscan = await resetClam({ scan_log: null });
+        clamscan = await resetClam({ scanLog: null });
     });
 
     const getGoodStream = () => {
@@ -1402,7 +1400,7 @@ describe('passthrough', () => {
     let clamscan;
 
     before(async () => {
-        clamscan = await resetClam({ scan_log: null });
+        clamscan = await resetClam({ scanLog: null });
     });
 
     it('should exist', () => {
@@ -1416,7 +1414,7 @@ describe('passthrough', () => {
     it('should throw an error if scan host is unreachable', async () => {
         try {
             const clamav = await resetClam({
-                scan_log: null,
+                scanLog: null,
                 clamdscan: {
                     socket: null,
                     host: '127.0.0.2',
@@ -1466,8 +1464,7 @@ describe('passthrough', () => {
 
         av.on('scan-complete', (result) => {
             check(done, () => {
-                const { isInfected, viruses, resultString } = result;
-                if (isInfected === null) console.log(resultString);
+                const { isInfected, viruses } = result;
                 expect(isInfected).to.be.a('boolean');
                 expect(isInfected).to.eql(true);
                 expect(viruses).to.be.an('array');
@@ -1486,8 +1483,7 @@ describe('passthrough', () => {
 
         av.on('scan-complete', (result) => {
             check(done, () => {
-                const { isInfected, viruses, resultString } = result;
-                if (isInfected === null) console.log(resultString);
+                const { isInfected, viruses } = result;
                 expect(isInfected).to.be.a('boolean');
                 expect(isInfected).to.eql(false);
                 expect(viruses).to.be.an('array');

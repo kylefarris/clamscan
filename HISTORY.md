@@ -305,6 +305,7 @@ This method is different than all the others in that it returns a PassthroughStr
 ## 1.2.0
 
 ### SECURITY PATCH
+
 An important security patch was released in this version which fixes a bug causing false negatives in specific edge cases. Please upgrade immediately and only use this version from this point on.
 
 All older versions of this package have been deprecated on NPM.
@@ -312,3 +313,18 @@ All older versions of this package have been deprecated on NPM.
 ## 1.3.0
 
 This just has some bug fixes and updates to dependencies. Technically, a new `'timeout'` event was added to the `passthrough` stream method, but, its not fully fleshed out and doesn't seem to work so it will remain undocumented for now.
+
+## 1.4.0
+
+- Updated Mocha to v8.1.1. Subsequently, the oldest version of NodeJS allowed for this module is now v10.12.0.
+- Fixed issue with the method not throwing errors when testing existence and viability of remote/local socket.
+
+## 1.4.1
+
+All sockets clients should now close when they are done being used, fail, or timeout.
+
+## 1.4.2
+
+- Fixed initialization to pass a config-file option during clamav version check
+- Added new contributor
+- Fixed tests
