@@ -13,6 +13,9 @@
     "chris-maclean <Christopher Maclean>"
   ],
   "scripts": {
+    "docs": "jsdoc2md index.js lib/* > API.md",
+    "format": "node_modules/.bin/prettier '**/*.{js,json}' --write",
+    "lint": "node_modules/.bin/eslint '**/*.js'",
     "test": "make test"
   },
   "repository": {
@@ -37,6 +40,7 @@
     "url": "https://github.com/kylefarris/clamscan/issues"
   },
   "devDependencies": {
+    "axios": "^0.21.1",
     "babel-eslint": "^10.1.0",
     "chai": "^4.2.0",
     "chai-as-promised": "^7.1.1",
@@ -44,11 +48,11 @@
     "eslint-config-airbnb": "^15.0.1",
     "eslint-config-prettier": "^8.3.0",
     "eslint-plugin-chai-friendly": "^0.6.0",
+    "eslint-plugin-import": "^2.22.1",
     "eslint-plugin-jsdoc": "^33.1.0",
     "eslint-plugin-prettier": "^3.4.0",
     "jsdoc-to-markdown": "^7.0.1",
     "mocha": "^8.1.1",
-    "prettier": "^2.2.1",
-    "request": "^2.88.0"
+    "prettier": "^2.2.1"
   }
 }

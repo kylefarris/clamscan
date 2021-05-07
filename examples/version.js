@@ -3,6 +3,7 @@ const NodeClam = require('../index.js'); // Offically: require('clamscan');
 
 const ClamScan = new NodeClam().init({
     debug_mode: false,
+    // prettier-ignore
     clamdscan: {
         // Run scan using command line
         path: '/usr/bin/clamdscan',                // <-- Secondary fallback to command line -|
@@ -14,13 +15,14 @@ const ClamScan = new NodeClam().init({
         socket: '/var/run/clamd.scan/clamd.sock',  // <-- Preferred connection method
         active: true,                              // Set to 'false' to test getting version info from `clamscan`
     },
+    // prettier-ignore
     clamscan: {
         path: '/usr/bin/clamscan',                 // <-- Worst-case scenario fallback
     },
-    preference: 'clamdscan',                        // Set to 'clamscan' to test getting version info from `clamav`
+    preference: 'clamdscan', // Set to 'clamscan' to test getting version info from `clamav`
 });
 
-ClamScan.then(async av => {
+ClamScan.then(async (av) => {
     const result = await av.get_version();
-    console.log("Version: ", result);
+    console.log('Version: ', result);
 });

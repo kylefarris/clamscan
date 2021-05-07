@@ -5,10 +5,6 @@
  * MIT Licensed
  */
 
-/**
- * @typedef {require('stream').ReadableStream} ReadableStream
- */
-
 // Module dependencies.
 const os = require('os');
 const net = require('net');
@@ -16,10 +12,14 @@ const fs = require('fs');
 const nodePath = require('path'); // renamed to prevent conflicts in `scanDir`
 const { promisify } = require('util');
 const { execFile } = require('child_process');
-const { PassThrough, Transform } = require('stream');
+const { PassThrough, Transform, ReadableStream } = require('stream');
 const { Socket } = require('dgram');
 const NodeClamError = require('./lib/NodeClamError');
 const NodeClamTransform = require('./lib/NodeClamTransform.js');
+
+/**
+ * @typedef {ReadableStream} ReadableStream
+ */
 
 // Enable these once the FS.promises API is no longer experimental
 // const fsPromises = require('fs').promises;
@@ -586,8 +586,7 @@ class NodeClam {
                     if (this.settings.debugMode) console.log(`${this.debugLabel}: Socket/Host connection closed.`);
                 })
                 .on('error', (e) => {
-                    if (this.settings.debugMode)
-                        console.error(`${this.debugLabel}: Socket/Host connection failed:`, e);
+                    if (this.settings.debugMode) console.error(`${this.debugLabel}: Socket/Host connection failed:`, e);
                     reject(e);
                 });
         });
@@ -1136,7 +1135,7 @@ class NodeClam {
      * });
      *
      * // For example's sake, we're using the Axios module
-     * const request = require('axios');
+     * const axios = require('axios');
      *
      * // Get a readable stream for a URL request
      * const input = axios.get(someUrl);
@@ -1147,8 +1146,8 @@ class NodeClam {
      * // Get instance of this module's PassthroughStream object
      * const av = clamscan.passthrough();
      *
-     * // Send output of RequestJS stream to ClamAV.
-     * // Send output of RequestJS to `someLocalFile` if ClamAV receives data successfully
+     * // Send output of Axios stream to ClamAV.
+     * // Send output of Axios to `someLocalFile` if ClamAV receives data successfully
      * input.pipe(av).pipe(output);
      *
      * // What happens when scan is completed
@@ -1292,8 +1291,7 @@ class NodeClam {
                             })
                             // When we are officially connected to the ClamAV socket (probably will never fire here)
                             .on('connect', () => {
-                                if (me.settings.debugMode)
-                                    console.log(`${me.debugLabel}: Connected to ClamAV socket`);
+                                if (me.settings.debugMode) console.log(`${me.debugLabel}: Connected to ClamAV socket`);
                             })
                             // If an error is emitted from the ClamAV socket
                             .on('error', (err) => {
@@ -2175,8 +2173,7 @@ class NodeClam {
                 stream
                     // The stream has dried up
                     .on('end', () => {
-                        if (this.settings.debugMode)
-                            console.log(`${this.debugLabel}: The input stream has dried up.`);
+                        if (this.settings.debugMode) console.log(`${this.debugLabel}: The input stream has dried up.`);
                         finished = true;
                         stream.destroy();
                     })
