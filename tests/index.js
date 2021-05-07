@@ -1,7 +1,8 @@
 /* eslint-disable no-unused-vars */
 /* eslint-env mocha */
 const fs = require('fs');
-const request = require('request');
+const { Agent } = require('https');
+const axios = require('axios');
 const chai = require('chai');
 const { promisify } = require('util');
 const { PassThrough, Readable } = require('stream');
@@ -283,8 +284,7 @@ describe('Initialized NodeClam module', () => {
     it('should initialize successfully with a custom config file, even if the default config file does not exist', async () => {
         /**
          * For this test, the test runner needs to ensure that the default clamdscan configuration file
-         * is *not* available. This file may reside at
-         *   ../etc/clamav/clamd.conf
+         * is *not* available. This file may reside at `../etc/clamav/clamd.conf`
          * relative to the clamdscan executable. Making this file unavailable can be as simple as
          * renaming it. Only if this file is unavailable will this test be meaningful. If present,
          * NodeClam.init will fall back to using the clamscan binary and the default config file.
@@ -1473,22 +1473,26 @@ describe('passthrough', () => {
         });
     });
 
-    it('should indicate that a stream was NOT infected in the "scan-complete" event if the stream DOES NOT contain a virus', (done) => {
-        const input = request.get({ url: noVirusUrl, strictSSL: false });
+    it('should indicate that a stream was NOT infected in the "scan-complete" event if the stream DOES NOT contain a virus', async () => {
+        const agent = new Agent({ rejectUnauthorized: false });
+        const input = await axios({
+            method: 'get',
+            url: noVirusUrl,
+            responseType: 'stream',
+            httpsAgent: agent,
+        });
         const output = fs.createWriteStream(passthruFile);
         const av = clamscan.passthrough();
 
-        input.pipe(av).pipe(output);
+        input.data.pipe(av).pipe(output);
         if (fs.existsSync(passthruFile)) fs.unlinkSync(passthruFile);
 
         av.on('scan-complete', (result) => {
-            check(done, () => {
-                const { isInfected, viruses } = result;
-                expect(isInfected).to.be.a('boolean');
-                expect(isInfected).to.eql(false);
-                expect(viruses).to.be.an('array');
-                expect(viruses).to.have.length(0);
-            });
+            const { isInfected, viruses } = result;
+            expect(isInfected).to.be.a('boolean');
+            expect(isInfected).to.eql(false);
+            expect(viruses).to.be.an('array');
+            expect(viruses).to.have.length(0);
         });
     });
 

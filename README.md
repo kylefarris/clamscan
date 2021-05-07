@@ -613,11 +613,11 @@ const clamscan = new NodeClam().init({
     }
 });
 
-// For example's sake, we're using the RequestJS module
-const request = require('request');
+// For example's sake, we're using the Axios module
+const axios = require('Axios');
 
 // Get a readable stream for a URL request
-const input = request.get(some_url);
+const input = axios.get(some_url);
 
 // Create a writable stream to a local file
 const output = fs.createWriteStream(some_local_file);
@@ -625,8 +625,8 @@ const output = fs.createWriteStream(some_local_file);
 // Get instance of this module's PassthroughStream object
 const av = clamscan.passthrough();
 
-// Send output of RequestJS stream to ClamAV.
-// Send output of RequestJS to `some_local_file` if ClamAV receives data successfully
+// Send output of Axios stream to ClamAV.
+// Send output of Axios to `some_local_file` if ClamAV receives data successfully
 input.pipe(av).pipe(output);
 
 // What happens when scan is completed

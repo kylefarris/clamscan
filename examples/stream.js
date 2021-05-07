@@ -1,13 +1,17 @@
-const {PassThrough, Readable, Writable} = require('stream');
-const request = require('request');
+const { PassThrough } = require('stream');
+// eslint-disable-next-line import/no-extraneous-dependencies
+const axios = require('axios');
 
-const fake_virus_url = 'https://secure.eicar.org/eicar_com.txt';
-const normal_file_url = 'https://raw.githubusercontent.com/kylefarris/clamscan/sockets/README.md';
-const test_url = normal_file_url;
+const fakeVirusUrl = 'https://secure.eicar.org/eicar_com.txt';
+// const normalFileUrl = 'https://raw.githubusercontent.com/kylefarris/clamscan/sockets/README.md';
+const testUrl = fakeVirusUrl;
 
 // Initialize the clamscan module
 const NodeClam = require('../index.js'); // Offically: require('clamscan');
 
+/**
+ * Actually run the test.
+ */
 async function test() {
     const clamscan = await new NodeClam().init({
         debug_mode: false,
@@ -20,21 +24,25 @@ async function test() {
     });
 
     const passthrough = new PassThrough();
-    const source = request.get(test_url);
+    const source = axios.get(testUrl);
 
     // Fetch fake Eicar virus file and pipe it through to our scan screeam
     source.pipe(passthrough);
 
     try {
-        const {is_infected, viruses} = await clamscan.scan_stream(passthrough)
+        const { isInfected, viruses } = await clamscan.scanStream(passthrough);
 
-        // If `is_infected` is TRUE, file is a virus!
-        if (is_infected === true) {
-            console.log(`You've downloaded a virus (${viruses.join('')})! Don't worry, it's only a test one and is not malicious...`);
-        } else if (is_infected === null) {
+        // If `isInfected` is TRUE, file is a virus!
+        if (isInfected === true) {
+            console.log(
+                `You've downloaded a virus (${viruses.join(
+                    ''
+                )})! Don't worry, it's only a test one and is not malicious...`
+            );
+        } else if (isInfected === null) {
             console.log("Something didn't work right...");
-        } else if (is_infected === false) {
-            console.log(`The file (${test_url}) you downloaded was just fine... Carry on...`);
+        } else if (isInfected === false) {
+            console.log(`The file (${testUrl}) you downloaded was just fine... Carry on...`);
         }
         process.exit(0);
     } catch (err) {
