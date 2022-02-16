@@ -1182,7 +1182,7 @@ class NodeClam {
         // Ex. uploadStream.pipe(<this_transform_stream>).pipe(destination_stream)
         return new Transform({
             // This should be fired on each chunk received
-            async transform(chunk, encoding, cb) {
+            transform(chunk, encoding, cb) {
                 // DRY method for handling each chunk as it comes in
                 const doTransform = () => {
                     // Write data to our fork stream. If it fails,
@@ -1231,134 +1231,147 @@ class NodeClam {
                     // Setup an array to collect the responses from ClamAV
                     this._clamavResponseChunks = [];
 
-                    try {
-                        // Get a connection to the ClamAV Socket
-                        this._clamavSocket = await me._initSocket('passthrough');
-                        if (me.settings.debugMode) console.log(`${me.debugLabel}: ClamAV Socket Initialized...`);
+                    // Get a connection to the ClamAV Socket
+                    me._initSocket('passthrough').then(
+                        (socket) => {
+                            this._clamavSocket = socket;
 
-                        // Setup a pipeline that will pass chunks through our custom Tranform and on to ClamAV
-                        this._forkStream.pipe(this._clamavTransform).pipe(this._clamavSocket);
+                            if (me.settings.debugMode) console.log(`${me.debugLabel}: ClamAV Socket Initialized...`);
 
-                        // When the CLamAV socket connection is closed (could be after 'end' or because of an error)...
-                        this._clamavSocket
-                            .on('close', (hadError) => {
-                                if (me.settings.debugMode)
-                                    console.log(
-                                        `${me.debugLabel}: ClamAV socket has been closed! Because of Error:`,
-                                        hadError
-                                    );
-                                this._clamavSocket.end();
-                            })
-                            // When the ClamAV socket connection ends (receives chunk)
-                            .on('end', () => {
-                                this._clamavSocket.end();
-                                if (me.settings.debugMode)
-                                    console.log(`${me.debugLabel}: ClamAV socket has received the last chunk!`);
-                                // Process the collected chunks
-                                const response = Buffer.concat(this._clamavResponseChunks);
-                                const result = me._processResult(response.toString('utf8'), null);
-                                this._clamavResponseChunks = [];
-                                if (me.settings.debugMode) {
-                                    console.log(`${me.debugLabel}: Result of scan:`, result);
-                                    console.log(
-                                        `${me.debugLabel}: It took ${_avScanTime} seconds to scan the file(s).`
-                                    );
-                                    clearScanBenchmark();
-                                }
+                            // Setup a pipeline that will pass chunks through our custom Tranform and on to ClamAV
+                            this._forkStream.pipe(this._clamavTransform).pipe(this._clamavSocket);
 
-                                // If the scan timed-out
-                                if (result.timeout === true) this.emit('timeout');
-
-                                // NOTE: "scan-complete" could be called by the `handleError` method.
-                                // We don't want to to double-emit this message.
-                                if (_scanComplete === false) {
-                                    _scanComplete = true;
+                            // When the CLamAV socket connection is closed (could be after 'end' or because of an error)...
+                            this._clamavSocket
+                                .on('close', (hadError) => {
+                                    if (me.settings.debugMode)
+                                        console.log(
+                                            `${me.debugLabel}: ClamAV socket has been closed! Because of Error:`,
+                                            hadError
+                                        );
                                     this._clamavSocket.end();
-                                    this.emit('scan-complete', result);
-                                }
-                            })
-                            // If connection timesout.
-                            .on('timeout', () => {
-                                this.emit('timeout', new Error('Connection to host/socket has timed out'));
-                                this._clamavSocket.end();
-                                if (me.settings.debugMode)
-                                    console.log(`${me.debugLabel}: Connection to host/socket has timed out`);
-                            })
-                            // When the ClamAV socket is ready to receive packets (this will probably never fire here)
-                            .on('ready', () => {
-                                if (me.settings.debugMode)
-                                    console.log(`${me.debugLabel}: ClamAV socket ready to receive`);
-                            })
-                            // When we are officially connected to the ClamAV socket (probably will never fire here)
-                            .on('connect', () => {
-                                if (me.settings.debugMode) console.log(`${me.debugLabel}: Connected to ClamAV socket`);
-                            })
-                            // If an error is emitted from the ClamAV socket
-                            .on('error', (err) => {
-                                console.error(`${me.debugLabel}: Error emitted from ClamAV socket: `, err);
-                                handleError(err);
-                            })
-                            // If ClamAV is sending stuff to us (ie, an "OK", "Virus FOUND", or "ERROR")
-                            .on('data', (cvChunk) => {
-                                // Push this chunk to our results collection array
-                                this._clamavResponseChunks.push(cvChunk);
-                                if (me.settings.debugMode)
-                                    console.log(`${me.debugLabel}: Got result!`, cvChunk.toString());
+                                })
+                                // When the ClamAV socket connection ends (receives chunk)
+                                .on('end', () => {
+                                    this._clamavSocket.end();
+                                    if (me.settings.debugMode)
+                                        console.log(`${me.debugLabel}: ClamAV socket has received the last chunk!`);
+                                    // Process the collected chunks
+                                    const response = Buffer.concat(this._clamavResponseChunks);
+                                    const result = me._processResult(response.toString('utf8'), null);
+                                    this._clamavResponseChunks = [];
+                                    if (me.settings.debugMode) {
+                                        console.log(`${me.debugLabel}: Result of scan:`, result);
+                                        console.log(
+                                            `${me.debugLabel}: It took ${_avScanTime} seconds to scan the file(s).`
+                                        );
+                                        clearScanBenchmark();
+                                    }
 
-                                // Parse what we've gotten back from ClamAV so far...
-                                const response = Buffer.concat(this._clamavResponseChunks);
-                                const result = me._processResult(response.toString(), null);
+                                    // If the scan timed-out
+                                    if (result.timeout === true) this.emit('timeout');
 
-                                // If there's an error supplied or if we detect a virus or timeout, stop stream immediately.
-                                if (
-                                    result instanceof NodeClamError ||
-                                    (typeof result === 'object' &&
-                                        (('isInfected' in result && result.isInfected === true) ||
-                                            ('timeout' in result && result.timeout === true)))
-                                ) {
-                                    // If a virus is detected...
+                                    // NOTE: "scan-complete" could be called by the `handleError` method.
+                                    // We don't want to to double-emit this message.
+                                    if (_scanComplete === false) {
+                                        _scanComplete = true;
+                                        this._clamavSocket.end();
+                                        this.emit('scan-complete', result);
+                                    }
+                                })
+                                // If connection timesout.
+                                .on('timeout', () => {
+                                    this.emit('timeout', new Error('Connection to host/socket has timed out'));
+                                    this._clamavSocket.end();
+                                    if (me.settings.debugMode)
+                                        console.log(`${me.debugLabel}: Connection to host/socket has timed out`);
+                                })
+                                // When the ClamAV socket is ready to receive packets (this will probably never fire here)
+                                .on('ready', () => {
+                                    if (me.settings.debugMode)
+                                        console.log(`${me.debugLabel}: ClamAV socket ready to receive`);
+                                })
+                                // When we are officially connected to the ClamAV socket (probably will never fire here)
+                                .on('connect', () => {
+                                    if (me.settings.debugMode)
+                                        console.log(`${me.debugLabel}: Connected to ClamAV socket`);
+                                })
+                                // If an error is emitted from the ClamAV socket
+                                .on('error', (err) => {
+                                    console.error(`${me.debugLabel}: Error emitted from ClamAV socket: `, err);
+                                    handleError(err);
+                                })
+                                // If ClamAV is sending stuff to us (ie, an "OK", "Virus FOUND", or "ERROR")
+                                .on('data', (cvChunk) => {
+                                    // Push this chunk to our results collection array
+                                    this._clamavResponseChunks.push(cvChunk);
+                                    if (me.settings.debugMode)
+                                        console.log(`${me.debugLabel}: Got result!`, cvChunk.toString());
+
+                                    // Parse what we've gotten back from ClamAV so far...
+                                    const response = Buffer.concat(this._clamavResponseChunks);
+                                    const result = me._processResult(response.toString(), null);
+
+                                    // If there's an error supplied or if we detect a virus or timeout, stop stream immediately.
                                     if (
-                                        typeof result === 'object' &&
-                                        'isInfected' in result &&
-                                        result.isInfected === true
+                                        result instanceof NodeClamError ||
+                                        (typeof result === 'object' &&
+                                            (('isInfected' in result && result.isInfected === true) ||
+                                                ('timeout' in result && result.timeout === true)))
                                     ) {
-                                        handleError(null, true, result);
-                                    }
+                                        // If a virus is detected...
+                                        if (
+                                            typeof result === 'object' &&
+                                            'isInfected' in result &&
+                                            result.isInfected === true
+                                        ) {
+                                            handleError(null, true, result);
+                                        }
 
-                                    // If a timeout is detected...
-                                    else if (
-                                        typeof result === 'object' &&
-                                        'isInfected' in result &&
-                                        result.isInfected === true
-                                    ) {
-                                        this.emit('timeout');
-                                        handleError(null, false, result);
-                                    }
+                                        // If a timeout is detected...
+                                        else if (
+                                            typeof result === 'object' &&
+                                            'isInfected' in result &&
+                                            result.isInfected === true
+                                        ) {
+                                            this.emit('timeout');
+                                            handleError(null, false, result);
+                                        }
 
-                                    // If any other kind of error is detected...
-                                    else {
-                                        handleError(result);
+                                        // If any other kind of error is detected...
+                                        else {
+                                            handleError(result);
+                                        }
                                     }
-                                }
-                                // For debugging purposes, spit out what was processed (if anything).
-                                else if (me.settings.debugMode)
-                                    console.log(`${me.debugLabel}: Processed Result: `, result, response.toString());
-                            });
+                                    // For debugging purposes, spit out what was processed (if anything).
+                                    else if (me.settings.debugMode)
+                                        console.log(
+                                            `${me.debugLabel}: Processed Result: `,
+                                            result,
+                                            response.toString()
+                                        );
+                                });
 
-                        if (me.settings.debugMode) console.log(`${me.debugLabel}: Doing initial transform!`);
-                        // Handle the chunk
-                        doTransform();
-                    } catch (err) {
-                        // Close socket if it's currently valid
-                        if (this._clamavSocket && 'readyState' in this._clamavSocket && this._clamavSocket.readyState) {
-                            this._clamavSocket.end();
+                            if (me.settings.debugMode) console.log(`${me.debugLabel}: Doing initial transform!`);
+                            // Handle the chunk
+                            doTransform();
+                        },
+                        (err) => {
+                            // Close socket if it's currently valid
+                            if (
+                                this._clamavSocket &&
+                                'readyState' in this._clamavSocket &&
+                                this._clamavSocket.readyState
+                            ) {
+                                this._clamavSocket.end();
+                            }
+
+                            // If there's an issue connecting to the ClamAV socket, this is where that's handled
+                            if (me.settings.debugMode)
+                                console.error(`${me.debugLabel}: Error initiating socket to ClamAV: `, err);
+                            handleError(err);
                         }
-
-                        // If there's an issue connecting to the ClamAV socket, this is where that's handled
-                        if (me.settings.debugMode)
-                            console.error(`${me.debugLabel}: Error initiating socket to ClamAV: `, err);
-                        handleError(err);
-                    }
+                    );
                 } else {
                     // if (me.settings.debugMode) console.log(`${me.debugLabel}: Doing transform: ${++counter}`);
                     // Handle the chunk
