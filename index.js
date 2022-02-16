@@ -12,14 +12,10 @@ const fs = require('fs');
 const nodePath = require('path'); // renamed to prevent conflicts in `scanDir`
 const { promisify } = require('util');
 const { execFile } = require('child_process');
-const { PassThrough, Transform, ReadableStream } = require('stream');
+const { PassThrough, Transform, Readable } = require('stream');
 const { Socket } = require('dgram');
 const NodeClamError = require('./lib/NodeClamError');
 const NodeClamTransform = require('./lib/NodeClamTransform.js');
-
-/**
- * @typedef {ReadableStream} ReadableStream
- */
 
 // Enable these once the FS.promises API is no longer experimental
 // const fsPromises = require('fs').promises;
@@ -2106,7 +2102,7 @@ class NodeClam {
      * use of a TCP or UNIX Domain socket. In other words, this will not work if you only
      * have access to a local ClamAV binary.
      *
-     * @param {ReadableStream} stream - A readable stream to scan
+     * @param {Readable} stream - A readable stream to scan
      * @param {Function} [cb] - What to do when the socket response with results
      * @returns {Promise<object>} Object like: `{ file: String, isInfected: Boolean, viruses: Array }`
      * @example
