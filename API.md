@@ -14,13 +14,6 @@ chunks into the correct format for a ClamAV socket.</p>
 </dd>
 </dl>
 
-## Typedefs
-
-<dl>
-<dt><a href="#ReadableStream">ReadableStream</a> : <code><a href="#ReadableStream">ReadableStream</a></code></dt>
-<dd></dd>
-</dl>
-
 <a name="NodeClam"></a>
 
 ## NodeClam
@@ -368,7 +361,7 @@ have access to a local ClamAV binary.
 
 | Param | Type | Description |
 | --- | --- | --- |
-| stream | [<code>ReadableStream</code>](#ReadableStream) | A readable stream to scan |
+| stream | <code>Readable</code> | A readable stream to scan |
 | [cb] | <code>function</code> | What to do when the socket response with results |
 
 **Example**  
@@ -467,7 +460,3 @@ This will flush out the stream when all data has been received.
 | --- | --- | --- |
 | cb | <code>function</code> | What to do when done |
 
-<a name="ReadableStream"></a>
-
-## ReadableStream : [<code>ReadableStream</code>](#ReadableStream)
-**Kind**: global typedef  
