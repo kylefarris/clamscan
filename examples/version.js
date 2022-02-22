@@ -2,12 +2,12 @@
 const NodeClam = require('../index.js'); // Offically: require('clamscan');
 
 const ClamScan = new NodeClam().init({
-    debug_mode: false,
+    debugMode: false,
     // prettier-ignore
     clamdscan: {
         // Run scan using command line
         path: '/usr/bin/clamdscan',                // <-- Secondary fallback to command line -|
-        config_file: '/etc/clamd.d/daemon.conf',   // <---------------------------------------|
+        configFile: '/etc/clamd.d/daemon.conf',   // <---------------------------------------|
         // Connect via Host/Port
         host: 'localhost',                         // <-- Primary fallback - |
         port: 3310,                                // <----------------------|
@@ -23,6 +23,6 @@ const ClamScan = new NodeClam().init({
 });
 
 ClamScan.then(async (av) => {
-    const result = await av.get_version();
+    const result = await av.getVersion();
     console.log('Version: ', result);
 });

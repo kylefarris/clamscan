@@ -36,11 +36,11 @@ async function removeFinalFile() {
  */
 async function test() {
     const clamscan = await new NodeClam().init({
-        debug_mode: true,
+        debugMode: true,
         clamdscan: {
             host: 'localhost',
             port: 3310,
-            bypass_test: true,
+            bypassTest: true,
             // socket: '/var/run/clamd.scan/clamd.sock',
         },
     });
