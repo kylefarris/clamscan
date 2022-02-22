@@ -72,7 +72,7 @@ class NodeClam {
                 multiscan: true,
                 reloadDb: false,
                 active: true,
-                bypassRest: false,
+                bypassTest: false,
             },
             preference: this.defaultScanner,
         });
@@ -106,7 +106,7 @@ class NodeClam {
      * @param {boolean} [options.clamdscan.multiscan=true] - If true, scan using all available cores
      * @param {boolean} [options.clamdscan.reloadDb=false] - If true, will re-load the DB on ever call (slow)
      * @param {boolean} [options.clamdscan.active=true] - If true, this module will consider using the `clamdscan` binary
-     * @param {boolean} [options.clamdscan.bypassRest=false] - If true, check to see if socket is avaliable
+     * @param {boolean} [options.clamdscan.bypassTest=false] - If true, check to see if socket is avaliable
      * @param {object} [options.preference='clamdscan'] - If preferred binary is found and active, it will be used by default
      * @param {Function} [cb] - Callback method. Prototype: `(err, <instance of NodeClam>)`
      * @returns {Promise<object>} An initated instance of NodeClam
@@ -136,7 +136,7 @@ class NodeClam {
      *         multiscan: true,
      *         reloadDb: false,
      *         active: true,
-     *         bypassRest: false,
+     *         bypassTest: false,
      *     },
      *     preference: 'clamdscan'
      });
@@ -314,7 +314,7 @@ class NodeClam {
             // Check the availability of the clamd service if socket or host/port are provided
             if (
                 this.scanner === 'clamdscan' &&
-                this.settings.clamdscan.bypassRest === false &&
+                this.settings.clamdscan.bypassTest === false &&
                 (this.settings.clamdscan.socket || this.settings.clamdscan.host || this.settings.clamdscan.port)
             ) {
                 if (this.settings.debugMode)

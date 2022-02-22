@@ -72,7 +72,7 @@ Initialization method.
 | [options.clamdscan.multiscan] | <code>boolean</code> | <code>true</code> | If true, scan using all available cores |
 | [options.clamdscan.reloadDb] | <code>boolean</code> | <code>false</code> | If true, will re-load the DB on ever call (slow) |
 | [options.clamdscan.active] | <code>boolean</code> | <code>true</code> | If true, this module will consider using the `clamdscan` binary |
-| [options.clamdscan.bypassRest] | <code>boolean</code> | <code>false</code> | If true, check to see if socket is avaliable |
+| [options.clamdscan.bypassTest] | <code>boolean</code> | <code>false</code> | If true, check to see if socket is avaliable |
 | [options.preference] | <code>object</code> | <code>&#x27;clamdscan&#x27;</code> | If preferred binary is found and active, it will be used by default |
 | [cb] | <code>function</code> |  | Callback method. Prototype: `(err, <instance of NodeClam>)` |
 
@@ -103,7 +103,7 @@ const ClamScan = new NodeClam().init({
         multiscan: true,
         reloadDb: false,
         active: true,
-        bypassRest: false,
+        bypassTest: false,
     },
     preference: 'clamdscan'
      });
