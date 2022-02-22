@@ -1562,7 +1562,7 @@ class NodeClam {
 
                         if (stderr.length > 0) {
                             badFiles = stderr.split(os.EOL).map((errLine) => {
-                                const match = errLine.match(/^ERROR: Can't access file (.*)+$/);
+                                const match = errLine.match(/^ERROR: Can't access file (.*)$/);
                                 if (match !== null && match.length > 1 && typeof match[1] === 'string') return match[1];
                                 return '';
                             });
