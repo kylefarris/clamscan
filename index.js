@@ -931,7 +931,7 @@ class NodeClam {
                 return hasCb ? cb(err, file, null, []) : reject(err);
             }
             // Clean file name
-            file = file.trim().replace(/ /g, ' ');
+            file = file.trim().replace(/\s+/g, ' ');
 
             // This is the function used for scanning viruses using the clamd command directly
             const localScan = () => {
