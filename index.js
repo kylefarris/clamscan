@@ -1549,7 +1549,7 @@ class NodeClam {
                 const command = `${self.settings[self.scanner].path} ${self._buildClamArgs(items).join(' ')}`;
                 if (self.settings.debugMode)
                     if (self.settings.debugMode)
-                        console.log(`${self.debugLabel}: Configured clam command: ${command}}`);
+                        console.log(`${self.debugLabel}: Configured clam command: ${command}`);
 
                 // Execute the clam binary with the proper flags
                 execFile(command, (err, stdout, stderr) => {
