@@ -1534,9 +1534,11 @@ describe('passthrough', () => {
     it('should not throw multiple callback error', (done) => {
         // To reliably reproduce the issue in the broken code, it's important that this is an async generator
         // and it emits some chunks larger than the default highWaterMark of 16 KB.
+        // eslint-disable-next-line require-jsdoc
         async function* gen(i = 10) {
             while (i < 25) {
-                yield Buffer.from(new Array(i++ * 1024).fill());
+                i += 1;
+                yield Buffer.from(new Array(i * 1024).fill());
             }
         }
 
