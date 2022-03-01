@@ -328,3 +328,7 @@ All sockets clients should now close when they are done being used, fail, or tim
 - Fixed initialization to pass a config-file option during clamav version check
 - Added new contributor
 - Fixed tests
+
+## Newer Versions
+
+Please see the [GitHub Release page](https://github.com/kylefarris/clamscan/releases) for this project to see changelog info starting with v2.0.0.

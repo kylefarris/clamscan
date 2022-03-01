@@ -728,20 +728,24 @@ class NodeClam {
     _processResult(result, file = null) {
         let timeout = false;
 
+        // The result value must be a string otherwise we can't parse it
         if (typeof result !== 'string') {
             if (this.settings.debugMode)
                 console.log(`${this.debugLabel}: Invalid stdout from scanner (not a string): `, result);
             throw new Error('Invalid result to process (not a string)');
         }
 
+        // Clean up the result string so that its predictably parseable
         result = result.trim();
 
+        // If the result string looks like 'Anything Here: OK\n', the scanned file is not infected
         // eslint-disable-next-line no-control-regex
         if (/:\s+OK(\u0000|[\r\n])?$/.test(result)) {
             if (this.settings.debugMode) console.log(`${this.debugLabel}: File is OK!`);
             return { isInfected: false, viruses: [], file, resultString: result, timeout };
         }
 
+        // If the result string looks like 'Anything Here: SOME VIRUS FOUND\n', the file is infected
         // eslint-disable-next-line no-control-regex
         if (/:\s+(.+)FOUND(\u0000|[\r\n])?/gm.test(result)) {
             if (this.settings.debugMode) {
@@ -759,7 +763,8 @@ class NodeClam {
             return { isInfected: true, viruses, file, resultString: result, timeout };
         }
 
-        if (/^(.+)ERROR/gm.test(result)) {
+        // If the result of the scan ends with "ERROR", there was an error (file permissions maybe)
+        if (/^(.+)ERROR(\u0000|[\r\n])?/gm.test(result)) {
             const error = result.replace(/^(.+)ERROR/gm, '$1').trim();
             if (this.settings.debugMode) {
                 if (this.settings.debugMode) console.log(`${this.debugLabel}: Error Response: `, error);
@@ -1040,11 +1045,12 @@ class NodeClam {
 
                         client.on('data', async (data) => {
                             if (this.settings.debugMode)
-                                console.log(`${this.debugLabel}: Received response from remote clamd service.`);
+                                console.log(`${this.debugLabel}: Received response from remote clamd service: `, data.toString());
                             try {
                                 const result = this._processResult(data.toString(), file);
                                 if (result instanceof Error) {
                                     client.end();
+                                    // Throw the error so that its caught and fallback is attempted
                                     throw result;
                                 }
 
@@ -1489,9 +1495,9 @@ class NodeClam {
         // At this point for a hybrid Promise/CB API to work, everything needs to be wrapped
         // in a Promise that will be returned
         return new Promise(async (resolve, reject) => {
-            const errors = {};
-            let badFiles = [];
+            let errors = {};
             let goodFiles = [];
+            let badFiles = [];
             let viruses = [];
             let origNumFiles = 0;
 
@@ -1502,15 +1508,15 @@ class NodeClam {
                     .trim()
                     .split(String.fromCharCode(10))
                     .map((v) => (/FOUND\n?$/.test(v) ? v.replace(/(.+):\s+(.+)FOUND\n?$/, '$2').trim() : null))
-                    .filter((v) => !!v);
+                    .filter(Boolean);
 
                 stdout
                     .trim()
                     .split(String.fromCharCode(10))
+                    .filter(Boolean)
                     .forEach((result) => {
                         if (/^[-]+$/.test(result)) return;
 
-                        // console.log("PATH: " + result)
                         let path = result.match(/^(.*): /);
                         if (path && path.length > 0) {
                             path = path[1];
@@ -1536,39 +1542,51 @@ class NodeClam {
 
                 if (err) return hasCb ? endCb(err, [], badFiles, {}, []) : reject(new NodeClamError({ badFiles }, err));
                 return hasCb
-                    ? endCb(null, goodFiles, badFiles, {}, viruses)
-                    : resolve({ goodFiles, badFiles, viruses, errors: null });
+                    ? endCb(null, goodFiles, badFiles, errors, viruses)
+                    : resolve({ goodFiles, badFiles, viruses, errors });
             };
 
             // Use this method when scanning using local binaries
-            const localScan = async () => {
+            const localScan = async (allFiles) => {
                 // Get array of escaped file names
-                const items = files.map((file) => file.replace(/ /g, '\\ '));
+                const items = allFiles.map((file) => file.replace(/ /g, '\\ '));
 
-                // Build the actual command to run
+                // Build the actual command purely for debugging purposes
                 const command = `${self.settings[self.scanner].path} ${self._buildClamArgs(items).join(' ')}`;
                 if (self.settings.debugMode)
                     if (self.settings.debugMode) console.log(`${self.debugLabel}: Configured clam command: ${command}`);
 
                 // Execute the clam binary with the proper flags
-                execFile(command, (err, stdout, stderr) => {
+                execFile(self.settings[self.scanner].path, self._buildClamArgs(items), (err, stdout, stderr) => {
                     if (self.settings.debugMode) console.log(`${this.debugLabel}: stdout:`, stdout);
 
-                    if (err) return parseStdout(err, stdout);
+                    // Exit code 1 just means "virus found". This is not an "error".
+                    if (err && err.code !== 1) {
+                        // If error code is 2 and the we find a non-file-permissions issue...
+                        if (err.code === 2) {
+                            // If not all error messages are file permissions issues, then throw an error.
+                            const numFilePermissionsIssues = stderr.split(os.EOL).filter(v => /^ERROR: Can't access file/.test(v));
+                            if (numFilePermissionsIssues.length < allFiles.length)
+                                return parseStdout(err, stdout);
+                        }
+                    }
 
+                    // Let user know if there are file permissions issues...
                     if (stderr) {
                         if (self.settings.debugMode) console.log(`${this.debugLabel}: `, stderr);
 
                         if (stderr.length > 0) {
-                            badFiles = stderr.split(os.EOL).map((errLine) => {
+                            const invalidFiles = stderr.split(os.EOL).map((errLine) => {
                                 const match = errLine.match(/^ERROR: Can't access file (.*)$/);
-                                if (match !== null && match.length > 1 && typeof match[1] === 'string') return match[1];
-                                return '';
-                            });
+                                if (match !== null && match.length > 1 && typeof match[1] === 'string')
+                                    return { [match[1]]: "Can't access file." };
+                                return null;
+                            }).filter(Boolean);
 
-                            badFiles = badFiles.filter((v) => !!v);
+                            errors = invalidFiles.reduce((l, r) => ({ ...l, ...r }), {});
                         }
                     }
+
                     return parseStdout(null, stdout);
                 });
             };
@@ -1579,7 +1597,7 @@ class NodeClam {
                 const numFiles = theFiles.length;
 
                 if (self.settings.debugMode)
-                    console.log(`${this.debugLabel}: Scanning a list of ${numFiles} passed files.`);
+                    console.log(`${this.debugLabel}: Scanning a list of ${numFiles} passed files.`, theFiles);
 
                 // Slower but more verbose/informative way...
                 if (fileCb && typeof fileCb === 'function') {
@@ -1644,7 +1662,6 @@ class NodeClam {
                 }
 
                 // The quicker but less-talkative way
-
                 let allFiles = [];
 
                 // This is where we scan every file/path in the `allFiles` array once it's been fully populated
@@ -1716,10 +1733,10 @@ class NodeClam {
                             ? endCb(null, goodFiles, badFiles, errors, viruses)
                             : resolve({ errors, goodFiles, badFiles, viruses });
                     }
-                    return localScan();
+                    return localScan(allFiles);
                 };
 
-                // If clamdscan is the preferred binary but we don't want to scan recursively
+                // If clamdscan is the preferred binary but if we don't want to scan recursively
                 // then we need to convert all path entries to a list of files found in the
                 // first layer of that path
                 if (this.scanRecursively === false && this.scanner === 'clamdscan') {
@@ -1804,7 +1821,7 @@ class NodeClam {
             }
 
             // Do some parameter validation
-            if (!Array.isArray(files) || files.length <= 0) {
+            if (!Array.isArray(files) || files.length === 0) {
                 // Before failing completely, check if there is a file list specified
                 if (!('fileList' in this.settings) || !this.settings.fileList) {
                     const err = new NodeClamError(
