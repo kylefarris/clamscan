@@ -26,7 +26,7 @@ If you are migrating from v0.8.5 or less to v1.0.0 or greater, please read the [
 - [Basic Usage Example](#basic-usage-example)
 - [API](#api)
   - [getVersion](#getVersion)
-  - [isInfected (alias: scan_file)](#isInfected)
+  - [isInfected (alias: scanFile)](#isInfected)
   - [scanDir](#scanDir)
   - [scanFiles](#scanFiles)
   - [scanStream](#scanStream)
@@ -124,7 +124,7 @@ const ClamScan = new NodeClam().init({
         host: false, // IP of host to connect to TCP interface
         port: false, // Port of host to use when connecting via TCP interface
         timeout: 60000, // Timeout for scanning files
-        localFallback: false, // Do no fail over to binary-method of scanning
+        localFallback: true, // Use local preferred binary to scan if socket/tcp fails
         path: '/usr/bin/clamdscan', // Path to the clamdscan binary on your server
         configFile: null, // Specify config file if it's in an unusual place
         multiscan: true, // Scan using all available cores! Yay!
@@ -158,7 +158,7 @@ const ClamScan = new NodeClam().init({
         host: '127.0.0.1', // If you want to connect locally but not through socket
         port: 12345, // Because, why not
         timeout: 300000, // 5 minutes
-        localFallback: true, // Use local preferred binary to scan if socket/tcp fails
+        localFallback: false, // Do no fail over to binary-method of scanning
         path: '/bin/clamdscan', // Special path to the clamdscan binary on your server
         configFile: '/etc/clamd.d/daemon.conf', // A fairly typical config location
         multiscan: false, // You hate speed and multi-threaded awesome-sauce
@@ -279,7 +279,7 @@ clamscan.getVersion().then(version => {
 
 <a name="isInfected"></a>
 
-## .isInfected(file_path[,callback])
+## .isInfected(filePath[,callback])
 
 This method allows you to scan a single file. It supports a callback and Promise API. If no callback is supplied, a Promise will be returned. This method will likely be the most common use-case for this module.
 
@@ -289,11 +289,11 @@ This method allows you to scan a single file. It supports a callback and Promise
 
 ### Parameters
 
-- `file_path` (string) Represents a path to the file to be scanned.
+- `filePath` (string) Represents a path to the file to be scanned.
 - `callback` (function) (optional) Will be called when the scan is complete. It takes 3 parameters:
 
   - `err` (object or null) A standard javascript Error object (null if no error)
-  - `file` (string) The original `file_path` passed into the `isInfected` method.
+  - `file` (string) The original `filePath` passed into the `isInfected` method.
   - `isInfected` (boolean) **True**: File is infected; **False**: File is clean. **NULL**: Unable to scan.
   - `viruses` (array) An array of any viruses found in the scanned file.
 
@@ -303,7 +303,7 @@ This method allows you to scan a single file. It supports a callback and Promise
 
   - Promise resolution returns: `result` (object):
 
-    - `file` (string) The original `file_path` passed into the `isInfected` method.
+    - `file` (string) The original `filePath` passed into the `isInfected` method.
     - `isInfected` (boolean) **True**: File is infected; **False**: File is clean. **NULL**: Unable to scan.
     - `viruses` (array) An array of any viruses found in the scanned file.
 
@@ -338,32 +338,32 @@ const {file, isInfected, viruses} = await clamscan.isInfected('/a/picture/for_ex
 
 <a name="scanDir"></a>
 
-## .scanDir(dir_path[,end_callback[,file_callback]])
+## .scanDir(dirPath[,endCallback[,fileCallback]])
 
 Allows you to scan an entire directory for infected files. This obeys your `recursive` option even for `clamdscan` which does not have a native way to turn this feature off. If you have multiple paths, send them in an array to `scanFiles`.
 
-**TL;DR:** For maximum speed, don't supply a `file_callback`.
+**TL;DR:** For maximum speed, don't supply a `fileCallback`.
 
-If you choose to supply a `file_callback`, the scan will run a little bit slower (depending on number of files to be scanned) for `clamdscan`. If you are using `clamscan`, while it will work, I'd highly advise you to NOT pass a `file_callback`... it will run incredibly slow.
+If you choose to supply a `fileCallback`, the scan will run a little bit slower (depending on number of files to be scanned) for `clamdscan`. If you are using `clamscan`, while it will work, I'd highly advise you to NOT pass a `fileCallback`... it will run incredibly slow.
 
 ### NOTE
 
-The `goodFiles` and `badFiles` parameters of the `end_callback` callback in this method will only contain the directories that were scanned in **all** **but** the following scenarios:
+The `goodFiles` and `badFiles` parameters of the `endCallback` callback in this method will only contain the directories that were scanned in **all** **but** the following scenarios:
 
-- A `file_callback` callback is provided, and `scanRecursively` is set to _true_.
+- A `fileCallback` callback is provided, and `scanRecursively` is set to _true_.
 - The scanner is set to `clamdscan` and `scanRecursively` is set to _false_.
 
 ### Parameters
 
-- `dir_path` (string) (required) Full path to the directory to scan.
-- `end_callback` (function) (optional) Will be called when the entire directory has been completely scanned. This callback takes 3 parameters:
+- `dirPath` (string) (required) Full path to the directory to scan.
+- `endCallback` (function) (optional) Will be called when the entire directory has been completely scanned. This callback takes 3 parameters:
 
   - `err` (object) A standard javascript Error object (null if no error)
   - `goodFiles` (array) List of the full paths to all files that are _clean_.
   - `badFiles` (array) List of the full paths to all files that are _infected_.
   - `viruses` (array) List of all the viruses found (feature request: associate to the bad files).
 
-- `file_callback` (function) (optional) Will be called after each file in the directory has been scanned. This is useful for keeping track of the progress of the scan. This callback takes 3 parameters:
+- `fileCallback` (function) (optional) Will be called after each file in the directory has been scanned. This is useful for keeping track of the progress of the scan. This callback takes 3 parameters:
 
   - `err` (object or null) A standard Javascript Error object (null if no error)
   - `file` (string) Path to the file that just got scanned.
@@ -415,20 +415,20 @@ const { path, isInfected, goodFiles, badFiles, viruses } = await clamscan.scanDi
 
 <a name="scanFiles"></a>
 
-## .scanFiles(files[,end_callback[,file_callback]])
+## .scanFiles(files[,endCallback[,fileCallback]])
 
 This allows you to scan many files that might be in different directories or maybe only certain files of a single directory. This is essentially a wrapper for `isInfected` that simplifies the process of scanning many files or directories.
 
 ### Parameters
 
 - `files` (array) (optional) A list of strings representing full paths to files you want scanned. If not supplied, the module will check for a `fileList` config option. If neither is found, the method will throw an error.
-- `end_callback` (function) (optional) Will be called when the entire list of files has been completely scanned. This callback takes 3 parameters:
+- `endCallback` (function) (optional) Will be called when the entire list of files has been completely scanned. This callback takes 3 parameters:
 
   - `err` (object or null) A standard JavaScript Error object (null if no error)
   - `goodFiles` (array) List of the full paths to all files that are _clean_.
   - `badFiles` (array) List of the full paths to all files that are _infected_.
 
-- `file_callback` (function) (optional) Will be called after each file in the list has been scanned. This is useful for keeping track of the progress of the scan. This callback takes 3 parameters:
+- `fileCallback` (function) (optional) Will be called after each file in the list has been scanned. This is useful for keeping track of the progress of the scan. This callback takes 3 parameters:
 
   - `err` (object or null) A standard JavaScript Error object (null if no error)
   - `file` (string) Path to the file that just got scanned.

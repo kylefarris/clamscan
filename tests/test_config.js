@@ -21,19 +21,21 @@ const which = (bin) => {
 const config = {
     removeInfected: false, // don't change
     quarantineInfected: `${__dirname}/infected`, // required for testing
-    // scan_log: `${__dirname}/clamscan-log`, // not required
+    // scanLog: `${__dirname}/clamscan-log`, // not required
     clamscan: {
         path: which('clamscan'), // required for testing
     },
     clamdscan: {
-        socket: '/usr/local/var/clamav/clamd.socket', // required for testing (change for your system e.g. '/var/run/clamd.scan/clamd.sock') - can be set to null
+        socket: '/var/run/clamd.scan/clamd.sock',
         host: '127.0.0.1', // required for testing (change for your system) - can be set to null
         port: 3310, // required for testing (change for your system) - can be set to null
         path: which('clamdscan'), // required for testing
         timeout: 1000,
-        // config_file: '/etc/clamd.d/scan.conf' // set if required
+        localFallback: false,
+        // configFile: '/etc/clamd.d/scan.conf' // set if required
+        // preference: 'clamdscan', // not used if socket/host+port is provided
     },
-    debug_mode: false,
+    debugMode: false,
 };
 
 // Force specific socket when on GitHub Actions
