@@ -692,7 +692,17 @@ class NodeClam {
                     console.log(`${this.debugLabel}: Established connection to clamscan server!`);
 
                 client.write('PING');
+
+                let dataReceived = false;
+                client.on('end', () => {
+                    if (!dataReceived) {
+                        const err = new NodeClamError('Did not get a PONG response from clamscan server.');
+                        return hasCb ? cb(err, null) : reject(err);
+                    }
+                });
+
                 client.on('data', (data) => {
+                    dataReceived = true;
                     if (data.toString().trim() === 'PONG') {
                         if (this.settings.debugMode) console.log(`${this.debugLabel}: PONG!`);
                         return hasCb ? cb(null, client) : resolve(client);
