@@ -419,6 +419,7 @@ describe('_ping', () => {
         expect(client.readable).to.eql(true);
         expect(client._hadError).to.eql(false);
         expect(client).to.respondTo('on');
+        expect(client).to.respondTo('end');
         expect(client).to.not.respondTo('foobar');
 
         client.end();
@@ -433,6 +434,7 @@ describe('_ping', () => {
                 expect(client.readable).to.eql(true);
                 expect(client._hadError).to.eql(false);
                 expect(client).to.respondTo('on');
+                expect(client).to.respondTo('end');
                 expect(client).to.not.respondTo('foobar');
             });
         });
