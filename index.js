@@ -1,3 +1,4 @@
+/* eslint-disable no-control-regex */
 /* eslint-disable no-async-promise-executor */
 /*!
  * Node - Clam
@@ -697,13 +698,14 @@ class NodeClam {
                 client.on('end', () => {
                     if (!dataReceived) {
                         const err = new NodeClamError('Did not get a PONG response from clamscan server.');
-                        return hasCb ? cb(err, null) : reject(err);
+                        if (hasCb) cb(err, null);
+                        else reject(err);
                     }
                 });
 
                 client.on('data', (data) => {
-                    dataReceived = true;
                     if (data.toString().trim() === 'PONG') {
+                        dataReceived = true;
                         if (this.settings.debugMode) console.log(`${this.debugLabel}: PONG!`);
                         return hasCb ? cb(null, client) : resolve(client);
                     }
@@ -1055,7 +1057,10 @@ class NodeClam {
 
                         client.on('data', async (data) => {
                             if (this.settings.debugMode)
-                                console.log(`${this.debugLabel}: Received response from remote clamd service: `, data.toString());
+                                console.log(
+                                    `${this.debugLabel}: Received response from remote clamd service: `,
+                                    data.toString()
+                                );
                             try {
                                 const result = this._processResult(data.toString(), file);
                                 if (result instanceof Error) {
@@ -1548,8 +1553,6 @@ class NodeClam {
                 goodFiles = Array.from(new Set(goodFiles));
                 viruses = Array.from(new Set(viruses));
 
-                // return (hasCb ? endCb(err, [], [], {}, []) : reject(err));
-
                 if (err) return hasCb ? endCb(err, [], badFiles, {}, []) : reject(new NodeClamError({ badFiles }, err));
                 return hasCb
                     ? endCb(null, goodFiles, badFiles, errors, viruses)
@@ -1575,9 +1578,10 @@ class NodeClam {
                         // If error code is 2 and the we find a non-file-permissions issue...
                         if (err.code === 2) {
                             // If not all error messages are file permissions issues, then throw an error.
-                            const numFilePermissionsIssues = stderr.split(os.EOL).filter(v => /^ERROR: Can't access file/.test(v));
-                            if (numFilePermissionsIssues.length < allFiles.length)
-                                return parseStdout(err, stdout);
+                            const numFilePermissionsIssues = stderr
+                                .split(os.EOL)
+                                .filter((v) => /^ERROR: Can't access file/.test(v));
+                            if (numFilePermissionsIssues.length < allFiles.length) return parseStdout(err, stdout);
                         }
                     }
 
@@ -1586,12 +1590,15 @@ class NodeClam {
                         if (self.settings.debugMode) console.log(`${this.debugLabel}: `, stderr);
 
                         if (stderr.length > 0) {
-                            const invalidFiles = stderr.split(os.EOL).map((errLine) => {
-                                const match = errLine.match(/^ERROR: Can't access file (.*)$/);
-                                if (match !== null && match.length > 1 && typeof match[1] === 'string')
-                                    return { [match[1]]: "Can't access file." };
-                                return null;
-                            }).filter(Boolean);
+                            const invalidFiles = stderr
+                                .split(os.EOL)
+                                .map((errLine) => {
+                                    const match = errLine.match(/^ERROR: Can't access file (.*)$/);
+                                    if (match !== null && match.length > 1 && typeof match[1] === 'string')
+                                        return { [match[1]]: "Can't access file." };
+                                    return null;
+                                })
+                                .filter(Boolean);
 
                             errors = invalidFiles.reduce((l, r) => ({ ...l, ...r }), {});
                         }
