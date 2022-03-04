@@ -269,7 +269,7 @@ describe('Initialized NodeClam module', () => {
             ...config,
             scanLog: `${__dirname}/should/not/exist`,
             preference: 'clamdscan',
-            clamdscan: { localFallback: true, },
+            clamdscan: { localFallback: true },
             foobar: true,
         };
 
@@ -998,8 +998,11 @@ describe('scanFiles', () => {
                     expect(goodFiles).to.be.empty;
                     expect(errorFiles).to.be.an('object');
 
-                    const fileNames = Object.keys(errorFiles).map(v => path.basename(v));
-                    expect(fileNames).to.be.eql(['wont_be_able_to_find_this_file.txt', 'wont_find_this_one_either.txt']);
+                    const fileNames = Object.keys(errorFiles).map((v) => path.basename(v));
+                    expect(fileNames).to.be.eql([
+                        'wont_be_able_to_find_this_file.txt',
+                        'wont_find_this_one_either.txt',
+                    ]);
                 });
             });
         });

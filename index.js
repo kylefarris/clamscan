@@ -1037,7 +1037,6 @@ class NodeClam {
 
             // If user wants to scan via socket or TCP...
             if (this.settings.clamdscan.socket || this.settings.clamdscan.host) {
-                // console.log("Yep");
                 // Scan using local unix domain socket (much simpler/faster process--especially with MULTISCAN enabled)
                 if (this.settings.clamdscan.socket) {
                     let client;

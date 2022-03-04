@@ -1,3 +1,12 @@
+/**
+ * This simple script simply allows us to generate an eicar file
+ * as opposed to storing one in our repository which could cause
+ * it to be immediately removed by antivirus software on contributors'
+ * machines or, even worse, flagged by github for hosting a virus.
+ *
+ * Previously, this library relied on downloading the eircar file from
+ * the eicar site but that proved slow and unreliable.
+ */
 const fs = require('fs');
 const { Readable } = require('stream');
 
@@ -20,7 +29,5 @@ const EicarGen = {
     writeFile: () => fs.writeFileSync(badScanFile, eicarBuffer.toString()),
     getStream: () => Readable.from(eicarBuffer),
 };
-
-// EicarGen.writeFile();
 
 module.exports = EicarGen;
