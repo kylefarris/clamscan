@@ -1981,7 +1981,10 @@ class NodeClam {
                         .trim()
                         .split(os.EOL)
                         .map((p) => p.replace(/ /g, '\\ ').trim());
-                    return this.scanFiles(files, endCb, fileCb);
+                    const { goodFiles, badFiles, viruses, errors } = await this.scanFiles(files, null, null);
+                    return hasCb
+                        ? endCb(null, goodFiles, badFiles, viruses)
+                        : resolve({ goodFiles, badFiles, viruses, errors });
                 } catch (e) {
                     const err = new NodeClamError({ path, err: e }, 'There was an issue scanning the path specified!');
                     return hasCb ? endCb(err, [], []) : reject(err);
@@ -1991,7 +1994,10 @@ class NodeClam {
             else if (this.settings.scanRecursively === false && this.scanner === 'clamdscan') {
                 try {
                     const allFiles = (await fsReaddir(path)).filter(async (file) => (await fsStat(file)).isFile());
-                    return this.scanFiles(allFiles, endCb, fileCb);
+                    const { goodFiles, badFiles, viruses, errors } = await this.scanFiles(allFiles, null, null);
+                    return hasCb
+                        ? endCb(null, goodFiles, badFiles, viruses)
+                        : resolve({ goodFiles, badFiles, viruses, errors });
                 } catch (e) {
                     const err = new NodeClamError(
                         { path, err: e },
