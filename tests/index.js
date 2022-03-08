@@ -21,6 +21,7 @@ const goodFileList = `${__dirname}/good_files_list.txt`;
 const badScanDir = `${__dirname}/bad_scan_dir`;
 const badScanFile = `${badScanDir}/bad_file_1.txt`;
 const badFileList = `${__dirname}/bad_files_list.txt`;
+const mixedScanDir = `${__dirname}/mixed_scan_dir`
 const passthruFile = `${__dirname}/output`;
 const noVirusUrl = 'https://raw.githubusercontent.com/kylefarris/clamscan/master/README.md';
 const fakeVirusFalseNegatives = [
@@ -457,7 +458,7 @@ describe('isInfected', () => {
 
     it('should require second parameter to be a callback function (if truthy value provided)', () => {
         expect(() => clamscan.isInfected(goodScanFile), 'nothing provided').to.not.throw(Error);
-        expect(() => clamscan.isInfected(goodScanFile, () => {}), 'good function provided').to.not.throw(Error);
+        expect(() => clamscan.isInfected(goodScanFile, () => { }), 'good function provided').to.not.throw(Error);
         expect(() => clamscan.isInfected(goodScanFile, undefined), 'undefined provided').to.not.throw(Error);
         expect(() => clamscan.isInfected(goodScanFile, null), 'null provided').to.not.throw(Error);
         expect(() => clamscan.isInfected(goodScanFile, ''), 'empty string provided').to.not.throw(Error);
@@ -1137,7 +1138,7 @@ describe('scanDir', () => {
     });
 
     it('should require the second parameter to be a callback function (if supplied)', () => {
-        const cb = (err, goodFiles, badFiles) => {};
+        const cb = (err, goodFiles, badFiles) => { };
         expect(() => clamscan.scanDir(goodScanDir, cb), 'good function provided').to.not.throw(Error);
         expect(() => clamscan.scanDir(goodScanDir), 'nothing provided').to.not.throw(Error);
         expect(() => clamscan.scanDir(goodScanDir, undefined), 'undefined provided').to.not.throw(Error);
@@ -1214,13 +1215,42 @@ describe('scanDir', () => {
         });
     });
 
+    it('should reply with all the good files, bad files, and viruses from a multi-level directory with some good files and some bad files', (done) => {
+        clamscan.settings.scanRecursively = false;
+        eicarGen.writeMixed();
+
+        clamscan.scanDir(mixedScanDir, (err, goodFiles, badFiles, viruses) => {
+            check(done, () => {
+                expect(err).to.not.be.instanceof(Error);
+
+                expect(badFiles).to.be.an('array');
+                expect(badFiles).to.have.length(2);
+                expect(badFiles).to.include(`${mixedScanDir}/folder1/bad_file_1.txt`);
+                expect(badFiles).to.include(`${mixedScanDir}/folder2/bad_file_2.txt`);
+
+                expect(goodFiles).to.be.an('array');
+                expect(goodFiles).to.have.length(2);
+                expect(goodFiles).to.include(`${mixedScanDir}/folder1/good_file_1.txt`);
+                expect(goodFiles).to.include(`${mixedScanDir}/folder2/good_file_2.txt`);
+
+                expect(viruses).to.not.be.empty;
+                expect(viruses).to.be.an('array');
+                expect(viruses).to.have.length(1);
+                expect(viruses[0]).to.match(eicarSignatureRgx);
+
+                // Just removed the mixed_scan_dir to remove "viruses"
+                if (fs.existsSync(mixedScanDir)) fs.rmSync(mixedScanDir, { recursive: true, force: true });
+            });
+        });
+    }).timeout(15000);
+
     // TODO: Write tests for file_callback
 });
 
 describe('scanStream', () => {
     let clamscan;
     before(async () => {
-        clamscan = await resetClam({ scanLog: null });
+        clamscan = await resetClam({ scanLog: null, scanRecursively: true });
     });
 
     const getGoodStream = () => {

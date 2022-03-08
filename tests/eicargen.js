@@ -7,10 +7,12 @@
  * Previously, this library relied on downloading the eircar file from
  * the eicar site but that proved slow and unreliable.
  */
-const fs = require('fs');
+const { writeFileSync, copyFileSync } = require('fs');
 const { Readable } = require('stream');
 
+const goodScanDir = `${__dirname}/good_scan_dir`;
 const badScanDir = `${__dirname}/bad_scan_dir`;
+const mixedScanDir = `${__dirname}/mixed_scan_dir`
 const badScanFile = `${badScanDir}/bad_file_1.txt`;
 
 // prettier-ignore
@@ -26,7 +28,14 @@ const eicarByteArray = [
 const eicarBuffer = Buffer.from(eicarByteArray);
 
 const EicarGen = {
-    writeFile: () => fs.writeFileSync(badScanFile, eicarBuffer.toString()),
+    writeFile: () => writeFileSync(badScanFile, eicarBuffer.toString()),
+    writeMixed: () => {
+        EicarGen.writeFile();
+        copyFileSync(`${goodScanDir}/good_file_1.txt`, `${mixedScanDir}/folder1/good_file_1.txt`);
+        copyFileSync(`${goodScanDir}/good_file_2.txt`, `${mixedScanDir}/folder2/good_file_2.txt`);
+        copyFileSync(badScanFile, `${mixedScanDir}/folder1/bad_file_1.txt`);
+        copyFileSync(badScanFile, `${mixedScanDir}/folder2/bad_file_2.txt`);
+    },
     getStream: () => Readable.from(eicarBuffer),
 };
 

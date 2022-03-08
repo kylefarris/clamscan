@@ -16,19 +16,15 @@ const { execFile } = require('child_process');
 const { PassThrough, Transform, Readable } = require('stream');
 const { Socket } = require('dgram');
 const NodeClamError = require('./lib/NodeClamError');
-const NodeClamTransform = require('./lib/NodeClamTransform.js');
+const NodeClamTransform = require('./lib/NodeClamTransform');
+const getFiles = require('./lib/getFiles');
 
-// Enable these once the FS.promises API is no longer experimental
-// const fsPromises = require('fs').promises;
-// const fsAccess = fsPromises.access;
-// const fsReadfile = fsPromises.readFile;
-// const fsReaddir = fsPromises.readdir;
-// const fsStat = fsPromises.stat;
-
-const fsAccess = promisify(fs.access);
-const fsReadfile = promisify(fs.readFile);
-const fsReaddir = promisify(fs.readdir);
-const fsStat = promisify(fs.stat);
+// Re-named `fs` promise methods to prevent conflicts while keeping short names
+const fsPromises = require('fs').promises;
+const fsAccess = fsPromises.access;
+const fsReadfile = fsPromises.readFile;
+const fsReaddir = fsPromises.readdir;
+const fsStat = fsPromises.stat;
 
 // Convert some stuff to promises
 const cpExecFile = promisify(execFile);
@@ -1990,10 +1986,11 @@ class NodeClam {
                     return hasCb ? endCb(err, [], []) : reject(err);
                 }
             }
+
             // Clamdscan always does recursive, so, here's a way to avoid that if you want (will call `scanFiles` method)
             else if (this.settings.scanRecursively === false && this.scanner === 'clamdscan') {
                 try {
-                    const allFiles = (await fsReaddir(path)).filter(async (file) => (await fsStat(file)).isFile());
+                    const allFiles = await getFiles(path);
                     const { goodFiles, badFiles, viruses, errors } = await this.scanFiles(allFiles, null, null);
                     return hasCb
                         ? endCb(null, goodFiles, badFiles, viruses)
@@ -2022,10 +2019,10 @@ class NodeClam {
 
                         if (this.settings.clamdscan.multiscan === true) {
                             // Use Multiple threads (faster)
-                            client.write(`MULTISCAN ${path}`);
+                            client.write(`MULTISCAN ${path} `);
                         } else {
                             // Use single or default # of threads (potentially slower)
-                            client.write(`SCAN ${path}`);
+                            client.write(`SCAN ${path} `);
                         }
 
                         // Where to buffer string response (not a real "Buffer", per se...)
@@ -2044,18 +2041,20 @@ class NodeClam {
                                     console.log(`${this.debugLabel}: Received response from remote clamd service.`);
                                 const response = Buffer.concat(chunks);
 
+                                console.log('Results: ', response.toString());
+
                                 const result = this._processResult(response.toString(), path);
                                 if (result instanceof Error) {
                                     // Fallback to local if that's an option
                                     if (this.settings.clamdscan.localFallback === true) return localScan();
                                     const err = new NodeClamError(
                                         { path, err: result },
-                                        'There was an issue scanning the path provided.'
+                                        `There was an issue scanning the path provided: ${result}`
                                     );
                                     return hasCb ? endCb(err, [], []) : reject(err);
                                 }
 
-                                // Fully close up the client
+                                // Fully close the client
                                 client.end();
 
                                 const { isInfected, viruses } = result;
@@ -2068,7 +2067,7 @@ class NodeClam {
                     } catch (e) {
                         const err = new NodeClamError(
                             { path, err: e },
-                            'There was an issue scanning the path provided.'
+                            `There was an issue scanning the path provided: ${e}`
                         );
                         return hasCb ? endCb(err, [], []) : reject(err);
                     }
@@ -2142,7 +2141,7 @@ class NodeClam {
      *
      * @param {Readable} stream - A readable stream to scan
      * @param {Function} [cb] - What to do when the socket response with results
-     * @returns {Promise<object>} Object like: `{ file: String, isInfected: Boolean, viruses: Array }`
+     * @returns {Promise<object>} Object like: `{ file: String, isInfected: Boolean, viruses: Array } `
      * @example
      * const NodeClam = require('clamscan');
      *
@@ -2228,7 +2227,7 @@ class NodeClam {
                     .on('error', (err) => {
                         if (this.settings.debugMode)
                             console.log(
-                                `${this.debugLabel}: There was an error with the input stream (maybe uploader closed browser?).`,
+                                `${this.debugLabel}: There was an error with the input stream(maybe uploader closed browser ?).`,
                                 err
                             );
                         return hasCb ? cb(err, null) : reject(err);
@@ -2272,7 +2271,7 @@ class NodeClam {
                         // If the scan didn't finish, throw error
                         if (!finished) {
                             const err = new NodeClamError(
-                                `Scan aborted. Reply from server: ${response.toString('utf8')}`
+                                `Scan aborted.Reply from server: ${response.toString('utf8')} `
                             );
                             return hasCb ? cb(err, null) : reject(err);
                         }
@@ -2280,7 +2279,7 @@ class NodeClam {
                         // The scan finished
 
                         if (this.settings.debugMode)
-                            console.log(`${this.debugLabel}: Raw Response:  ${response.toString('utf8')}`);
+                            console.log(`${this.debugLabel}: Raw Response:  ${response.toString('utf8')} `);
                         const result = this._processResult(response.toString('utf8'), null);
                         return hasCb ? cb(null, result) : resolve(result);
                     });
