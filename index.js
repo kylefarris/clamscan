@@ -1216,7 +1216,9 @@ class NodeClam {
                     this._forkStream.unpipe();
                     this._forkStream.destroy();
                     this._clamavTransform.destroy();
-                    this._clamavSocket.end();
+                    if (this._clamavSocket) {
+                        this._clamavSocket.end();
+                    }
                     clearScanBenchmark();
 
                     // Finding an infected file isn't really an error...
