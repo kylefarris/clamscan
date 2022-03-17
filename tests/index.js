@@ -1242,7 +1242,7 @@ describe('scanDir', () => {
                 expect(viruses[0]).to.match(eicarSignatureRgx);
 
                 // Just removed the mixed_scan_dir to remove "viruses"
-                if (fs.existsSync(mixedScanDir)) fs.rmSync(mixedScanDir, { recursive: true, force: true });
+                if (fs.existsSync(mixedScanDir)) fs.rm(mixedScanDir, { recursive: true, force: true });
             });
         });
     }).timeout(15000);
