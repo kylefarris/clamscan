@@ -2041,8 +2041,6 @@ class NodeClam {
                                     console.log(`${this.debugLabel}: Received response from remote clamd service.`);
                                 const response = Buffer.concat(chunks);
 
-                                console.log('Results: ', response.toString());
-
                                 const result = this._processResult(response.toString(), path);
                                 if (result instanceof Error) {
                                     // Fallback to local if that's an option

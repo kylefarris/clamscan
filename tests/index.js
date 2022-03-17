@@ -17,6 +17,7 @@ const config = require('./test_config');
 const goodScanDir = `${__dirname}/good_scan_dir`;
 const emptyFile = `${goodScanDir}/empty_file.txt`;
 const goodScanFile = `${goodScanDir}/good_file_1.txt`;
+const goodScanFile2 = `${goodScanDir}/good_file_2.txt`;
 const goodFileList = `${__dirname}/good_files_list.txt`;
 const badScanDir = `${__dirname}/bad_scan_dir`;
 const badScanFile = `${badScanDir}/bad_file_1.txt`;
@@ -1160,7 +1161,7 @@ describe('scanDir', () => {
     });
 
     it('should return error if directory not found (Callback API)', (done) => {
-        clamscan.scanDir(`${__dirname}/missing_dir`, (err, file, isInfected) => {
+        clamscan.scanDir(`${__dirname}/missing_dir`, (err) => {
             check(done, () => {
                 expect(err).to.be.instanceof(Error);
             });
@@ -1168,12 +1169,15 @@ describe('scanDir', () => {
     });
 
     it('should supply goodFiles array with scanned path when directory has no infected files (Callback API)', (done) => {
+        clamscan.settings.scanRecursively = false;
         clamscan.scanDir(goodScanDir, (err, goodFiles, badFiles) => {
             check(done, () => {
                 expect(err).to.not.be.instanceof(Error);
                 expect(goodFiles).to.be.an('array');
-                expect(goodFiles).to.have.length(1);
-                expect(goodFiles).to.include(goodScanDir);
+                expect(goodFiles).to.have.length(3);
+                expect(goodFiles).to.include(goodScanFile);
+                expect(goodFiles).to.include(goodScanFile2);
+                expect(goodFiles).to.include(emptyFile);
 
                 expect(badFiles).to.be.an('array');
                 expect(badFiles).to.be.empty;
@@ -1183,13 +1187,12 @@ describe('scanDir', () => {
 
     it('should supply badFiles array with scanned path when directory has infected files', (done) => {
         eicarGen.writeFile();
-
         clamscan.scanDir(badScanDir, (err, goodFiles, badFiles) => {
             check(done, () => {
                 expect(err).to.not.be.instanceof(Error);
                 expect(badFiles).to.be.an('array');
                 expect(badFiles).to.have.length(1);
-                expect(badFiles).to.include(badScanDir);
+                expect(badFiles).to.include(badScanFile);
 
                 expect(goodFiles).to.be.an('array');
                 expect(goodFiles).to.be.empty;
