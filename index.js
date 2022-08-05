@@ -1102,7 +1102,7 @@ class NodeClam {
                         if (this.settings.clamdscan.localFallback === true) return await localScan();
 
                         // Otherwise, fail
-                        const err = new NodeClamError({ err: e, file }, 'Could not scan file via TCP or locally!');
+                        const err = new NodeClamError({ err: e, file }, `Could not scan file via TCP or locally! ${e.message}`);
                         return hasCb ? cb(err, file, null, []) : reject(err);
                     } finally {
                         // Kill file stream on response
