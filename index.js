@@ -2281,6 +2281,9 @@ class NodeClam {
                         if (this.settings.debugMode)
                             console.log(`${this.debugLabel}: Raw Response:  ${response.toString('utf8')} `);
                         const result = this._processResult(response.toString('utf8'), null);
+                        if (result instanceof Error) {
+                            return hasCb ? cb(result, null) : reject(result);
+                        }
                         return hasCb ? cb(null, result) : resolve(result);
                     });
             } catch (err) {
