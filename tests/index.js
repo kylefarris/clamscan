@@ -1629,7 +1629,7 @@ describe('tls', () => {
             preference: 'clamscan',
         });
     });
-    it('Connects to server over tls', async () => {
+    it('Connects to clamd server via a TLS proxy', async () => {
         (await clamscan._ping()).end();
     });
 });
