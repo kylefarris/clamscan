@@ -11,6 +11,7 @@ const os = require('os');
 const net = require('net');
 const fs = require('fs');
 const nodePath = require('path'); // renamed to prevent conflicts in `scanDir`
+const tls = require('tls');
 const { promisify } = require('util');
 const { execFile } = require('child_process');
 const { PassThrough, Transform, Readable } = require('stream');
@@ -70,6 +71,7 @@ class NodeClam {
                 reloadDb: false,
                 active: true,
                 bypassTest: false,
+                tls: false,
             },
             preference: this.defaultScanner,
         });
@@ -104,6 +106,7 @@ class NodeClam {
      * @param {boolean} [options.clamdscan.reloadDb=false] - If true, will re-load the DB on ever call (slow)
      * @param {boolean} [options.clamdscan.active=true] - If true, this module will consider using the `clamdscan` binary
      * @param {boolean} [options.clamdscan.bypassTest=false] - If true, check to see if socket is avaliable
+     * @param {boolean} [options.clamdscan.tls=false] - If true, connect to a TLS-Termination proxy in from of ClamAV
      * @param {object} [options.preference='clamdscan'] - If preferred binary is found and active, it will be used by default
      * @param {Function} [cb] - Callback method. Prototype: `(err, <instance of NodeClam>)`
      * @returns {Promise<object>} An initated instance of NodeClam
@@ -525,14 +528,26 @@ class NodeClam {
             else if (this.settings.clamdscan.port) {
                 // If a host is specified (usually for a remote host)
                 if (this.settings.clamdscan.host) {
-                    client = net.createConnection({
-                        host: this.settings.clamdscan.host,
-                        port: this.settings.clamdscan.port,
-                        timeout,
-                    });
+                    if (this.settings.clamdscan.tls) {
+                        client = tls.connect({
+                            host: this.settings.clamdscan.host,
+                            port: this.settings.clamdscan.port,
+                            // Activate SNI
+                            servername: this.settings.clamdscan.host,
+                            timeout,
+                        });
+                    } else {
+                        client = net.createConnection({
+                            host: this.settings.clamdscan.host,
+                            port: this.settings.clamdscan.port,
+                            timeout,
+                        });
+                    }
                 }
                 // Host can be ignored since the default is `localhost`
-                else {
+                else if (this.settings.tls) {
+                    client = tls.connect({ port: this.settings.clamdscan.port, timeout });
+                } else {
                     client = net.createConnection({ port: this.settings.clamdscan.port, timeout });
                 }
             }

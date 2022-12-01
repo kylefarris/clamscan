@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-18.04
     strategy:
       matrix:
-        node-version: [12,13,14,15,16,17]
+        node-version: [12,13,14,15,16,17,18,19]
     steps:
       - name: Update Apt
         run: sudo apt-get update
@@ -24,6 +24,22 @@ jobs:
         run: sudo systemctl restart clamav-daemon
       - name: Chill for 30 seconds again
         run: sleep 30
+      - name: Install OpenSSL
+        run: sudo apt-get install openssl
+      - name: Generate Key Pair for TLS
+        run: openssl req -new -sha256 -subj "/C=US/ST=Denial/L=Springfield/O=Dis/CN=localhost" -newkey ed25519 -keyout key.pem -nodes -x509 -days 365 -out cert.pem
+      - name: Install stunnel
+        run: sudo apt-get install stunnel4
+      - name: Install / Trust certificate
+        run: |
+          sudo cp cert.pem /usr/local/share/ca-certificates/snakeoil.crt
+          sudo update-ca-certificates
+          sudo cp cert.pem /etc/stunnel/cert.pem
+          sudo cp key.pem /etc/stunnel/key.pem
+      - name: Set stunnel config
+        run: sudo cp tests/stunnel.conf /etc/stunnel/
+      - name: Restart stunnel
+        run: sudo systemctl restart stunnel
       - name: Checkout repository
         uses: actions/checkout@v2
       - name: Use Node.js ${{ matrix.node-version }}
