@@ -1616,3 +1616,20 @@ describe('passthrough', () => {
         });
     }
 });
+
+describe('tls', () => {
+    let clamscan;
+    before(async () => {
+        clamscan = resetClam({
+            clamdscan: {
+                host: 'localhost',
+                port: 3311,
+                tls: true,
+            },
+            preference: 'clamscan',
+        });
+    });
+    it('Connects to server over tls', async () => {
+        (await clamscan._ping()).end();
+    });
+});

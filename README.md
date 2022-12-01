@@ -131,6 +131,7 @@ const ClamScan = new NodeClam().init({
         reloadDb: false, // If true, will re-load the DB on every call (slow)
         active: true, // If true, this module will consider using the clamdscan binary
         bypassTest: false, // Check to see if socket is available when applicable
+        tls: false // If true, will connect to clamd over TLS instead of plaintext TCP. (Only checked when clamdscan.socket is falsey)
     },
     preference: 'clamdscan' // If clamdscan is found and active, it will be used by default
 });
