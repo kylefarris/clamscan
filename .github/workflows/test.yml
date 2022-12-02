@@ -41,7 +41,7 @@ jobs:
       - name: Set stunnel config
         run: sudo cp tests/stunnel.conf /etc/stunnel/
       - name: Restart stunnel
-        run: sudo /etc/init.d/stunnel restart
+        run: sudo /etc/init.d/stunnel4 restart
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v2
         with:
