@@ -37,7 +37,14 @@ jobs:
           sudo cp cert.pem /etc/stunnel/cert.pem
           sudo cp key.pem /etc/stunnel/key.pem
       - name: Set stunnel config
-        run: sudo cp tests/stunnel.conf /etc/stunnel/
+        run: |
+          cat << EOF >> /etc/stunnel/stunnel.conf
+[clamd-tls]
+accept = 3311
+connect = 3310
+cert = /etc/stunnel/cert.pem
+key = /etc/stunnel/key.pem
+EOF
       - name: Restart stunnel
         run: sudo systemctl restart stunnel
       - name: Checkout repository
