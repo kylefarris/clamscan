@@ -44,8 +44,9 @@ jobs:
         run: sudo /etc/init.d/stunnel4 restart
       - name: inspect
         run: |
+          pwd
           whoami
-          ls -la
+          ls -laR tests
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v3
         with:
