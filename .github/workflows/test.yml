@@ -36,19 +36,12 @@ jobs:
           sudo update-ca-certificates
           sudo cp cert.pem /etc/stunnel/cert.pem
           sudo cp key.pem /etc/stunnel/key.pem
-      - name: Set stunnel config
-        run: |
-          cat << EOF >> /etc/stunnel/stunnel.conf
-[clamd-tls]
-accept = 3311
-connect = 3310
-cert = /etc/stunnel/cert.pem
-key = /etc/stunnel/key.pem
-EOF
-      - name: Restart stunnel
-        run: sudo systemctl restart stunnel
       - name: Checkout repository
         uses: actions/checkout@v2
+      - name: Set stunnel config
+        run: sudo cp tests/stunnel.conf /etc/stunnel/
+      - name: Restart stunnel
+        run: sudo systemctl restart stunnel
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v2
         with:
