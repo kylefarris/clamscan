@@ -15,7 +15,7 @@ jobs:
       - name: Update Apt
         run: sudo apt-get update
       - name: Install ClamAV
-        run: sudo apt-get install clamav clamav-daemon clamdscan
+        run: sudo apt-get install clamav clamav-daemon
       - name: Restart Freshclam
         run: sudo systemctl restart clamav-freshclam
       - name: Chill for 30 seconds
