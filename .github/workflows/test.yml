@@ -48,6 +48,7 @@ jobs:
           whoami
           ls -laR tests
           ps -eF|grep clam
+          namei -l $(pwd)/tests/good_scan_dir/good_file_1.txt
           sudo -u clamav clamdscan tests/good_scan_dir/good_file_1.txt
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v3
