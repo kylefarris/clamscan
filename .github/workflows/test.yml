@@ -15,7 +15,7 @@ jobs:
       - name: Update Apt
         run: sudo apt-get update
       - name: Install ClamAV
-        run: sudo apt-get install clamav clamav-daemon
+        run: sudo apt-get install clamav clamav-daemon clamdscan
       - name: Restart Freshclam
         run: sudo systemctl restart clamav-freshclam
       - name: Chill for 30 seconds
@@ -48,6 +48,7 @@ jobs:
           whoami
           ls -laR tests
           ps -eF|grep clam
+          sudo -u clamav clamdscan tests/good_scan_dir/good_file_1.txt
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v3
         with:
