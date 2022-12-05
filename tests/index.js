@@ -1619,18 +1619,25 @@ describe('passthrough', () => {
 
 describe('tls', () => {
     let clamscan;
-    before(async () => {
+
+    it('Connects to clamd server via a TLS proxy', async () => {
         clamscan = await resetClam({
             clamdscan: {
                 host: 'localhost',
                 port: 3311,
                 tls: true,
             },
-            preference: 'clamscan',
         });
+        (await clamscan._ping()).end();
     });
 
-    it('Connects to clamd server via a TLS proxy', async () => {
+    it('Connects to clamd server via a TLS proxym on localhost', async () => {
+        clamscan = await resetClam({
+            clamdscan: {
+                port: 3311,
+                tls: true,
+            },
+        });
         (await clamscan._ping()).end();
     });
 });
