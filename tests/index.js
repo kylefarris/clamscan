@@ -1632,7 +1632,7 @@ describe('tls', () => {
         (await clamscan._ping()).end();
     });
 
-    it('Connects to clamd server via a TLS proxym on localhost', async () => {
+    it('Connects to clamd server via a TLS proxy on localhost', async () => {
         clamscan = await resetClam({
             clamdscan: {
                 port: 3311,
