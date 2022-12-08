@@ -52,3 +52,5 @@ jobs:
         run: npm ci
       - name: Run tests
         run: npm test
+        env:
+          NODE_EXTRA_CA_CERTS: /usr/local/share/ca-certificates/snakeoil.crt
