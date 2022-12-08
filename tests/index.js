@@ -1625,6 +1625,7 @@ describe('tls', () => {
             clamdscan: {
                 host: 'localhost',
                 port: 3311,
+                socket: false,
                 tls: true,
             },
         });
@@ -1635,6 +1636,7 @@ describe('tls', () => {
         clamscan = await resetClam({
             clamdscan: {
                 port: 3311,
+                socket: false,
                 tls: true,
             },
         });
