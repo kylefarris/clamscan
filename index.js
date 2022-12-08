@@ -106,7 +106,7 @@ class NodeClam {
      * @param {boolean} [options.clamdscan.reloadDb=false] - If true, will re-load the DB on ever call (slow)
      * @param {boolean} [options.clamdscan.active=true] - If true, this module will consider using the `clamdscan` binary
      * @param {boolean} [options.clamdscan.bypassTest=false] - If true, check to see if socket is avaliable
-     * @param {boolean} [options.clamdscan.tls=false] - If true, connect to a TLS-Termination proxy in from of ClamAV
+     * @param {boolean} [options.clamdscan.tls=false] - If true, connect to a TLS-Termination proxy in front of ClamAV
      * @param {object} [options.preference='clamdscan'] - If preferred binary is found and active, it will be used by default
      * @param {Function} [cb] - Callback method. Prototype: `(err, <instance of NodeClam>)`
      * @returns {Promise<object>} An initated instance of NodeClam

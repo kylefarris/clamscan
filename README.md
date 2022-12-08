@@ -166,6 +166,7 @@ const ClamScan = new NodeClam().init({
         reloadDb: true, // You want your scans to run slow like with clamscan
         active: false, // you don't want to use this at all because it's evil
         bypassTest: true, // Don't check to see if socket is available. You should probably never set this to true.
+        tls: true, // Connect to clamd over TLS
     },
     preference: 'clamscan' // If clamscan is found and active, it will be used by default
 });
