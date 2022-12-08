@@ -11,7 +11,8 @@
     "SaltwaterC <Ștefan Rusu>",
     "Sjord <Sjoerd Langkemper>",
     "chris-maclean <Christopher Maclean>",
-    "ngraef <Nick Graef>"
+    "ngraef <Nick Graef>",
+    "caroneater <Gabriel Fournier>"
   ],
   "scripts": {
     "docs": "jsdoc2md index.js lib/* > API.md",
