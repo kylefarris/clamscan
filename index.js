@@ -713,7 +713,7 @@ class NodeClam {
                         else reject(err);
                     }
                 });
-
+                client.on('error', (err) => reject(err));
                 client.on('data', (data) => {
                     if (data.toString().trim() === 'PONG') {
                         dataReceived = true;
