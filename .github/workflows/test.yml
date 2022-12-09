@@ -44,7 +44,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
       - name: Set stunnel config
-        run: sudo cp tests/stunnel.conf /etc/stunnel/
+        run: |
+          sudo cp tests/stunnel.conf /etc/stunnel/
+          sed -i "s/\/var\/run\/clamd.scan\/clamd.sock/$(sudo cat /etc/clamav/clamd.conf |grep "LocalSocket "|cut -d " " -f 2 | sed 's/\//\\\//g')/" tests/stunnel.conf
       - name: Restart stunnel
         run: |
           sudo systemctl restart stunnel4;
