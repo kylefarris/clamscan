@@ -68,7 +68,7 @@ jobs:
       - name: debug?
         if: ${{ failure() }}
         run: |
-          echo 'PING' | openssl s_client --connect localhost:3311;
+          echo 'PING' | openssl s_client --connect localhost:3311 -ign_eof;
           ls -la /etc/clamav
           cat /etc/clamav/clamd.conf;
           sudo ps -eF|grep stunnel;
