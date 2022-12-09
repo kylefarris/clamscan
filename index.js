@@ -545,7 +545,7 @@ class NodeClam {
                     }
                 }
                 // Host can be ignored since the default is `localhost`
-                else if (this.settings.tls) {
+                else if (this.settings.clamdscan.tls) {
                     client = tls.connect({ port: this.settings.clamdscan.port, timeout });
                 } else {
                     client = net.createConnection({ port: this.settings.clamdscan.port, timeout });
