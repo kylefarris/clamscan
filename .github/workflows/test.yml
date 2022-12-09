@@ -22,6 +22,10 @@ jobs:
         run: |
           until sudo grep "$(date | cut -c -10)" /var/log/clamav/freshclam.log | grep -Eq 'Clamd was NOT notified|Clamd successfully notified about the update.'; do sleep 1; done;
           sudo tail /var/log/clamav/freshclam.log
+      - name: Remove Syslog from ClamD Config
+        run: |
+          cat /lib/systemd/system/clamav-daemon.service;
+          sudo sed /syslog/d /lib/systemd/system/clamav-daemon.service;
       - name: Restart ClamD
         run: sudo systemctl restart clamav-daemon
       - name: Install OpenSSL
