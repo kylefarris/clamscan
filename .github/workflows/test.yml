@@ -60,7 +60,7 @@ jobs:
       - name: Wait for ClamD Socket
         run: |
           sudo systemctl status clamav-daemon
-          until [ -f $(cat /etc/clamav/clamd.conf |grep "LocalSocket "|cut -d ' ' -f 2) ]; do sleep 1; done
+          until [ -S $(cat /etc/clamav/clamd.conf |grep "LocalSocket "|cut -d ' ' -f 2) ]; do sleep 1; done
       - name: Run tests
         run: npm test
         env:
