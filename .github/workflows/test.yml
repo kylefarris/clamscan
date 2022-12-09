@@ -54,7 +54,6 @@ jobs:
         run: |
           sudo systemctl status clamav-daemon;
           sudo journalctl -e -u clamav-daemon;
-          until [ -f /var/run/clamd.scan/clamd.sock ]; do sleep 1; done
       - name: Run tests
         run: npm test
         env:
