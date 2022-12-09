@@ -27,7 +27,7 @@ jobs:
       - name: Install OpenSSL
         run: sudo apt-get install openssl
       - name: Generate Key Pair for TLS
-        run: openssl req -new -sha256 -subj "/C=US/ST=Denial/L=Springfield/O=Dis/CN=localhost" -addext "subjectAltName = DNS:localhost,IP:127.0.0.1" -newkey ed25519 -keyout key.pem -nodes -x509 -days 365 -out cert.pem
+        run: openssl req -new -sha256 -subj "/C=US/ST=Denial/L=Springfield/O=Dis/CN=localhost" -addext "subjectAltName = DNS:localhost,IP:127.0.0.1,IP:::1" -newkey ed25519 -keyout key.pem -nodes -x509 -days 365 -out cert.pem
       - name: Install stunnel
         run: sudo apt-get install stunnel4
       - name: Install / Trust certificate
