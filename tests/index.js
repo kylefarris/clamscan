@@ -1632,9 +1632,34 @@ describe('tls', () => {
         (await clamscan._ping()).end();
     });
 
+    it('Connects to clamd server via a TLS proxy on 127.0.0.1', async () => {
+        clamscan = await resetClam({
+            clamdscan: {
+                host: '127.0.0.1',
+                port: 3311,
+                socket: false,
+                tls: true,
+            },
+        });
+        (await clamscan._ping()).end();
+    });
+
+    it('Connects to clamd server via a TLS proxy on ::1', async () => {
+        clamscan = await resetClam({
+            clamdscan: {
+                host: '::1',
+                port: 3311,
+                socket: false,
+                tls: true,
+            },
+        });
+        (await clamscan._ping()).end();
+    });
+
     it('Connects to clamd server via a TLS proxy on localhost', async () => {
         clamscan = await resetClam({
             clamdscan: {
+                host: false,
                 port: 3311,
                 socket: false,
                 tls: true,
