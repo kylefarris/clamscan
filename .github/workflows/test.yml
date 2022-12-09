@@ -18,12 +18,10 @@ jobs:
         run: sudo apt-get install clamav clamav-daemon
       - name: Restart Freshclam
         run: sudo systemctl restart clamav-freshclam
-      - name: Chill for 30 seconds
-        run: sleep 30
+      - name: Wait for freshclam to be up to date
+        run: until grep -q "database is up-to-date" /var/log/clamav/freshclam.log; do echo 'do'; sleep 1; done;
       - name: Restart ClamD
         run: sudo systemctl restart clamav-daemon
-      - name: Chill for 30 seconds again
-        run: sleep 30
       - name: Install OpenSSL
         run: sudo apt-get install openssl
       - name: Generate Key Pair for TLS
