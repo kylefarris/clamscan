@@ -1620,7 +1620,7 @@ describe('passthrough', () => {
 describe('tls', () => {
     let clamscan;
 
-    it('Connects to clamd server via a TLS proxy', async () => {
+    it('Connects to clamd server via a TLS proxy on localhost', async () => {
         clamscan = await resetClam({
             clamdscan: {
                 host: 'localhost',
@@ -1656,7 +1656,7 @@ describe('tls', () => {
         (await clamscan._ping()).end();
     });
 
-    it('Connects to clamd server via a TLS proxy on localhost', async () => {
+    it('Connects to clamd server via a TLS proxy on implicit localhost', async () => {
         clamscan = await resetClam({
             clamdscan: {
                 host: false,
