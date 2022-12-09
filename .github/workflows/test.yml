@@ -20,7 +20,7 @@ jobs:
         run: sudo systemctl restart clamav-freshclam
       - name: Wait for freshclam to be up to date
         run: |
-          until sudo grep -q "Database test passed." /var/log/clamav/freshclam.log; do sleep 1; done;
+          until sudo grep "$(date | cut -c -10)" /var/log/clamav/freshclam.log | grep -Eq 'Clamd was NOT notified|Clamd successfully notified about the update.'; do sleep 1; done;
           sudo tail /var/log/clamav/freshclam.log
       - name: Restart ClamD
         run: sudo systemctl restart clamav-daemon
