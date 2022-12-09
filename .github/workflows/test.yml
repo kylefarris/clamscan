@@ -63,3 +63,10 @@ jobs:
         run: npm test
         env:
           NODE_EXTRA_CA_CERTS: /usr/local/share/ca-certificates/snakeoil.crt
+      - name: debug?
+        if: ${{ failure() }}
+        run: |
+          echo 'PING' | openssl s_client --connect localhost:3311;
+          cat /etc/clamav/clamd.conf;
+          sudo ps -eF|grep stunnel;
+          sudo ls -la $(cat /etc/clamav/clamd.conf |grep "LocalSocket "|cut -d ' ' -f 2)
