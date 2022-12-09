@@ -48,6 +48,8 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - name: Install dependencies
         run: npm ci
+      - name: Wait for ClamD Socket
+        run: until [ -f /var/run/clamd.scan/clamd.sock ]; do ls /var/run/clamd.scan; sleep 1; done
       - name: Run tests
         run: npm test
         env:
