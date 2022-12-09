@@ -25,7 +25,7 @@ jobs:
       - name: Remove Syslog from ClamD Config
         run: |
           cat /lib/systemd/system/clamav-daemon.service;
-          sudo sed /syslog/d /lib/systemd/system/clamav-daemon.service;
+          sudo sed -i /syslog/d /lib/systemd/system/clamav-daemon.service;
       - name: Restart ClamD
         run: sudo systemctl restart clamav-daemon
       - name: Install OpenSSL
