@@ -22,13 +22,13 @@ jobs:
         run: |
           until sudo grep "$(date | cut -c -10)" /var/log/clamav/freshclam.log | grep -Eq 'Clamd was NOT notified|Clamd successfully notified about the update.'; do sleep 1; done;
           sudo tail /var/log/clamav/freshclam.log
-      - name: Remove Syslog from ClamD Config
+      - name: Remove Syslog from ClamD Config & Restard ClamD
         run: |
+          sudo systemctl stop clamav-daemon;
           sudo sed -i /syslog/d /lib/systemd/system/clamav-daemon.service;
           sudo systemctl daemon-reload;
           cat /lib/systemd/system/clamav-daemon.service;
-      - name: Restart ClamD
-        run: sudo systemctl restart clamav-daemon
+          sudo systemctl start clamav-daemon;
       - name: Install OpenSSL
         run: sudo apt-get install openssl
       - name: Generate Key Pair for TLS
@@ -67,6 +67,8 @@ jobs:
         if: ${{ failure() }}
         run: |
           echo 'PING' | openssl s_client --connect localhost:3311;
+          ls -la /etc/clamav
           cat /etc/clamav/clamd.conf;
           sudo ps -eF|grep stunnel;
           sudo ls -la $(cat /etc/clamav/clamd.conf |grep "LocalSocket "|cut -d ' ' -f 2)
+          env | grep CI
