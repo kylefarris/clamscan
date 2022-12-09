@@ -19,7 +19,7 @@ jobs:
       - name: Restart Freshclam
         run: sudo systemctl restart clamav-freshclam
       - name: Wait for freshclam to be up to date
-        run: until grep -q "database is up-to-date" /var/log/clamav/freshclam.log; do echo 'do'; sleep 1; done;
+        run: until sudo grep -q "database is up-to-date" /var/log/clamav/freshclam.log; do ls /var/log/; sleep 1; done;
       - name: Restart ClamD
         run: sudo systemctl restart clamav-daemon
       - name: Install OpenSSL
