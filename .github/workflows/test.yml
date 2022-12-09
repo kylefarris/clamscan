@@ -24,8 +24,9 @@ jobs:
           sudo tail /var/log/clamav/freshclam.log
       - name: Remove Syslog from ClamD Config
         run: |
-          cat /lib/systemd/system/clamav-daemon.service;
           sudo sed -i /syslog/d /lib/systemd/system/clamav-daemon.service;
+          sudo systemctl daemon-reload;
+          cat /lib/systemd/system/clamav-daemon.service;
       - name: Restart ClamD
         run: sudo systemctl restart clamav-daemon
       - name: Install OpenSSL
@@ -45,7 +46,9 @@ jobs:
       - name: Set stunnel config
         run: sudo cp tests/stunnel.conf /etc/stunnel/
       - name: Restart stunnel
-        run: sudo systemctl restart stunnel4
+        run: |
+          sudo systemctl restart stunnel4;
+          sudo ss -tlnp;
       - name: Open ~ for all users to read
         run: chmod 755 ~
       - name: Use Node.js ${{ matrix.node-version }}
@@ -55,9 +58,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Wait for ClamD Socket
-        run: |
-          sudo systemctl status clamav-daemon;
-          sudo journalctl -e -u clamav-daemon;
+        run: sudo systemctl status clamav-daemon
       - name: Run tests
         run: npm test
         env:
