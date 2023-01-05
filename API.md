@@ -73,6 +73,7 @@ Initialization method.
 | [options.clamdscan.reloadDb] | <code>boolean</code> | <code>false</code> | If true, will re-load the DB on ever call (slow) |
 | [options.clamdscan.active] | <code>boolean</code> | <code>true</code> | If true, this module will consider using the `clamdscan` binary |
 | [options.clamdscan.bypassTest] | <code>boolean</code> | <code>false</code> | If true, check to see if socket is avaliable |
+| [options.clamdscan.tls] | <code>boolean</code> | <code>false</code> | If true, connect to a TLS-Termination proxy in front of ClamAV |
 | [options.preference] | <code>object</code> | <code>&#x27;clamdscan&#x27;</code> | If preferred binary is found and active, it will be used by default |
 | [cb] | <code>function</code> |  | Callback method. Prototype: `(err, <instance of NodeClam>)` |
 
@@ -357,7 +358,7 @@ use of a TCP or UNIX Domain socket. In other words, this will not work if you on
 have access to a local ClamAV binary.
 
 **Kind**: instance method of [<code>NodeClam</code>](#NodeClam)  
-**Returns**: <code>Promise.&lt;object&gt;</code> - Object like: `{ file: String, isInfected: Boolean, viruses: Array }`  
+**Returns**: <code>Promise.&lt;object&gt;</code> - Object like: `{ file: String, isInfected: Boolean, viruses: Array } `  
 
 | Param | Type | Description |
 | --- | --- | --- |
