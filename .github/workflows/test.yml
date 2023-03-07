@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-22.04
     strategy:
       matrix:
-        node-version: [12,13,14,15,16,17,18,19]
+        node-version: [14,16,18,19]
     steps:
       - name: Update Apt
         run: sudo apt-get update
