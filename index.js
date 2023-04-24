@@ -1117,7 +1117,7 @@ class NodeClam {
                     // Attempt to scan the stream.
                     try {
                         const isInfected = await this.scanStream(stream);
-                        return hasCb ? cb(null, file, isInfected, []) : resolve({ file, ...isInfected });
+                        return hasCb ? cb(null, file, isInfected, []) : resolve({ ...isInfected, file });
                     } catch (e) {
                         // Fallback to local if that's an option
                         if (this.settings.clamdscan.localFallback === true) return await localScan();
