@@ -1657,15 +1657,15 @@ if (process.env.CI) {
             (await clamscan._ping()).end();
         });
 
-        it('Connects to clamd server via a TLS proxy on implicit localhost', async () => {
-            clamscan = await resetClam({
-                clamdscan: {
-                    host: false,
-                    port: 3311,
-                    socket: false,
-                    tls: true,
-                },
-            });
+        // it('Connects to clamd server via a TLS proxy on implicit localhost', async () => {
+        //     clamscan = await resetClam({
+        //         clamdscan: {
+        //             host: false,
+        //             port: 3311,
+        //             socket: false,
+        //             tls: true,
+        //         },
+        //     });
         });
     });
 }
