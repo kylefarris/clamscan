@@ -729,7 +729,7 @@ class NodeClam {
                     return hasCb ? cb(err, null) : reject(err);
                 });
                 client.on('error', (err) => {
-                    if(this.settings.debugMode) {
+                    if (this.settings.debugMode) {
                         console.log(`${this.debugLabel}: Could not connect to the clamscan server.`, err);
                     }
                     return hasCb ? cb(err, null) : reject(err);
