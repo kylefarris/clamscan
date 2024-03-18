@@ -2182,9 +2182,9 @@ class NodeClam {
      * rs.push(null);
      *
      * // Callback Example
-     * clamscan.scanStream(stream, (err, isInfected) => {
+     * clamscan.scanStream(stream, (err, { isInfected, viruses }) => {
      *     if (err) return console.error(err);
-     *     if (isInfected) return console.log('Stream is infected! Booo!');
+     *     if (isInfected) return console.log('Stream is infected! Booo!', viruses);
      *     console.log('Stream is not infected! Yay!');
      * });
      *
@@ -2292,13 +2292,12 @@ class NodeClam {
                         // If the scan didn't finish, throw error
                         if (!finished) {
                             const err = new NodeClamError(
-                                `Scan aborted.Reply from server: ${response.toString('utf8')} `
+                                `Scan aborted. Reply from server: ${response.toString('utf8')} `
                             );
                             return hasCb ? cb(err, null) : reject(err);
                         }
 
                         // The scan finished
-
                         if (this.settings.debugMode)
                             console.log(`${this.debugLabel}: Raw Response:  ${response.toString('utf8')} `);
                         const result = this._processResult(response.toString('utf8'), null);

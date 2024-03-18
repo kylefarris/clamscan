@@ -565,10 +565,10 @@ rs.push('foooooo');
 rs.push('barrrrr');
 rs.push(null);
 
-clamscan.scanStream(stream, (err, isInfected) => {
+clamscan.scanStream(stream, (err, { isInfected. viruses }) => {
     if (err) return console.error(err);
-    if (isInfected) return console.log("Stream is infected! Booo!");
-    console.log("Stream is not infected! Yay!");
+    if (isInfected) return console.log('Stream is infected! Booo!', viruses);
+    console.log('Stream is not infected! Yay!');
 });
 ```
 
