@@ -1224,22 +1224,34 @@ describe('scanDir', () => {
 
         clamscan.scanDir(mixedScanDir, (err, goodFiles, badFiles, viruses) => {
             check(done, () => {
-                expect(err).to.not.be.instanceof(Error);
+                const ignoreFiles = ['.DS_Store'].map((v) => `${mixedScanDir}/${v}`);
+                goodFiles = goodFiles.filter((v) => !ignoreFiles.includes(v));
+                console.log('Good Files: ', mixedScanDir, goodFiles);
 
-                expect(badFiles).to.be.an('array');
-                expect(badFiles).to.have.length(2);
-                expect(badFiles).to.include(`${mixedScanDir}/folder1/bad_file_1.txt`);
-                expect(badFiles).to.include(`${mixedScanDir}/folder2/bad_file_2.txt`);
+                expect(err, 'scanDir should not return error').to.not.be.instanceof(Error);
 
-                expect(goodFiles).to.be.an('array');
-                expect(goodFiles).to.have.length(2);
-                expect(goodFiles).to.include(`${mixedScanDir}/folder1/good_file_1.txt`);
-                expect(goodFiles).to.include(`${mixedScanDir}/folder2/good_file_2.txt`);
+                expect(badFiles, 'bad files should be array').to.be.an('array');
+                expect(badFiles, 'bad files should have 2 items').to.have.length(2);
+                expect(badFiles, 'bad files should include bad_file_1.txt').to.include(
+                    `${mixedScanDir}/folder1/bad_file_1.txt`
+                );
+                expect(badFiles, 'bad files should include bad_file_2.txt').to.include(
+                    `${mixedScanDir}/folder2/bad_file_2.txt`
+                );
 
-                expect(viruses).to.not.be.empty;
-                expect(viruses).to.be.an('array');
-                expect(viruses).to.have.length(1);
-                expect(viruses[0]).to.match(eicarSignatureRgx);
+                expect(goodFiles, 'good files should be array').to.be.an('array');
+                expect(goodFiles, 'good files should have 3 items').to.have.length(2);
+                expect(goodFiles, 'good files include good_file_1.txt').to.include(
+                    `${mixedScanDir}/folder1/good_file_1.txt`
+                );
+                expect(goodFiles, 'good files should include good_file_2.txt').to.include(
+                    `${mixedScanDir}/folder2/good_file_2.txt`
+                );
+
+                expect(viruses, 'viruses should not be empty').to.not.be.empty;
+                expect(viruses, 'viruses should be array').to.be.an('array');
+                expect(viruses, 'viruses should have 1 element').to.have.length(1);
+                expect(viruses[0], 'viruses should contain eircar virus signature').to.match(eicarSignatureRgx);
 
                 // Just removed the mixed_scan_dir to remove "viruses"
                 if (fs.existsSync(mixedScanDir)) eicarGen.emptyMixed();
