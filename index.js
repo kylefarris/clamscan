@@ -533,7 +533,7 @@ class NodeClam {
                             host: this.settings.clamdscan.host,
                             port: this.settings.clamdscan.port,
                             // Activate SNI
-                            servername: this.settings.clamdscan.host,
+                            // servername: this.settings.clamdscan.host,
                             timeout,
                         });
                     } else {
