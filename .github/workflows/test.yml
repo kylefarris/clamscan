@@ -18,16 +18,21 @@ jobs:
         run: sudo apt-get install clamav clamav-daemon
       - name: Restart Freshclam
         run: sudo systemctl restart clamav-freshclam
-      - name: Chill for 30 seconds
-        run: sleep 30
-      - name: Restart ClamD
-        run: sudo systemctl restart clamav-daemon
-      - name: Chill for 30 seconds again
-        run: sleep 30
+      - name: Wait for freshclam to be up to date
+        run: |
+          until sudo grep "$(date | cut -c -10)" /var/log/clamav/freshclam.log | grep -Eq 'Clamd was NOT notified|Clamd successfully notified about the update.'; do sleep 1; done;
+          sudo tail /var/log/clamav/freshclam.log
+      - name: Remove Syslog from ClamD Config & Restard ClamD
+        run: |
+          sudo systemctl stop clamav-daemon;
+          sudo sed -i /syslog/d /lib/systemd/system/clamav-daemon.service;
+          sudo systemctl daemon-reload;
+          cat /lib/systemd/system/clamav-daemon.service;
+          sudo systemctl start clamav-daemon;
       - name: Install OpenSSL
         run: sudo apt-get install openssl
       - name: Generate Key Pair for TLS
-        run: openssl req -new -sha256 -subj "/C=US/ST=Denial/L=Springfield/O=Dis/CN=localhost" -newkey ed25519 -keyout key.pem -nodes -x509 -days 365 -out cert.pem
+        run: openssl req -new -sha256 -subj "/C=US/ST=Denial/L=Springfield/O=Dis/CN=localhost" -addext "subjectAltName = DNS:localhost,IP:127.0.0.1,IP:::1" -newkey ed25519 -keyout key.pem -nodes -x509 -days 365 -out cert.pem
       - name: Install stunnel
         run: sudo apt-get install stunnel4
       - name: Install / Trust certificate
@@ -39,9 +44,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
       - name: Set stunnel config
-        run: sudo cp tests/stunnel.conf /etc/stunnel/
+        run: |
+          sudo cp tests/stunnel.conf /etc/stunnel/
+          sudo sed -i "s/\/var\/run\/clamd.scan\/clamd.sock/$(sudo cat /etc/clamav/clamd.conf |grep "LocalSocket "|cut -d " " -f 2 | sed 's/\//\\\//g')/" /etc/stunnel/stunnel.conf
       - name: Restart stunnel
-        run: sudo /etc/init.d/stunnel4 restart
+        run: |
+          sudo systemctl restart stunnel4;
+          sudo ss -tlnp;
       - name: Open ~ for all users to read
         run: chmod 755 ~
       - name: Use Node.js ${{ matrix.node-version }}
@@ -50,5 +59,17 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - name: Install dependencies
         run: npm ci
+      - name: Wait for ClamD Socket
+        run: |
+          sudo systemctl status clamav-daemon
+          until [ -S $(cat /etc/clamav/clamd.conf |grep "LocalSocket "|cut -d ' ' -f 2) ]; do sleep 1; done
       - name: Run tests
         run: npm test
+        env:
+          NODE_EXTRA_CA_CERTS: /usr/local/share/ca-certificates/snakeoil.crt
+      - name: debug?
+        if: ${{ failure() }}
+        run: |
+          sudo journalctl -e -u stunnel4;
+          sudo journalctl -e -u clamav-daemon;
+          echo 'PING' | openssl s_client --connect localhost:3311 -ign_eof;

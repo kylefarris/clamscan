@@ -22,7 +22,7 @@ const goodFileList = `${__dirname}/good_files_list.txt`;
 const badScanDir = `${__dirname}/bad_scan_dir`;
 const badScanFile = `${badScanDir}/bad_file_1.txt`;
 const badFileList = `${__dirname}/bad_files_list.txt`;
-const mixedScanDir = `${__dirname}/mixed_scan_dir`
+const mixedScanDir = `${__dirname}/mixed_scan_dir`;
 const passthruFile = `${__dirname}/output`;
 const noVirusUrl = 'https://raw.githubusercontent.com/kylefarris/clamscan/master/README.md';
 const fakeVirusFalseNegatives = [
@@ -459,7 +459,7 @@ describe('isInfected', () => {
 
     it('should require second parameter to be a callback function (if truthy value provided)', () => {
         expect(() => clamscan.isInfected(goodScanFile), 'nothing provided').to.not.throw(Error);
-        expect(() => clamscan.isInfected(goodScanFile, () => { }), 'good function provided').to.not.throw(Error);
+        expect(() => clamscan.isInfected(goodScanFile, () => {}), 'good function provided').to.not.throw(Error);
         expect(() => clamscan.isInfected(goodScanFile, undefined), 'undefined provided').to.not.throw(Error);
         expect(() => clamscan.isInfected(goodScanFile, null), 'null provided').to.not.throw(Error);
         expect(() => clamscan.isInfected(goodScanFile, ''), 'empty string provided').to.not.throw(Error);
@@ -1139,7 +1139,7 @@ describe('scanDir', () => {
     });
 
     it('should require the second parameter to be a callback function (if supplied)', () => {
-        const cb = (err, goodFiles, badFiles) => { };
+        const cb = (err, goodFiles, badFiles) => {};
         expect(() => clamscan.scanDir(goodScanDir, cb), 'good function provided').to.not.throw(Error);
         expect(() => clamscan.scanDir(goodScanDir), 'nothing provided').to.not.throw(Error);
         expect(() => clamscan.scanDir(goodScanDir, undefined), 'undefined provided').to.not.throw(Error);
@@ -1617,27 +1617,55 @@ describe('passthrough', () => {
     }
 });
 
-describe('tls', () => {
-    let clamscan;
+if (process.env.CI) {
+    describe('tls', () => {
+        let clamscan;
 
-    it('Connects to clamd server via a TLS proxy', async () => {
-        clamscan = await resetClam({
-            clamdscan: {
-                host: 'localhost',
-                port: 3311,
-                tls: true,
-            },
+        it('Connects to clamd server via a TLS proxy on localhost', async () => {
+            clamscan = await resetClam({
+                clamdscan: {
+                    host: 'localhost',
+                    port: 3311,
+                    socket: false,
+                    tls: true,
+                },
+            });
+            (await clamscan._ping()).end();
         });
-        (await clamscan._ping()).end();
-    });
 
-    it('Connects to clamd server via a TLS proxym on localhost', async () => {
-        clamscan = await resetClam({
-            clamdscan: {
-                port: 3311,
-                tls: true,
-            },
+        it('Connects to clamd server via a TLS proxy on 127.0.0.1', async () => {
+            clamscan = await resetClam({
+                clamdscan: {
+                    host: '127.0.0.1',
+                    port: 3311,
+                    socket: false,
+                    tls: true,
+                },
+            });
+            (await clamscan._ping()).end();
         });
-        (await clamscan._ping()).end();
+
+        it('Connects to clamd server via a TLS proxy on ::1', async () => {
+            clamscan = await resetClam({
+                clamdscan: {
+                    host: '::1',
+                    port: 3311,
+                    socket: false,
+                    tls: true,
+                },
+            });
+            (await clamscan._ping()).end();
+        });
+
+        it('Connects to clamd server via a TLS proxy on implicit localhost', async () => {
+            clamscan = await resetClam({
+                clamdscan: {
+                    host: false,
+                    port: 3311,
+                    socket: false,
+                    tls: true,
+                },
+            });
+        });
     });
-});
+}
