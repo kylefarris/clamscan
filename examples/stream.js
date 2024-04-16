@@ -2,7 +2,7 @@ const { PassThrough } = require('stream');
 // eslint-disable-next-line import/no-extraneous-dependencies
 const axios = require('axios');
 
-const fakeVirusUrl = 'https://secure.eicar.org/eicar_com.txt';
+const fakeVirusUrl = 'https://www.eicar.org/download/eicar-com-2/?wpdmdl=8842&refresh=661ef9d576b211713306069';
 // const normalFileUrl = 'https://raw.githubusercontent.com/kylefarris/clamscan/sockets/README.md';
 const testUrl = fakeVirusUrl;
 
@@ -19,15 +19,18 @@ async function test() {
             bypassTest: true,
             host: 'localhost',
             port: 3310,
-            socket: '/var/run/clamd.scan/clamd.sock',
+            //socket: '/var/run/clamd.scan/clamd.sock',
         },
     });
 
-    const passthrough = new PassThrough();
-    const source = axios.get(testUrl);
-
     // Fetch fake Eicar virus file and pipe it through to our scan screeam
-    source.pipe(passthrough);
+    const passthrough = new PassThrough();
+    axios.get(
+        testUrl, { responseType: 'stream' }
+    ).then((response) => {
+        response.data.pipe(passthrough);
+    });
+
 
     try {
         const { isInfected, viruses } = await clamscan.scanStream(passthrough);
