@@ -188,12 +188,12 @@ class NodeClam {
                 ('preference' in this.settings && typeof this.settings.preference !== 'string') ||
                 !['clamscan', 'clamdscan'].includes(this.settings.preference)
             ) {
-                // If no valid scanner is found (but a socket/host is), disable the fallback to a local CLI scanning method
-                if (this.settings.clamdscan.socket || this.settings.clamdscan.host) {
+                // If no valid scanner is found (but a socket/port/host is), disable the fallback to a local CLI scanning method
+                if (this.settings.clamdscan.socket || this.settings.clamdscan.port || this.settings.clamdscan.host) {
                     this.settings.clamdscan.localFallback = false;
                 } else {
                     const err = new NodeClamError(
-                        'Invalid virus scanner preference defined and no valid host/socket option provided!'
+                        'Invalid virus scanner preference defined and no valid socket/port/host option provided!'
                     );
                     return hasCb ? cb(err, null) : reject(err);
                 }
@@ -238,11 +238,15 @@ class NodeClam {
                     ) {
                         this.scanner = 'clamdscan';
                     } else {
-                        // If preferred scanner is not a valid binary but there is a socket/host option, disable
+                        // If preferred scanner is not a valid binary but there is a socket/port/host option, disable
                         // failover to local CLI implementation
-                        if (!this.settings.clamdscan.socket && !this.settings.clamdscan.host) {
+                        if (
+                            !this.settings.clamdscan.socket &&
+                            !this.settings.clamdscan.port &&
+                            !this.settings.clamdscan.host
+                        ) {
                             const err = new NodeClamError(
-                                'No valid & active virus scanning binaries are active and available and no host/socket option provided!'
+                                'No valid & active virus scanning binaries are active and available and no socket/port/host option provided!'
                             );
                             return hasCb ? cb(err, null) : reject(err);
                         }
@@ -257,6 +261,7 @@ class NodeClam {
             // Make sure quarantineInfected path exists at specified location
             if (
                 !this.settings.clamdscan.socket &&
+                !this.settings.clamdscan.port &&
                 !this.settings.clamdscan.host &&
                 ((this.settings.clamdscan.active === true && this.settings.clamdscan.localFallback === true) ||
                     this.settings.clamscan.active === true) &&
@@ -277,6 +282,7 @@ class NodeClam {
             // If using clamscan, make sure definition db exists at specified location
             if (
                 !this.settings.clamdscan.socket &&
+                !this.settings.clamdscan.port &&
                 !this.settings.clamdscan.host &&
                 this.scanner === 'clamscan' &&
                 this.settings.clamscan.db
@@ -292,8 +298,8 @@ class NodeClam {
 
             // Make sure scanLog exists at specified location
             if (
-                ((!this.settings.clamdscan.socket && !this.settings.clamdscan.host) ||
-                    ((this.settings.clamdscan.socket || this.settings.clamdscan.host) &&
+                ((!this.settings.clamdscan.socket && !this.settings.clamdscan.port && !this.settings.clamdscan.host) ||
+                    ((this.settings.clamdscan.socket || this.settings.clamdscan.port || this.settings.clamdscan.host) &&
                         this.settings.clamdscan.localFallback === true &&
                         this.settings.clamdscan.active === true) ||
                     (this.settings.clamdscan.active === false && this.settings.clamscan.active === true) ||
@@ -315,7 +321,7 @@ class NodeClam {
             if (
                 this.scanner === 'clamdscan' &&
                 this.settings.clamdscan.bypassTest === false &&
-                (this.settings.clamdscan.socket || this.settings.clamdscan.host || this.settings.clamdscan.port)
+                (this.settings.clamdscan.socket || this.settings.clamdscan.port || this.settings.clamdscan.host)
             ) {
                 if (this.settings.debugMode)
                     console.log(`${this.debugLabel}: Initially testing socket/tcp connection to clamscan server.`);
@@ -885,7 +891,10 @@ class NodeClam {
             };
 
             // If user wants to connect via socket or TCP...
-            if (this.scanner === 'clamdscan' && (this.settings.clamdscan.socket || this.settings.clamdscan.host)) {
+            if (
+                this.scanner === 'clamdscan' &&
+                (this.settings.clamdscan.socket || this.settings.clamdscan.port || this.settings.clamdscan.host)
+            ) {
                 const chunks = [];
                 let client;
 
@@ -1053,7 +1062,7 @@ class NodeClam {
             }
 
             // If user wants to scan via socket or TCP...
-            if (this.settings.clamdscan.socket || this.settings.clamdscan.host) {
+            if (this.settings.clamdscan.socket || this.settings.clamdscan.port || this.settings.clamdscan.host) {
                 // Scan using local unix domain socket (much simpler/faster process--especially with MULTISCAN enabled)
                 if (this.settings.clamdscan.socket) {
                     let client;
@@ -2032,7 +2041,11 @@ class NodeClam {
             else if (typeof fileCb !== 'function' || !hasCb) {
                 // Scan locally via socket (either TCP or Unix socket)
                 // This is much simpler/faster process--potentially even more with MULTISCAN enabled)
-                if (this.settings.clamdscan.socket || (this.settings.clamdscan.port && this._isLocalHost())) {
+
+                if (
+                    this.settings.clamdscan.socket ||
+                    (this.settings.clamdscan.port && (!this.settings.clamdscan.host || this._isLocalHost()))
+                ) {
                     let client;
 
                     try {
@@ -2213,7 +2226,7 @@ class NodeClam {
             if (this.settings.debugMode) console.log(`${this.debugLabel}: Provided stream is readable.`);
 
             // Verify that they have a valid socket or host/port config
-            if (!this.settings.clamdscan.socket && (!this.settings.clamdscan.port || !this.settings.clamdscan.host)) {
+            if (!this.settings.clamdscan.socket && !this.settings.clamdscan.port && !this.settings.clamdscan.host) {
                 const err = new NodeClamError(
                     { clamdscanSettings: this.settings.clamdscan },
                     'Invalid information provided to connect to clamav service. A unix socket or port (+ optional host) is required!'

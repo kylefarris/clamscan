@@ -214,11 +214,11 @@ describe('Initialized NodeClam module', () => {
         expect(clamscan.scanner).to.eql('clamscan');
     });
 
-    it('should fail if an invalid scanner preference is supplied when socket or host is not specified and localFallback is not false', () => {
+    it('should fail if an invalid scanner preference is supplied when socket or port or host is not specified and localFallback is not false', () => {
         expect(resetClam({ preference: 'clamscan' }), 'valid scanner').to.not.be.rejectedWith(Error);
         expect(resetClam({ preference: 'badscanner' }), 'invalid scanner').to.not.be.rejectedWith(Error);
         expect(
-            resetClam({ clamdscan: { localFallback: true, socket: false, host: false }, preference: 'badscanner' }),
+            resetClam({ clamdscan: { localFallback: true, socket: false, port: false, host: false }, preference: 'badscanner' }),
             'invalid scanner - no socket or host for local fallback'
         ).to.be.rejectedWith(Error);
     });
@@ -230,6 +230,7 @@ describe('Initialized NodeClam module', () => {
             active: true,
             localFallback: true,
             socket: false,
+            port: false,
             host: false,
         };
         const clamscanOptions = { ...config.clamscan, path: `${__dirname}/should/not/exist`, active: true };
@@ -244,6 +245,7 @@ describe('Initialized NodeClam module', () => {
             active: true,
             localFallback: true,
             socket: false,
+            port: false,
             host: false,
         };
         const clamscanOptions = { ...config.clamscan, active: true };
@@ -257,7 +259,7 @@ describe('Initialized NodeClam module', () => {
     });
 
     it('should set definition database (clamscan) to null if specified db is not found', async () => {
-        const clamdScanOptions = { ...config.clamdscan, socket: false, host: false };
+        const clamdScanOptions = { ...config.clamdscan, socket: false, port: false, host: false };
         const clamscanOptions = { ...config.clamscan, db: '/usr/bin/better_clam_db', active: true };
 
         const options = { ...config, clamdscan: clamdScanOptions, clamscan: clamscanOptions, preference: 'clamscan' };
