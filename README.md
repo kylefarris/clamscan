@@ -172,6 +172,8 @@ const ClamScan = new NodeClam().init({
 });
 ```
 
+NOTE: If a valid `port` is provided but no `host` value is provided, the clamscan will assume `'localhost'` for `host`.
+
 ## A note about using this module via sockets or TCP
 
 As of version v1.0.0, this module supports communication with a local or remote ClamAV daemon through Unix Domain sockets or a TCP host/port combo. If you supply both in your configuration object, the UNIX Domain socket option will be used. The module _will not_ not fallback to using the alternative Host/Port method. If you wish to connect via Host/Port and not a Socket, please either omit the `socket` property in the config object or use `socket: null`.
