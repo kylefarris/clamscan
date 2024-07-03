@@ -311,6 +311,13 @@ describe('Initialized NodeClam module', () => {
         });
         expect(clamscan.scanner).to.eq('clamdscan'); // Verify that the scanner did not fall back to another binary
     });
+
+    it('should initialize with only a port (no host or socket provided)', async () => {
+        expect(resetClam({
+            preference: 'clamdscan',
+            clamdscan: { host: null, port: config.clamdscan.port },
+        })).to.not.be.rejectedWith(Error);
+    });
 });
 
 describe('_buildClamFlags', () => {
