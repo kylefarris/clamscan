@@ -2247,15 +2247,33 @@ class NodeClam {
                 socket = await this._initSocket('scanStream');
 
                 // Pipe the stream through our transform and into the ClamAV socket
-                stream.pipe(transform).pipe(socket);
+                // stream.pipe(transform).pipe(socket);
+                transform
+                    // Writing data into ClamAV socket
+                    .on('data', data => {
+                        socket.write(data);
+                    })
+                    // The transform stream has dried up
+                    .on('end', () => {
+                        if (this.settings.debugMode) console.log(`${this.debugLabel}: The transform stream has ended.`);
+                    })
+                    .on('error', err => {
+                        console.error(`${this.debugLabel}: Error emitted from transform stream: `, err);
+                        socket.end();
+                        return hasCb ? cb(err, null) : reject(err);
+                    });
 
                 // Setup the listeners for the stream
                 stream
+                    // The stream is writting data into transform stream
+                    .on('data', data => {
+                        transform.write(data);
+                    })
                     // The stream has dried up
                     .on('end', () => {
                         if (this.settings.debugMode) console.log(`${this.debugLabel}: The input stream has dried up.`);
                         finished = true;
-                        stream.destroy();
+                        transform.end();
                     })
                     // There was an error with the stream (ex. uploader closed browser)
                     .on('error', (err) => {
@@ -2290,6 +2308,7 @@ class NodeClam {
                     .on('error', (err) => {
                         console.error(`${this.debugLabel}: Error emitted from ClamAV socket: `, err);
                         socket.end();
+                        transform.destroy();
                         return hasCb ? cb(err, null) : reject(err);
                     })
 
@@ -2297,7 +2316,8 @@ class NodeClam {
                     .on('end', () => {
                         if (this.settings.debugMode) console.log(`${this.debugLabel}: ClamAV is done scanning.`);
                         // Fully close up the socket
-                        socket.end();
+                        socket.destroy();
+                        transform.destroy();
 
                         // Concat all the response chunks into a single buffer
                         const response = Buffer.concat(chunks);
