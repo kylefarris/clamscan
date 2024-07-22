@@ -974,12 +974,11 @@ class NodeClam {
                 return hasCb ? cb(err, file, null, []) : reject(err);
             }
             // Clean file name
-            file = file.trim().replace(/\s+/g, ' ');
+            file = file.trim();
 
             // This is the function used for scanning viruses using the clamd command directly
             const localScan = () => {
-                // console.log("Doing local scan...");
-                if (self.settings.debugMode) console.log(`${this.debugLabel}: Scanning ${file}`);
+                if (self.settings.debugMode) console.log(`${this.debugLabel}: [Local Scan] Scanning ${file}`);
                 // Build the actual command to run
                 const args = self._buildClamArgs(file);
                 if (self.settings.debugMode)

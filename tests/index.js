@@ -21,6 +21,7 @@ const goodScanFile2 = `${goodScanDir}/good_file_2.txt`;
 const goodFileList = `${__dirname}/good_files_list.txt`;
 const badScanDir = `${__dirname}/bad_scan_dir`;
 const badScanFile = `${badScanDir}/bad_file_1.txt`;
+const spacedVirusFile = `${badScanDir}/bad file 1.txt`;
 const badFileList = `${__dirname}/bad_files_list.txt`;
 const mixedScanDir = `${__dirname}/mixed_scan_dir`;
 const passthruFile = `${__dirname}/output`;
@@ -708,25 +709,6 @@ describe('isInfected', () => {
                 if (fs.existsSync(badScanFile)) fs.unlinkSync(badScanFile);
             }
         });
-
-        // it('should respond with properties: "file" (string), "isInfected" (boolean), and "viruses" (array) when scanning with remote host', async () => {
-        //     const clamdScanOptions = Object.assign({}, config.clamdscan, {active: true, socket: false, host: 'localhost', port: 3310});
-        //     const options = Object.assign({}, config, {clamdscan: clamdScanOptions});
-        //
-        //     try {
-        //         clamscan = await resetClam(options);
-        //         const {viruses, isInfected, file} = await clamscan.isInfected(goodScanFile);
-        //         expect(viruses).to.be.an('array');
-        //         expect(viruses).to.have.length(0);
-        //         expect(isInfected).to.be.a('boolean');
-        //         expect(isInfected).to.eql(false);
-        //         expect(viruses).to.be.an('array');
-        //         expect(viruses).to.have.length(0);
-        //     } catch (e) {
-        //         // console.error("Annoying error: ", e);
-        //         throw e;
-        //     }
-        // });
     });
 
     describe('Edge Cases', () => {
@@ -757,6 +739,29 @@ describe('isInfected', () => {
                 fakeVirusFalseNegatives.forEach((v) => {
                     if (fs.existsSync(v)) fs.unlinkSync(v);
                 });
+            }
+        });
+
+        it('should be okay when scanning a file with consecutive (or any) spaces in it while doing a local scan', async () => {
+            // Make sure we're forced to scan locally
+            clamscan = await resetClam({ clamdscan: { host: null, port: null, socket: null, localFallback: true }, debugMode: true  });
+
+            // Write virus file with spaces in its name
+            eicarGen.writeFileSpaced();
+
+            // Check if infected
+            try {
+                const { file, isInfected, viruses } = await clamscan.isInfected(spacedVirusFile);
+                expect(isInfected, 'isInfected should be true').to.be.true;
+                expect(file, 'spaced file name should be the same').to.eql(spacedVirusFile);
+                expect(viruses, 'viruses found should be an array').to.be.an('array');
+                expect(viruses, 'viruses found should have 1 element').to.have.length(1);
+                expect(viruses[0], 'element should match eicar').to.match(eicarSignatureRgx);
+                // eslint-disable-next-line no-useless-catch
+            } catch (err) {
+                throw err;
+            } finally {
+                if (fs.existsSync(spacedVirusFile)) fs.unlinkSync(spacedVirusFile);
             }
         });
     });
