@@ -1587,16 +1587,13 @@ class NodeClam {
 
             // Use this method when scanning using local binaries
             const localScan = async (allFiles) => {
-                // Get array of escaped file names
-                const items = allFiles.map((file) => file.replace(/ /g, '\\ '));
-
                 // Build the actual command purely for debugging purposes
-                const command = `${self.settings[self.scanner].path} ${self._buildClamArgs(items).join(' ')}`;
+                const command = `${self.settings[self.scanner].path} ${self._buildClamArgs(allFiles).join(' ')}`;
                 if (self.settings.debugMode)
                     if (self.settings.debugMode) console.log(`${self.debugLabel}: Configured clam command: ${command}`);
 
                 // Execute the clam binary with the proper flags
-                execFile(self.settings[self.scanner].path, self._buildClamArgs(items), (err, stdout, stderr) => {
+                execFile(self.settings[self.scanner].path, self._buildClamArgs(allFiles), (err, stdout, stderr) => {
                     if (self.settings.debugMode) console.log(`${this.debugLabel}: stdout:`, stdout);
 
                     // Exit code 1 just means "virus found". This is not an "error".
@@ -2004,10 +2001,7 @@ class NodeClam {
                             : resolve({ stderr, path, isInfected: null, goodFiles: [], badFiles: [], viruses: [] });
                     }
 
-                    const files = stdout
-                        .trim()
-                        .split(os.EOL)
-                        .map((p) => p.replace(/ /g, '\\ ').trim());
+                    const files = stdout.trim().split(os.EOL);
                     const { goodFiles, badFiles, viruses, errors } = await this.scanFiles(files, null, null);
                     return hasCb
                         ? endCb(null, goodFiles, badFiles, viruses)
@@ -2122,7 +2116,7 @@ class NodeClam {
                         }
 
                         // Get the proper recursive list of files from the path
-                        const files = stdout.split('\n').map((p) => p.replace(/ /g, '\\ '));
+                        const files = stdout.split('\n');
 
                         // Send files to remote server in parallel chunks of 10
                         const chunkSize = 10;

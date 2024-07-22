@@ -744,7 +744,7 @@ describe('isInfected', () => {
 
         it('should be okay when scanning a file with consecutive (or any) spaces in it while doing a local scan', async () => {
             // Make sure we're forced to scan locally
-            clamscan = await resetClam({ clamdscan: { host: null, port: null, socket: null, localFallback: true }, debugMode: true  });
+            clamscan = await resetClam({ clamdscan: { host: null, port: null, socket: null, localFallback: true }, debugMode: true, quarantineInfected: false });
 
             // Write virus file with spaces in its name
             eicarGen.writeFileSpaced();
@@ -1115,6 +1115,61 @@ describe('scanFiles', () => {
             );
         });
     });
+
+    describe('async/await api', () => {
+        it('should provide a list of viruses found if the any of the files in the list is infected', async () => {
+            eicarGen.writeFile();
+
+            try {
+                const { goodFiles, badFiles, errors, viruses } = await clamscan.scanFiles([badScanFile, goodScanFile]);
+                expect(goodFiles).to.not.be.empty;
+                expect(goodFiles).to.be.an('array');
+                expect(goodFiles).to.have.length(1);
+                expect(badFiles).to.not.be.empty;
+                expect(badFiles).to.be.an('array');
+                expect(badFiles).to.have.length(1);
+                expect(errors).to.be.eql({});
+                expect(viruses).to.not.be.empty;
+                expect(viruses).to.be.an('array');
+                expect(viruses).to.have.length(1);
+                expect(viruses[0]).to.match(eicarSignatureRgx);
+            } catch (err) {
+                throw err;
+            } finally {
+                if (fs.existsSync(badScanFile)) fs.unlinkSync(badScanFile);
+            }
+        });
+    });
+    
+    describe('edge cases', () => {
+        it('should be fine when one of the filenames has consecutive spaces in it when locally scanning', async () => {
+            // Make sure we're forced to scan locally
+            clamscan = await resetClam({ clamdscan: { host: null, port: null, socket: null, localFallback: true }, debugMode: true, quarantineInfected: false });
+
+            eicarGen.writeFile();
+            eicarGen.writeFileSpaced();
+
+            try {
+                const { goodFiles, badFiles, errors, viruses } = await clamscan.scanFiles([badScanFile, goodScanFile, spacedVirusFile]);
+                expect(goodFiles).to.not.be.empty;
+                expect(goodFiles).to.be.an('array');
+                expect(goodFiles).to.have.length(1);
+                expect(badFiles).to.not.be.empty;
+                expect(badFiles).to.be.an('array');
+                expect(badFiles).to.have.length(2);
+                expect(errors).to.be.eql({});
+                expect(viruses).to.not.be.empty;
+                expect(viruses).to.be.an('array');
+                expect(viruses).to.have.length(1);
+                expect(viruses[0]).to.match(eicarSignatureRgx);
+            } catch (err) {
+                throw err;
+            } finally {
+                if (fs.existsSync(badScanFile)) fs.unlinkSync(badScanFile);
+                if (fs.existsSync(spacedVirusFile)) fs.unlinkSync(spacedVirusFile);
+            }
+        });
+    });
 });
 
 describe('scanDir', () => {
@@ -1274,6 +1329,34 @@ describe('scanDir', () => {
     }).timeout(15000);
 
     // TODO: Write tests for file_callback
+
+    describe('edge cases', () => {
+        it('should work when falling back to local scan and there is a file with consecutive spaces in it', async () => {
+            // Make sure we're forced to scan locally
+            clamscan = await resetClam({ clamdscan: { host: null, port: null, socket: null, localFallback: true }, debugMode: true, quarantineInfected: false });
+
+            eicarGen.writeFile();
+            eicarGen.writeFileSpaced();
+    
+            try {
+                const { goodFiles, badFiles, viruses } = await clamscan.scanDir(badScanDir);
+
+                expect(viruses).to.not.be.empty;
+                expect(viruses).to.be.an('array');
+                expect(viruses).to.have.length(1);
+                expect(viruses[0]).to.match(eicarSignatureRgx);
+                expect(goodFiles).to.be.an('array');
+                expect(goodFiles).to.have.length(0);
+                expect(badFiles).to.be.an('array');
+                expect(badFiles).to.have.length(2);
+            } catch (err) {
+                throw err;
+            } finally {
+                if (fs.existsSync(badScanFile)) fs.unlinkSync(badScanFile);
+                if (fs.existsSync(spacedVirusFile)) fs.unlinkSync(spacedVirusFile);
+            }
+        });
+    })
 });
 
 describe('scanStream', () => {
