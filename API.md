@@ -14,6 +14,15 @@ chunks into the correct format for a ClamAV socket.</p>
 </dd>
 </dl>
 
+## Functions
+
+<dl>
+<dt><a href="#getFiles">getFiles(dir, [recursive])</a> ⇒ <code>Array</code></dt>
+<dd><p>Gets a listing of all files (no directories) within a given path.
+By default, it will retrieve files recursively.</p>
+</dd>
+</dl>
+
 <a name="NodeClam"></a>
 
 ## NodeClam
@@ -334,11 +343,11 @@ method also allows for non-recursive scanning with the clamdscan binary.
 **Example**  
 ```js
 // Callback Method
-clamscan.scanDir('/some/path/to/scan', (err, goodFiles, badFiles, viruses) {
+clamscan.scanDir('/some/path/to/scan', (err, goodFiles, badFiles, viruses, numGoodFiles) {
     if (err) return console.error(err);
 
     if (badFiles.length > 0) {
-        console.log(`${path} was infected. The offending files (${badFiles.join (', ')}) have been quarantined.`);
+        console.log(`${path} was infected. The offending files (${badFiles.map(v => `${v.file} (${v.virus})`).join (', ')}) have been quarantined.`);
         console.log(`Viruses Found: ${viruses.join(', ')}`);
     } else {
         console.log('Everything looks good! No problems here!.');
@@ -385,9 +394,9 @@ rs.push('barrrrr');
 rs.push(null);
 
 // Callback Example
-clamscan.scanStream(stream, (err, isInfected) => {
+clamscan.scanStream(stream, (err, { isInfected, viruses }) => {
     if (err) return console.error(err);
-    if (isInfected) return console.log('Stream is infected! Booo!');
+    if (isInfected) return console.log('Stream is infected! Booo!', viruses);
     console.log('Stream is not infected! Yay!');
 });
 
@@ -460,4 +469,18 @@ This will flush out the stream when all data has been received.
 | Param | Type | Description |
 | --- | --- | --- |
 | cb | <code>function</code> | What to do when done |
+
+<a name="getFiles"></a>
+
+## getFiles(dir, [recursive]) ⇒ <code>Array</code>
+Gets a listing of all files (no directories) within a given path.
+By default, it will retrieve files recursively.
+
+**Kind**: global function  
+**Returns**: <code>Array</code> - - List of all requested path files  
+
+| Param | Type | Default | Description |
+| --- | --- | --- | --- |
+| dir | <code>string</code> |  | The directory to get all files of |
+| [recursive] | <code>boolean</code> | <code>true</code> | If true (default), get all files recursively; False: only get files directly in path |
 
