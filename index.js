@@ -789,11 +789,11 @@ class NodeClam {
             }
 
             // Parse out the name of the virus(es) found...
-            const viruses = result
+            const viruses = Array.from(new Set(result
                 // eslint-disable-next-line no-control-regex
                 .split(/(\u0000|[\r\n])/)
                 .map((v) => (/:\s+(.+)FOUND$/gm.test(v) ? v.replace(/(.+:\s+)(.+)FOUND/gm, '$2').trim() : null))
-                .filter((v) => !!v);
+                .filter((v) => !!v)));
 
             return { isInfected: true, viruses, file, resultString: result, timeout };
         }
@@ -1907,11 +1907,11 @@ class NodeClam {
      * @returns {Promise<object>} Object like: `{ path: String, isInfected: Boolean, goodFiles: Array, badFiles: Array, viruses: Array }`
      * @example
      * // Callback Method
-     * clamscan.scanDir('/some/path/to/scan', (err, goodFiles, badFiles, viruses) {
+     * clamscan.scanDir('/some/path/to/scan', (err, goodFiles, badFiles, viruses, numGoodFiles) {
      *     if (err) return console.error(err);
      *
      *     if (badFiles.length > 0) {
-     *         console.log(`${path} was infected. The offending files (${badFiles.join (', ')}) have been quarantined.`);
+     *         console.log(`${path} was infected. The offending files (${badFiles.map(v => `${v.file} (${v.virus})`).join (', ')}) have been quarantined.`);
      *         console.log(`Viruses Found: ${viruses.join(', ')}`);
      *     } else {
      *         console.log('Everything looks good! No problems here!.');
@@ -2034,7 +2034,6 @@ class NodeClam {
             else if (typeof fileCb !== 'function' || !hasCb) {
                 // Scan locally via socket (either TCP or Unix socket)
                 // This is much simpler/faster process--potentially even more with MULTISCAN enabled)
-
                 if (
                     this.settings.clamdscan.socket ||
                     (this.settings.clamdscan.port && (!this.settings.clamdscan.host || this._isLocalHost()))
@@ -2048,10 +2047,10 @@ class NodeClam {
 
                         if (this.settings.clamdscan.multiscan === true) {
                             // Use Multiple threads (faster)
-                            client.write(`MULTISCAN ${path} `);
+                            client.write(`MULTISCAN ${path}`);
                         } else {
                             // Use single or default # of threads (potentially slower)
-                            client.write(`SCAN ${path} `);
+                            client.write(`CONTSCAN ${path}`);
                         }
 
                         // Where to buffer string response (not a real "Buffer", per se...)
@@ -2068,8 +2067,8 @@ class NodeClam {
                             .on('end', async () => {
                                 if (this.settings.debugMode)
                                     console.log(`${this.debugLabel}: Received response from remote clamd service.`);
-                                const response = Buffer.concat(chunks);
 
+                                const response = Buffer.concat(chunks);
                                 const result = this._processResult(response.toString(), path);
                                 if (result instanceof Error) {
                                     // Fallback to local if that's an option
@@ -2084,12 +2083,31 @@ class NodeClam {
                                 // Fully close the client
                                 client.end();
 
+                                if (this.settings.debugMode) console.log(`${this.debugLabel}: Results: `, result);
                                 const { isInfected, viruses } = result;
+
+                                // If the path is infected, build out list of infected files
+                                let badFiles = [];
+                                if (isInfected) {
+                                    badFiles = Array.from(new Set(result.resultString.split(os.EOL).map(v => {
+                                        const [file, virus] = v.replace(/ FOUND$/, '').split(': ');
+                                        return { file, virus };
+                                    })));
+                                }
+
+                                // Having a list of good files could use up all available memory if a big enough
+                                // directory is scanned. Just return the scanned path if all files are good.
                                 const goodFiles = isInfected ? [] : [path];
-                                const badFiles = isInfected ? [path] : [];
+
+                                // Get a count of all the good files since that should be easy enough...
+                                const numGoodFiles = (await getFiles(path)).length - badFiles.length;
+
+                                if (this.settings.debugMode) console.log(`${this.debugLabel}: Bad Files: `, badFiles);
+                                if (this.settings.debugMode) console.log(`${this.debugLabel}: # Good Files: `, numGoodFiles);
+
                                 return hasCb
-                                    ? endCb(null, goodFiles, badFiles, viruses)
-                                    : resolve({ path, isInfected, goodFiles, badFiles, viruses });
+                                    ? endCb(null, goodFiles, badFiles, viruses, numGoodFiles)
+                                    : resolve({ path, isInfected, goodFiles, badFiles, viruses, numGoodFiles });
                             });
                     } catch (e) {
                         const err = new NodeClamError(

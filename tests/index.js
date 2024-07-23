@@ -1255,7 +1255,7 @@ describe('scanDir', () => {
     });
 
     it('should supply badFiles array with scanned path when directory has infected files', (done) => {
-        clamscan.settings.scanRecursively = true;
+        // clamscan.settings.scanRecursively = true;
         eicarGen.writeFile();
         clamscan.scanDir(badScanDir, (err, goodFiles, badFiles) => {
             // if (err) console.error(err);
@@ -1290,34 +1290,37 @@ describe('scanDir', () => {
     });
 
     it('should reply with all the good files, bad files, and viruses from a multi-level directory with some good files and some bad files', (done) => {
-        clamscan.settings.scanRecursively = false;
         eicarGen.writeMixed();
 
-        clamscan.scanDir(mixedScanDir, (err, goodFiles, badFiles, viruses) => {
+        clamscan.settings.scanRecursively = true;
+        // clamscan.settings.debugMode = true;
+
+        clamscan.scanDir(mixedScanDir, (err, goodFiles, badFiles, viruses, numGoodFiles) => {
             check(done, () => {
                 const ignoreFiles = ['.DS_Store'].map((v) => `${mixedScanDir}/${v}`);
                 goodFiles = goodFiles.filter((v) => !ignoreFiles.includes(v));
-                console.log('Good Files: ', mixedScanDir, goodFiles);
+                // console.log('Good Files: ', mixedScanDir, goodFiles);
+                // console.log('Bad Files: ', mixedScanDir, badFiles);
 
                 expect(err, 'scanDir should not return error').to.not.be.instanceof(Error);
 
+                const validBadFiles = [
+                    `${mixedScanDir}/folder1/bad_file_1.txt`,
+                    `${mixedScanDir}/folder2/bad_file_2.txt`,
+                ];
+
                 expect(badFiles, 'bad files should be array').to.be.an('array');
                 expect(badFiles, 'bad files should have 2 items').to.have.length(2);
-                expect(badFiles, 'bad files should include bad_file_1.txt').to.include(
-                    `${mixedScanDir}/folder1/bad_file_1.txt`
+                expect(validBadFiles, 'bad files should include bad_file_1.txt').to.include(
+                    badFiles[0].file
                 );
-                expect(badFiles, 'bad files should include bad_file_2.txt').to.include(
-                    `${mixedScanDir}/folder2/bad_file_2.txt`
+                expect(validBadFiles, 'bad files should include bad_file_2.txt').to.include(
+                    badFiles[1].file
                 );
 
                 expect(goodFiles, 'good files should be array').to.be.an('array');
-                expect(goodFiles, 'good files should have 3 items').to.have.length(2);
-                expect(goodFiles, 'good files include good_file_1.txt').to.include(
-                    `${mixedScanDir}/folder1/good_file_1.txt`
-                );
-                expect(goodFiles, 'good files should include good_file_2.txt').to.include(
-                    `${mixedScanDir}/folder2/good_file_2.txt`
-                );
+                expect(goodFiles, 'good files should be empty').to.have.length(0);
+                expect(numGoodFiles, 'num good files should be 2').to.be.eql(2);
 
                 expect(viruses, 'viruses should not be empty').to.not.be.empty;
                 expect(viruses, 'viruses should be array').to.be.an('array');

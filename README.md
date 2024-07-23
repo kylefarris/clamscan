@@ -352,10 +352,13 @@ If you choose to supply a `fileCallback`, the scan will run a little bit slower 
 
 ### NOTE
 
-The `goodFiles` and `badFiles` parameters of the `endCallback` callback in this method will only contain the directories that were scanned in **all** **but** the following scenarios:
+The `goodFiles` parameter of the `endCallback` callback in this method will only contain the directory that was scanned in **all** **but** the following scenarios:
 
 - A `fileCallback` callback is provided, and `scanRecursively` is set to _true_.
 - The scanner is set to `clamdscan` and `scanRecursively` is set to _false_.
+- The scanned directory contains 1 or more viruses. In this case, the `goodFiles` array will be empty.
+
+There will, however, be a total count of the good files which is calculated by determining the total number of files scanned and subtracting the number of bad files from that count. We simply can't provide a list of all good files due to the potential large memory usage implications of scanning a directory with, for example, _millions_ of files.
 
 ### Parameters
 
@@ -363,9 +366,10 @@ The `goodFiles` and `badFiles` parameters of the `endCallback` callback in this 
 - `endCallback` (function) (optional) Will be called when the entire directory has been completely scanned. This callback takes 3 parameters:
 
   - `err` (object) A standard javascript Error object (null if no error)
-  - `goodFiles` (array) List of the full paths to all files that are _clean_.
+  - `goodFiles` (array) An *empty* array if path is _infected_. An array containing the directory name that was passed in if _clean_.
   - `badFiles` (array) List of the full paths to all files that are _infected_.
   - `viruses` (array) List of all the viruses found (feature request: associate to the bad files).
+  - `numGoodFiles` (number) Number of files that were found to be clean.
 
 - `fileCallback` (function) (optional) Will be called after each file in the directory has been scanned. This is useful for keeping track of the progress of the scan. This callback takes 3 parameters:
 
@@ -381,21 +385,22 @@ The `goodFiles` and `badFiles` parameters of the `endCallback` callback in this 
 
     - `path` (string) The original `dir_path` passed into the `scanDir` method.
     - `isInfected` (boolean) **True**: File is infected; **False**: File is clean. **NULL**: Unable to scan.
-    - `goodFiles` (array) List of the full paths to all files that are _clean_.
+    - `goodFiles` (array) An *empty* array if path is _infected_. An array containing the directory name that was passed in if _clean_.
     - `badFiles` (array) List of the full paths to all files that are _infected_.
     - `viruses` (array) List of all the viruses found (feature request: associate to the bad files).
+    - `numGoodFiles` (number) Number of files that were found to be clean.
 
 ### Callback Example
 
 ```javascript
-clamscan.scanDir('/some/path/to/scan', (err, goodFiles, badFiles, viruses) {
+clamscan.scanDir('/some/path/to/scan', (err, goodFiles, badFiles, viruses, numGoodFiles) {
     if (err) return console.error(err);
 
     if (badFiles.length > 0) {
         console.log(`${path} was infected. The offending files (${badFiles.join (', ')}) have been quarantined.`);
         console.log(`Viruses Found: ${viruses.join(', ')}`);
     } else {
-        console.log("Everything looks good! No problems here!.");
+        console.log(`${goodFiles[0]} looks good! ${numGoodFiles} file scanned and no problems found!.`);
     }
 });
 ```
@@ -404,7 +409,7 @@ clamscan.scanDir('/some/path/to/scan', (err, goodFiles, badFiles, viruses) {
 
 ```javascript
 clamscan.scanDir('/some/path/to/scan').then(results => {
-    const { path, isInfected, goodFiles, badFiles, viruses } = results;
+    const { path, isInfected, goodFiles, badFiles, viruses, numGoodFiles } = results;
     //...
 }).catch(err => {
     return console.error(err);
@@ -414,7 +419,7 @@ clamscan.scanDir('/some/path/to/scan').then(results => {
 ### Async/Await Example
 
 ```javascript
-const { path, isInfected, goodFiles, badFiles, viruses } = await clamscan.scanDir('/some/path/to/scan');
+const { path, isInfected, goodFiles, badFiles, viruses, numGoodFiles } = await clamscan.scanDir('/some/path/to/scan');
 ```
 
 <a name="scanFiles"></a>
