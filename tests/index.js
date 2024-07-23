@@ -744,7 +744,7 @@ describe('isInfected', () => {
 
         it('should be okay when scanning a file with consecutive (or any) spaces in it while doing a local scan', async () => {
             // Make sure we're forced to scan locally
-            clamscan = await resetClam({ clamdscan: { host: null, port: null, socket: null, localFallback: true }, debugMode: true, quarantineInfected: false });
+            clamscan = await resetClam({ clamdscan: { host: null, port: null, socket: null, localFallback: true }, debugMode: false, quarantineInfected: false });
 
             // Write virus file with spaces in its name
             eicarGen.writeFileSpaced();
@@ -1144,7 +1144,7 @@ describe('scanFiles', () => {
     describe('edge cases', () => {
         it('should be fine when one of the filenames has consecutive spaces in it when locally scanning', async () => {
             // Make sure we're forced to scan locally
-            clamscan = await resetClam({ clamdscan: { host: null, port: null, socket: null, localFallback: true }, debugMode: true, quarantineInfected: false });
+            clamscan = await resetClam({ clamdscan: { host: null, port: null, socket: null, localFallback: true }, debugMode: false, quarantineInfected: false });
 
             eicarGen.writeFile();
             eicarGen.writeFileSpaced();
@@ -1255,8 +1255,10 @@ describe('scanDir', () => {
     });
 
     it('should supply badFiles array with scanned path when directory has infected files', (done) => {
+        clamscan.settings.scanRecursively = true;
         eicarGen.writeFile();
         clamscan.scanDir(badScanDir, (err, goodFiles, badFiles) => {
+            // if (err) console.error(err);
             check(done, () => {
                 expect(err).to.not.be.instanceof(Error);
                 expect(badFiles).to.be.an('array');
@@ -1333,7 +1335,7 @@ describe('scanDir', () => {
     describe('edge cases', () => {
         it('should work when falling back to local scan and there is a file with consecutive spaces in it', async () => {
             // Make sure we're forced to scan locally
-            clamscan = await resetClam({ clamdscan: { host: null, port: null, socket: null, localFallback: true }, debugMode: true, quarantineInfected: false });
+            clamscan = await resetClam({ clamdscan: { host: null, port: null, socket: null, localFallback: true }, debugMode: false, quarantineInfected: false });
 
             eicarGen.writeFile();
             eicarGen.writeFileSpaced();
