@@ -1992,16 +1992,7 @@ class NodeClam {
             // Get all files recursively using `scanFiles`
             if (this.settings.scanRecursively === true && (typeof fileCb === 'function' || !hasCb)) {
                 try {
-                    const { stdout, stderr } = await cpExecFile('find', [path]);
-
-                    if (stderr) {
-                        if (this.settings.debugMode) console.log(`${this.debugLabel}: `, stderr);
-                        return hasCb
-                            ? endCb(null, [], [])
-                            : resolve({ stderr, path, isInfected: null, goodFiles: [], badFiles: [], viruses: [] });
-                    }
-
-                    const files = stdout.trim().split(os.EOL);
+                    const files = await getFiles(path, true);
                     const { goodFiles, badFiles, viruses, errors } = await this.scanFiles(files, null, null);
                     return hasCb
                         ? endCb(null, goodFiles, badFiles, viruses)
@@ -2118,23 +2109,14 @@ class NodeClam {
                     }
                 }
 
-                // Scan path recursively using remote host/port and TCP protocol (must stream every single file to it...)
+                // Scan path using remote host/port and TCP protocol (must stream every single file to it...)
                 // WARNING: This is going to be really slow
                 else if (this.settings.clamdscan.port && !this._isLocalHost()) {
                     const results = [];
 
                     try {
-                        const { stdout, stderr } = await cpExecFile('find', [path]);
-
-                        if (stderr) {
-                            if (this.settings.debugMode) console.log(`${this.debugLabel}: `, stderr);
-                            return hasCb
-                                ? endCb(null, [], [])
-                                : resolve({ stderr, path, isInfected: null, goodFiles: [], badFiles: [], viruses: [] });
-                        }
-
-                        // Get the proper recursive list of files from the path
-                        const files = stdout.split('\n');
+                        // Get all files in the directory (potentially recursively)
+                        const files = await getFiles(path, this.settings.scanRecursively);
 
                         // Send files to remote server in parallel chunks of 10
                         const chunkSize = 10;
