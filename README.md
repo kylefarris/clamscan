@@ -600,13 +600,11 @@ const { isInfected, viruses } = await clamscan.scanStream(stream);
 
 ## .passthrough()
 
-The `passthrough` method returns a PassthroughStream object which allows you pipe a ReadbleStream through it and on to another output. In the case of this module's passthrough implementation, it's actually forking the data to also go to ClamAV via TCP or Domain Sockets. Each data chunk is only passed on to the output if that chunk was successfully sent to and received by ClamAV. The PassthroughStream object returned from this method has a special event that is emitted when ClamAV finishes scanning the streamed data so that you can decide if there's anything you need to do with the final output destination (ex. delete a file or S3 object).
+The `passthrough` method returns a PassthroughStream object which allows you pipe a ReadbleStream through it and on to another output. In the case of this module's passthrough implementation, it's actually forking the data to also go to ClamAV via TCP or Domain Sockets. Each data chunk is only passed on to the output if that chunk was successfully sent to and received by ClamAV. The PassthroughStream object returned from this method contains a 'result' property which will be complete at the end of the pipeline and will contain the elements linked to the scanned file. In the case of an infected file, you can decide if there's anything to be done after the pipeline has been completed (ex. delete a file into I/O disk or S3 object).
 
-In typical, non-passthrough setups, a file is uploaded to the local filesytem and then subsequently scanned. With that setup, you have to wait for the upload to complete _and then wait again_ for the scan to complete. Using this module's `passthrough` method, you could theoretically speed up user uploads intended to be scanned by up to 2x because the files are simultaneously scanned and written to any WriteableStream output (examples: filesystem, S3, gzip, etc...).
+With this method, the file is both transmitted via TCP socket to clamav and also piped in an output. However, clamAV waits to collect the file chunks before scanning the entire file.
 
 As for these theoretical gains, your mileage my vary and I'd love to hear feedback on this to see where things can still be improved.
-
-Please note that this method is different than all the others in that it returns a PassthroughStream object and does not support a Promise or Callback API. This makes sense once you see the example below (a practical working example can be found in the examples directory of this module):
 
 ### Example
 
@@ -614,40 +612,40 @@ Please note that this method is different than all the others in that it returns
 const NodeClam = require('clamscan');
 
 // You'll need to specify your socket or TCP connection info
-const clamscan = new NodeClam().init({
-    clamdscan: {
-        socket: '/var/run/clamd.scan/clamd.sock',
-        host: '127.0.0.1',
-        port: 3310,
+(async() => {
+    const clamscan = new NodeClam().init({
+        clamdscan: {
+            socket: '/var/run/clamd.scan/clamd.sock',
+            host: '127.0.0.1',
+            port: 3310,
+        }
+    });
+    
+    // For example's sake, we're using the Axios module
+    const axios = require('Axios');
+    
+    // Get a readable stream for a URL request
+    const input = axios.get(some_url);
+    
+    // Create a writable stream to a local file
+    const output = fs.createWriteStream(some_local_file);
+    
+    // Get instance of this module's PassthroughStream object
+    const av = await clamscan.passthrough();
+    
+    // Send output of Axios stream to ClamAV.
+    // Send output of Axios to `some_local_file` if ClamAV receives data successfully
+    await pipeline(input, av, output)
+    const { isInfected, viruses, timeout } = av.result;
+
+    if (isInfected) {
+        throw new Error(`...${viruses.join("|")}`);
     }
-});
 
-// For example's sake, we're using the Axios module
-const axios = require('Axios');
-
-// Get a readable stream for a URL request
-const input = axios.get(some_url);
-
-// Create a writable stream to a local file
-const output = fs.createWriteStream(some_local_file);
-
-// Get instance of this module's PassthroughStream object
-const av = clamscan.passthrough();
-
-// Send output of Axios stream to ClamAV.
-// Send output of Axios to `some_local_file` if ClamAV receives data successfully
-input.pipe(av).pipe(output);
-
-// What happens when scan is completed
-av.on('scan-complete', result => {
-   const { isInfected, viruses } = result;
-   // Do stuff if you want
-});
-
-// What happens when data has been fully written to `output`
-output.on('finish', () => {
-    // Do stuff if you want
-});
+    if (timeout) {
+        throw new Error("...");
+    }
+})()
 
 // NOTE: no errors (or other events) are being handled in this example but standard errors will be emitted according to NodeJS's Stream specifications
 ```

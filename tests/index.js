@@ -1,12 +1,14 @@
 /* eslint-disable no-unused-vars */
 /* eslint-env mocha */
 const fs = require('fs');
+const { pipeline } = require("stream/promises")
+const fsPromise = require("fs/promises")
 const path = require('path');
 const { Agent } = require('https');
 const axios = require('axios');
 const chai = require('chai');
 const { promisify } = require('util');
-const { PassThrough, Readable } = require('stream');
+const { PassThrough, Readable, Writable } = require('stream');
 const chaiAsPromised = require('chai-as-promised');
 const eicarGen = require('./eicargen');
 
@@ -1584,59 +1586,40 @@ describe('passthrough', () => {
                     port: 65535,
                 },
             });
-
-            const input = fs.createReadStream(goodScanFile);
-            const output = fs.createWriteStream(passthruFile);
-            const av = clamav.passthrough();
-
-            input.pipe(av).pipe(output);
-            if (fs.existsSync(passthruFile)) fs.unlinkSync(passthruFile);
-
-            av.on('error', (err) => {
-                expect(err).to.be.instanceof(Error);
-            });
         } catch (err) {
             expect(err).to.be.instanceof(Error);
         }
     });
 
-    it('should fire a "scan-complete" event when the stream has been fully scanned and provide a result object that contains "isInfected" and "viruses" properties', (done) => {
+    it('should get a "result" getter with the required properties after complete file scanning', async () => {
         const input = eicarGen.getStream();
         const output = fs.createWriteStream(passthruFile);
-        const av = clamscan.passthrough();
+        const av = await clamscan.passthrough();
 
-        input.pipe(av).pipe(output);
+        await pipeline(input, av, output)
         if (fs.existsSync(passthruFile)) fs.unlinkSync(passthruFile);
 
-        av.on('scan-complete', (result) => {
-            check(done, () => {
-                expect(result)
-                    .to.be.an('object')
-                    .that.has.all.keys('isInfected', 'viruses', 'file', 'resultString', 'timeout');
-            });
-        });
+        expect(av.result)
+            .to.be.an('object')
+            .that.has.all.keys('isInfected', 'viruses', 'file', 'resultString', 'timeout');
     });
 
-    it('should indicate that a stream was infected in the "scan-complete" event if the stream DOES contain a virus', (done) => {
+    it('should indicate that a stream was infected in the "result" property if the stream DOES contain a virus', async () => {
         const input = eicarGen.getStream();
         const output = fs.createWriteStream(passthruFile);
-        const av = clamscan.passthrough();
+        const av = await clamscan.passthrough();
 
-        input.pipe(av).pipe(output);
+        await pipeline(input, av, output)
         if (fs.existsSync(passthruFile)) fs.unlinkSync(passthruFile);
 
-        av.on('scan-complete', (result) => {
-            check(done, () => {
-                const { isInfected, viruses } = result;
-                expect(isInfected).to.be.a('boolean');
-                expect(isInfected).to.eql(true);
-                expect(viruses).to.be.an('array');
-                expect(viruses).to.have.length(1);
-            });
-        });
+        const { isInfected, viruses } = av.result
+        expect(isInfected).to.be.a('boolean');
+        expect(isInfected).to.eql(true);
+        expect(viruses).to.be.an('array');
+        expect(viruses).to.have.length(1);
     });
 
-    it('should indicate that a stream was NOT infected in the "scan-complete" event if the stream DOES NOT contain a virus', async () => {
+    it('should indicate that a stream was NOT infected in the "result" property if the stream DOES NOT contain a virus', async () => {
         const agent = new Agent({ rejectUnauthorized: false });
         const input = await axios({
             method: 'get',
@@ -1645,88 +1628,79 @@ describe('passthrough', () => {
             httpsAgent: agent,
         });
         const output = fs.createWriteStream(passthruFile);
-        const av = clamscan.passthrough();
+        const av = await clamscan.passthrough();
 
-        input.data.pipe(av).pipe(output);
+        await pipeline(input.data, av, output)
         if (fs.existsSync(passthruFile)) fs.unlinkSync(passthruFile);
 
-        av.on('scan-complete', (result) => {
-            const { isInfected, viruses } = result;
-            expect(isInfected).to.be.a('boolean');
-            expect(isInfected).to.eql(false);
-            expect(viruses).to.be.an('array');
-            expect(viruses).to.have.length(0);
-        });
+        const { isInfected, viruses } = av.result;
+        expect(isInfected).to.be.a('boolean');
+        expect(isInfected).to.eql(false);
+        expect(viruses).to.be.an('array');
+        expect(viruses).to.have.length(0);
     });
 
-    it('should (for example) have created the file that the stream is being piped to', (done) => {
+    it('should (for example) have created the file that the stream is being piped to', async () => {
         const input = fs.createReadStream(goodScanFile);
         const output = fs.createWriteStream(passthruFile);
-        const av = clamscan.passthrough();
+        const av = await clamscan.passthrough();
 
-        input.pipe(av).pipe(output);
+        await pipeline(input, av, output);
 
-        output.on('finish', () => {
-            Promise.all([
-                expect(fsState(passthruFile), 'get passthru file stats').to.not.be.rejectedWith(Error),
-                expect(fsReadfile(passthruFile), 'get passthru file').to.not.be.rejectedWith(Error),
-            ]).should.notify(() => {
-                if (fs.existsSync(passthruFile)) fs.unlinkSync(passthruFile);
-                done();
-            });
-        });
+        await expect(fsPromise.access(passthruFile)).to.not.be.rejected;
     });
 
-    it('should have cleanly piped input to output', () => {
+    it('should have cleanly piped input to output', async () => {
         const input = fs.createReadStream(goodScanFile);
         const output = fs.createWriteStream(passthruFile);
-        const av = clamscan.passthrough();
+        const av = await clamscan.passthrough();
 
-        input.pipe(av).pipe(output);
+        await pipeline(input, av, output)
 
-        output.on('finish', () => {
-            const origFile = fs.readFileSync(goodScanFile);
-            const outFile = fs.readFileSync(passthruFile);
-            if (fs.existsSync(passthruFile)) fs.unlinkSync(passthruFile);
+        const [origFile, outFile] = await Promise.all([
+            fsPromise.readFile(goodScanFile),
+            fsPromise.readFile(passthruFile),
+        ])
 
-            expect(origFile).to.eql(outFile);
-        });
+        expect(origFile).to.eql(outFile);
     });
 
     // https://github.com/kylefarris/clamscan/issues/82
-    it('should not throw multiple callback error', (done) => {
+    it('should not throw multiple callback error', async () => {
         // To reliably reproduce the issue in the broken code, it's important that this is an async generator
         // and it emits some chunks larger than the default highWaterMark of 16 KB.
         // eslint-disable-next-line require-jsdoc
-        async function* gen(i = 10) {
+        let i = 10;
+        async function* gen() {
             while (i < 25) {
                 i += 1;
                 yield Buffer.from(new Array(i * 1024).fill());
             }
         }
-
-        const input = Readable.from(gen());
-        const av = clamscan.passthrough();
+        const av = await clamscan.passthrough();
+        const output = new Writable({
+            write(chunk, _, callback) {
+                callback(null, chunk)
+            }
+        })
 
         // The failure case will throw an error and not finish
-        input.pipe(av).on('end', done).resume();
+        await pipeline(gen, av, output)
     });
 
     if (!process.env.CI) {
-        it('should handle a 0-byte file', () => {
+        it('should handle a 0-byte file', async () => {
             const input = fs.createReadStream(emptyFile);
             const output = fs.createWriteStream(passthruFile);
-            const av = clamscan.passthrough();
+            const av = await clamscan.passthrough();
 
-            input.pipe(av).pipe(output);
-
-            output.on('finish', () => {
-                const origFile = fs.readFileSync(emptyFile);
-                const outFile = fs.readFileSync(passthruFile);
-                if (fs.existsSync(passthruFile)) fs.unlinkSync(passthruFile);
-
-                expect(origFile).to.eql(outFile);
-            });
+            await pipeline(input, av, output)
+            const [origFile, outFile] = await Promise.all([
+                fsPromise.readFile(emptyFile),
+                fsPromise.readFile(passthruFile),
+            ])
+    
+            expect(origFile).to.eql(outFile);
         });
     }
 });
