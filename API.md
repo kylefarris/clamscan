@@ -37,6 +37,7 @@ NodeClam class definition. To cf
     * [.getVersion([cb])](#NodeClam+getVersion) ⇒ <code>Promise.&lt;string&gt;</code>
     * [.isInfected(file, [cb])](#NodeClam+isInfected) ⇒ <code>Promise.&lt;object&gt;</code>
     * [.passthrough()](#NodeClam+passthrough) ⇒ <code>Transform</code>
+    * [.ping([cb])](#NodeClam+ping) ⇒ <code>Promise.&lt;object&gt;</code>
     * [.scanFile(file, [cb])](#NodeClam+scanFile) ⇒ <code>Promise.&lt;object&gt;</code>
     * [.scanFiles(files, [endCb], [fileCb])](#NodeClam+scanFiles) ⇒ <code>Promise.&lt;object&gt;</code>
     * [.scanDir(path, [endCb], [fileCb])](#NodeClam+scanDir) ⇒ <code>Promise.&lt;object&gt;</code>
@@ -250,6 +251,44 @@ output.on('finish', () => {
 
 // NOTE: no errors (or other events) are being handled in this example but standard errors will be emitted according to NodeJS's Stream specifications
 ```
+
+<a name="NodeClam+ping"></a>
+
+### nodeClam.ping([cb]) ⇒ <code>Promise.&lt;object&gt;</code>
+This method allows you to ping the socket. It supports a callback and Promise API.
+If no callback is supplied, a Promise will be returned.
+
+**Kind**: instance method of [<code>NodeClam</code>](#NodeClam)  
+**Returns**: <code>Promise.&lt;object&gt;</code> - A copy of the Socket/TCP client.
+
+| Param | Type | Description |
+| --- | --- | --- |
+| [cb] | <code>function</code> | What to do after the ping |
+
+**Example**  
+```js
+// Callback Example
+clamscan.ping((err, client) => {
+    if (err) return console.error(err);
+
+    console.log("ClamAV client is working");
+    client.end();
+});
+
+// Promise Example
+clamscan.ping().then(client => {
+    console.log("ClamAV client is working");
+    client.end();
+}).then(err => {
+    console.error(err);
+});
+
+// Async/Await Example
+const client = await clamscan.ping();
+console.log("ClamAV client is working");
+client.end();
+```
+
 <a name="NodeClam+scanFile"></a>
 
 ### nodeClam.scanFile(file, [cb]) ⇒ <code>Promise.&lt;object&gt;</code>

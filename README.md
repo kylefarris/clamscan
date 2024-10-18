@@ -31,6 +31,7 @@ If you are migrating from v0.8.5 or less to v1.0.0 or greater, please read the [
   - [scanFiles](#scanFiles)
   - [scanStream](#scanStream)
   - [passthrough](#passthrough)
+  - [ping](#ping)
 - [Contribute](#contribute)
 - [Resources used to help develop this module](#resources-used-to-help-develop-this-module)
 
@@ -650,6 +651,66 @@ output.on('finish', () => {
 });
 
 // NOTE: no errors (or other events) are being handled in this example but standard errors will be emitted according to NodeJS's Stream specifications
+```
+
+<a name="ping"></a>
+
+## .ping()
+
+This method checks to see if the remote/local socket is working. It supports a callback and Promise API. If no callback is supplied, a Promise will be returned. This method can be used for healthcheck purposes and is already implicitly used during scan.
+
+### Parameters
+
+- `callback` (function) (optional) Will be called after the ping:
+
+  - `err` (object or null) A standard JavaScript Error object (null if no error)
+  - `client` (object) A copy of the Socket/TCP client
+
+### Returns
+
+- Promise
+
+  - Promise resolution returns: `client` (object): A copy of the Socket/TCP client
+
+### Examples
+
+**Callback Example:**
+
+```javascript
+const NodeClam = require('clamscan');
+
+// You'll need to specify your socket or TCP connection info
+const clamscan = new NodeClam().init({
+    clamdscan: {
+        socket: '/var/run/clamd.scan/clamd.sock',
+        host: '127.0.0.1',
+        port: 3310,
+    }
+});
+
+clamscan.ping((err, client) => {
+    if (err) return console.error(err);
+    console.log('ClamAV is still working!');
+    client.end();
+});
+```
+
+**Promise Example:**
+
+```javascript
+clamscan.ping().then((client) => {
+    console.log('ClamAV is still working!');
+    client.end();
+}).catch(err => {
+    console.error(err);
+};
+```
+
+**Promise Example:**
+
+```javascript
+const client = await clamscan.ping();
+client.end();
 ```
 
 # Contribute
