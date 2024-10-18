@@ -326,7 +326,7 @@ class NodeClam {
                 if (this.settings.debugMode)
                     console.log(`${this.debugLabel}: Initially testing socket/tcp connection to clamscan server.`);
                 try {
-                    const client = await this._ping();
+                    const client = await this.ping();
                     client.end();
                     if (this.settings.debugMode)
                         console.log(`${this.debugLabel}: Established connection to clamscan server!`);
@@ -684,11 +684,10 @@ class NodeClam {
      * Quick check to see if the remote/local socket is working. Callback/Resolve
      * response is an instance to a ClamAV socket client.
      *
-     * @private
      * @param {Function} [cb] - What to do after the ping
      * @returns {Promise<object>} A copy of the Socket/TCP client
      */
-    _ping(cb) {
+    ping(cb) {
         let hasCb = false;
 
         // Verify second param, if supplied, is a function
@@ -704,7 +703,7 @@ class NodeClam {
         // eslint-disable-next-line consistent-return
         return new Promise(async (resolve, reject) => {
             try {
-                client = await this._initSocket('_ping');
+                client = await this._initSocket('ping');
 
                 if (this.settings.debugMode)
                     console.log(`${this.debugLabel}: Established connection to clamscan server!`);
