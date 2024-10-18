@@ -410,21 +410,21 @@ describe('_initSocket', () => {
     });
 });
 
-describe('_ping', () => {
+describe('ping', () => {
     let clamscan;
     beforeEach(async () => {
         clamscan = await resetClam();
     });
 
     it('should exist', () => {
-        should.exist(clamscan._ping);
+        should.exist(clamscan.ping);
     });
     it('should be a function', () => {
-        clamscan._ping.should.be.a('function');
+        clamscan.ping.should.be.a('function');
     });
 
     it('should respond with a socket client (Promise API)', async () => {
-        const client = await clamscan._ping();
+        const client = await clamscan.ping();
         expect(client).to.be.an('object');
         expect(client.readyState).to.eql('open');
         expect(client.writable).to.eql(true);
@@ -438,7 +438,7 @@ describe('_ping', () => {
     });
 
     it('should respond with a socket client (Callback API)', (done) => {
-        clamscan._ping((err, client) => {
+        clamscan.ping((err, client) => {
             check(done, () => {
                 expect(err).to.not.be.instanceof(Error);
                 expect(client).to.be.an('object');
@@ -1744,7 +1744,7 @@ if (process.env.CI) {
                     tls: true,
                 },
             });
-            (await clamscan._ping()).end();
+            (await clamscan.ping()).end();
         });
 
         it('Connects to clamd server via a TLS proxy on 127.0.0.1', async () => {
@@ -1756,7 +1756,7 @@ if (process.env.CI) {
                     tls: true,
                 },
             });
-            (await clamscan._ping()).end();
+            (await clamscan.ping()).end();
         });
 
         it('Connects to clamd server via a TLS proxy on ::1', async () => {
@@ -1768,7 +1768,7 @@ if (process.env.CI) {
                     tls: true,
                 },
             });
-            (await clamscan._ping()).end();
+            (await clamscan.ping()).end();
         });
 
         // it('Connects to clamd server via a TLS proxy on implicit localhost', async () => {
