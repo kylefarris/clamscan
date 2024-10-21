@@ -1844,17 +1844,17 @@ class NodeClam {
                                 }
                             }
                         }
-
-                        // Scan the files in the allFiles array
-                        return finishScan();
                     }
-                } else {
-                    // Just scan all the files
-                    allFiles = theFiles;
 
                     // Scan the files in the allFiles array
                     return finishScan();
                 }
+
+                // If not scanning recursively, just scan all the files
+                allFiles = theFiles;
+
+                // Scan the files in the allFiles array
+                return finishScan();
             };
 
             // If string is provided in files param, forgive them... create a single element array
