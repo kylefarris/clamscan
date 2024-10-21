@@ -2,7 +2,7 @@
 
 <dl>
 <dt><a href="#NodeClam">NodeClam</a></dt>
-<dd><p>NodeClam class definition. To cf</p>
+<dd><p>NodeClam class definition.</p>
 </dd>
 <dt><a href="#NodeClamError">NodeClamError</a></dt>
 <dd><p>Clamscan-specific extension of the Javascript Error object</p>
@@ -11,6 +11,15 @@
 <dt><a href="#NodeClamTransform">NodeClamTransform</a></dt>
 <dd><p>A NodeClam - specific Transform extension that coddles
 chunks into the correct format for a ClamAV socket.</p>
+</dd>
+</dl>
+
+## Members
+
+<dl>
+<dt><a href="#ping">ping</a> ⇒ <code>Promise.&lt;object&gt;</code></dt>
+<dd><p>Quick check to see if the remote/local socket is working. Callback/Resolve
+response is an instance to a ClamAV socket client.</p>
 </dd>
 </dl>
 
@@ -26,7 +35,7 @@ By default, it will retrieve files recursively.</p>
 <a name="NodeClam"></a>
 
 ## NodeClam
-NodeClam class definition. To cf
+NodeClam class definition.
 
 **Kind**: global class  
 
@@ -37,7 +46,6 @@ NodeClam class definition. To cf
     * [.getVersion([cb])](#NodeClam+getVersion) ⇒ <code>Promise.&lt;string&gt;</code>
     * [.isInfected(file, [cb])](#NodeClam+isInfected) ⇒ <code>Promise.&lt;object&gt;</code>
     * [.passthrough()](#NodeClam+passthrough) ⇒ <code>Transform</code>
-    * [.ping([cb])](#NodeClam+ping) ⇒ <code>Promise.&lt;object&gt;</code>
     * [.scanFile(file, [cb])](#NodeClam+scanFile) ⇒ <code>Promise.&lt;object&gt;</code>
     * [.scanFiles(files, [endCb], [fileCb])](#NodeClam+scanFiles) ⇒ <code>Promise.&lt;object&gt;</code>
     * [.scanDir(path, [endCb], [fileCb])](#NodeClam+scanDir) ⇒ <code>Promise.&lt;object&gt;</code>
@@ -56,6 +64,7 @@ Initialization method.
 
 **Kind**: instance method of [<code>NodeClam</code>](#NodeClam)  
 **Returns**: <code>Promise.&lt;object&gt;</code> - An initated instance of NodeClam  
+**Access**: public  
 
 | Param | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -126,6 +135,7 @@ Allows one to create a new instances of clamscan with new options.
 
 **Kind**: instance method of [<code>NodeClam</code>](#NodeClam)  
 **Returns**: <code>Promise.&lt;object&gt;</code> - A reset instance of NodeClam  
+**Access**: public  
 
 | Param | Type | Description |
 | --- | --- | --- |
@@ -139,6 +149,7 @@ Establish the clamav version of a local or remote clamav daemon.
 
 **Kind**: instance method of [<code>NodeClam</code>](#NodeClam)  
 **Returns**: <code>Promise.&lt;string&gt;</code> - - The version of ClamAV that is being interfaced with  
+**Access**: public  
 
 | Param | Type | Description |
 | --- | --- | --- |
@@ -166,6 +177,7 @@ be the most common use-case for this module.
 
 **Kind**: instance method of [<code>NodeClam</code>](#NodeClam)  
 **Returns**: <code>Promise.&lt;object&gt;</code> - Object like: `{ file: String, isInfected: Boolean, viruses: Array }`  
+**Access**: public  
 
 | Param | Type | Description |
 | --- | --- | --- |
@@ -209,6 +221,7 @@ destination (ex. delete a file or S3 object).
 
 **Kind**: instance method of [<code>NodeClam</code>](#NodeClam)  
 **Returns**: <code>Transform</code> - A Transform stream for piping a Readable stream into  
+**Access**: public  
 **Example**  
 ```js
 const NodeClam = require('clamscan');
@@ -251,44 +264,6 @@ output.on('finish', () => {
 
 // NOTE: no errors (or other events) are being handled in this example but standard errors will be emitted according to NodeJS's Stream specifications
 ```
-
-<a name="NodeClam+ping"></a>
-
-### nodeClam.ping([cb]) ⇒ <code>Promise.&lt;object&gt;</code>
-This method allows you to ping the socket. It supports a callback and Promise API.
-If no callback is supplied, a Promise will be returned.
-
-**Kind**: instance method of [<code>NodeClam</code>](#NodeClam)  
-**Returns**: <code>Promise.&lt;object&gt;</code> - A copy of the Socket/TCP client.
-
-| Param | Type | Description |
-| --- | --- | --- |
-| [cb] | <code>function</code> | What to do after the ping |
-
-**Example**  
-```js
-// Callback Example
-clamscan.ping((err, client) => {
-    if (err) return console.error(err);
-
-    console.log("ClamAV client is working");
-    client.end();
-});
-
-// Promise Example
-clamscan.ping().then(client => {
-    console.log("ClamAV client is working");
-    client.end();
-}).then(err => {
-    console.error(err);
-});
-
-// Async/Await Example
-const client = await clamscan.ping();
-console.log("ClamAV client is working");
-client.end();
-```
-
 <a name="NodeClam+scanFile"></a>
 
 ### nodeClam.scanFile(file, [cb]) ⇒ <code>Promise.&lt;object&gt;</code>
@@ -296,6 +271,7 @@ Just an alias to `isInfected`. See docs for that for usage examples.
 
 **Kind**: instance method of [<code>NodeClam</code>](#NodeClam)  
 **Returns**: <code>Promise.&lt;object&gt;</code> - Object like: `{ file: String, isInfected: Boolean, viruses: Array }`  
+**Access**: public  
 
 | Param | Type | Description |
 | --- | --- | --- |
@@ -315,6 +291,7 @@ of scanning many files or directories.
 
 **Kind**: instance method of [<code>NodeClam</code>](#NodeClam)  
 **Returns**: <code>Promise.&lt;object&gt;</code> - Object like: `{ goodFiles: Array, badFiles: Array, errors: Object, viruses: Array }`  
+**Access**: public  
 
 | Param | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -372,6 +349,7 @@ method also allows for non-recursive scanning with the clamdscan binary.
 
 **Kind**: instance method of [<code>NodeClam</code>](#NodeClam)  
 **Returns**: <code>Promise.&lt;object&gt;</code> - Object like: `{ path: String, isInfected: Boolean, goodFiles: Array, badFiles: Array, viruses: Array }`  
+**Access**: public  
 
 | Param | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -407,6 +385,7 @@ have access to a local ClamAV binary.
 
 **Kind**: instance method of [<code>NodeClam</code>](#NodeClam)  
 **Returns**: <code>Promise.&lt;object&gt;</code> - Object like: `{ file: String, isInfected: Boolean, viruses: Array } `  
+**Access**: public  
 
 | Param | Type | Description |
 | --- | --- | --- |
@@ -508,6 +487,20 @@ This will flush out the stream when all data has been received.
 | Param | Type | Description |
 | --- | --- | --- |
 | cb | <code>function</code> | What to do when done |
+
+<a name="ping"></a>
+
+## ping ⇒ <code>Promise.&lt;object&gt;</code>
+Quick check to see if the remote/local socket is working. Callback/Resolve
+response is an instance to a ClamAV socket client.
+
+**Kind**: global variable  
+**Returns**: <code>Promise.&lt;object&gt;</code> - A copy of the Socket/TCP client  
+**Access**: public  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| [cb] | <code>function</code> | What to do after the ping |
 
 <a name="getFiles"></a>
 

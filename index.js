@@ -2,7 +2,7 @@
 /* eslint-disable no-async-promise-executor */
 /*!
  * Node - Clam
- * Copyright(c) 2013-2020 Kyle Farris <kyle@chomponllc.com>
+ * Copyright(c) 2013-2024 Kyle Farris <kylefarris@gmail.com>
  * MIT Licensed
  */
 
@@ -31,7 +31,7 @@ const fsStat = fsPromises.stat;
 const cpExecFile = promisify(execFile);
 
 /**
- * NodeClam class definition. To cf
+ * NodeClam class definition.
  *
  * @typicalname NodeClam
  */
@@ -39,6 +39,8 @@ class NodeClam {
     /**
      * This sets up all the defaults of the instance but does not
      * necessarily return an initialized instance. Use `.init` for that.
+     * 
+     * @constructor
      */
     constructor() {
         this.initialized = false;
@@ -82,6 +84,7 @@ class NodeClam {
     /**
      * Initialization method.
      *
+     * @public
      * @param {object} [options] - User options for the Clamscan module
      * @param {boolean} [options.removeInfected=false] - If true, removes infected files when found
      * @param {boolean|string} [options.quarantineInfected=false] - If not false, should be a string to a path to quarantine infected files
@@ -353,6 +356,7 @@ class NodeClam {
     /**
      * Allows one to create a new instances of clamscan with new options.
      *
+     * @public
      * @param {object} [options] - Same options as the `init` method
      * @param {Function} [cb] - What to do after reset (repsponds with reset instance of NodeClam)
      * @returns {Promise<object>} A reset instance of NodeClam
@@ -681,68 +685,13 @@ class NodeClam {
     }
 
     /**
-     * Quick check to see if the remote/local socket is working. Callback/Resolve
-     * response is an instance to a ClamAV socket client.
-     *
-     * @param {Function} [cb] - What to do after the ping
-     * @returns {Promise<object>} A copy of the Socket/TCP client
+     * Alias `ping()` for backwards-compatibility with older package versions.
+     * 
+     * @private
+     * @alias ping
      */
-    ping(cb) {
-        let hasCb = false;
-
-        // Verify second param, if supplied, is a function
-        if (cb && typeof cb !== 'function')
-            throw new NodeClamError('Invalid cb provided to ping. Second parameter must be a function!');
-
-        // Making things simpler
-        if (cb && typeof cb === 'function') hasCb = true;
-
-        // Setup the socket client variable
-        let client;
-
-        // eslint-disable-next-line consistent-return
-        return new Promise(async (resolve, reject) => {
-            try {
-                client = await this._initSocket('ping');
-
-                if (this.settings.debugMode)
-                    console.log(`${this.debugLabel}: Established connection to clamscan server!`);
-
-                client.write('PING');
-
-                let dataReceived = false;
-                client.on('end', () => {
-                    if (!dataReceived) {
-                        const err = new NodeClamError('Did not get a PONG response from clamscan server.');
-                        if (hasCb) cb(err, null);
-                        else reject(err);
-                    }
-                });
-
-                client.on('data', (data) => {
-                    if (data.toString().trim() === 'PONG') {
-                        dataReceived = true;
-                        if (this.settings.debugMode) console.log(`${this.debugLabel}: PONG!`);
-                        return hasCb ? cb(null, client) : resolve(client);
-                    }
-
-                    // I'm not even sure this case is possible, but...
-                    const err = new NodeClamError(
-                        data,
-                        'Could not establish connection to the remote clamscan server.'
-                    );
-                    return hasCb ? cb(err, null) : reject(err);
-                });
-                client.on('error', (err) => {
-                    if (this.settings.debugMode) {
-                        console.log(`${this.debugLabel}: Could not connect to the clamscan server.`, err);
-                    }
-                    return hasCb ? cb(err, null) : reject(err);
-                });
-            } catch (err) {
-                return hasCb ? cb(err, false) : reject(err);
-            }
-        });
+    _ping(cb) {
+        return this.ping(cb);
     }
 
     /**
@@ -829,6 +778,7 @@ class NodeClam {
     /**
      * Establish the clamav version of a local or remote clamav daemon.
      *
+     * @public
      * @param {Function} [cb] - What to do when version is established
      * @returns {Promise<string>} - The version of ClamAV that is being interfaced with
      * @example
@@ -926,6 +876,7 @@ class NodeClam {
      * If no callback is supplied, a Promise will be returned. This method will likely
      * be the most common use-case for this module.
      *
+     * @public
      * @param {string} file - Path to the file to check
      * @param {Function} [cb] - What to do after the scan
      * @returns {Promise<object>} Object like: `{ file: String, isInfected: Boolean, viruses: Array }`
@@ -1161,6 +1112,7 @@ class NodeClam {
      * so that you can decide if there's anything you need to do with the final output
      * destination (ex. delete a file or S3 object).
      *
+     * @public
      * @returns {Transform} A Transform stream for piping a Readable stream into
      * @example
      * const NodeClam = require('clamscan');
@@ -1450,9 +1402,77 @@ class NodeClam {
         });
     }
 
+        /**
+     * Quick check to see if the remote/local socket is working. Callback/Resolve
+     * response is an instance to a ClamAV socket client.
+     *
+     * @public
+     * @name ping
+     * @param {Function} [cb] - What to do after the ping
+     * @returns {Promise<object>} A copy of the Socket/TCP client
+     */
+    ping(cb) {
+        let hasCb = false;
+
+        // Verify second param, if supplied, is a function
+        if (cb && typeof cb !== 'function')
+            throw new NodeClamError('Invalid cb provided to ping. Second parameter must be a function!');
+
+        // Making things simpler
+        if (cb && typeof cb === 'function') hasCb = true;
+
+        // Setup the socket client variable
+        let client;
+
+        // eslint-disable-next-line consistent-return
+        return new Promise(async (resolve, reject) => {
+            try {
+                client = await this._initSocket('ping');
+
+                if (this.settings.debugMode)
+                    console.log(`${this.debugLabel}: Established connection to clamscan server!`);
+
+                client.write('PING');
+
+                let dataReceived = false;
+                client.on('end', () => {
+                    if (!dataReceived) {
+                        const err = new NodeClamError('Did not get a PONG response from clamscan server.');
+                        if (hasCb) cb(err, null);
+                        else reject(err);
+                    }
+                });
+
+                client.on('data', (data) => {
+                    if (data.toString().trim() === 'PONG') {
+                        dataReceived = true;
+                        if (this.settings.debugMode) console.log(`${this.debugLabel}: PONG!`);
+                        return hasCb ? cb(null, client) : resolve(client);
+                    }
+
+                    // I'm not even sure this case is possible, but...
+                    const err = new NodeClamError(
+                        data,
+                        'Could not establish connection to the remote clamscan server.'
+                    );
+                    return hasCb ? cb(err, null) : reject(err);
+                });
+                client.on('error', (err) => {
+                    if (this.settings.debugMode) {
+                        console.log(`${this.debugLabel}: Could not connect to the clamscan server.`, err);
+                    }
+                    return hasCb ? cb(err, null) : reject(err);
+                });
+            } catch (err) {
+                return hasCb ? cb(err, false) : reject(err);
+            }
+        });
+    }
+
     /**
      * Just an alias to `isInfected`. See docs for that for usage examples.
      *
+     * @public
      * @param {string} file - Path to the file to check
      * @param {Function} [cb] - What to do after the scan
      * @returns {Promise<object>} Object like: `{ file: String, isInfected: Boolean, viruses: Array }`
@@ -1470,6 +1490,7 @@ class NodeClam {
      *
      * **NOTE:** The only way to get per-file notifications is through the callback API.
      *
+     * @public
      * @param {Array} files - A list of files or paths (full paths) to be scanned
      * @param {Function} [endCb] - What to do after the scan completes
      * @param {Function} [fileCb] - What to do after each file has been scanned
@@ -1900,6 +1921,7 @@ class NodeClam {
      * using the `clamscan` binary. Doing so with `clamdscan` is okay, however. This
      * method also allows for non-recursive scanning with the clamdscan binary.
      *
+     * @public
      * @param {string} path - The directory to scan files of
      * @param {Function} [endCb] - What to do when all files have been scanned
      * @param {Function} [fileCb] - What to do after each file has been scanned
@@ -2165,6 +2187,7 @@ class NodeClam {
      * use of a TCP or UNIX Domain socket. In other words, this will not work if you only
      * have access to a local ClamAV binary.
      *
+     * @public
      * @param {Readable} stream - A readable stream to scan
      * @param {Function} [cb] - What to do when the socket response with results
      * @returns {Promise<object>} Object like: `{ file: String, isInfected: Boolean, viruses: Array } `
