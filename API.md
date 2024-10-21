@@ -38,6 +38,7 @@ By default, it will retrieve files recursively.</p>
 NodeClam class definition.
 
 **Kind**: global class  
+**Access**: public  
 
 * [NodeClam](#NodeClam)
     * [new NodeClam()](#new_NodeClam_new)
@@ -94,7 +95,7 @@ Initialization method.
 | [options.clamdscan.bypassTest] | <code>boolean</code> | <code>false</code> | If true, check to see if socket is avaliable |
 | [options.clamdscan.tls] | <code>boolean</code> | <code>false</code> | If true, connect to a TLS-Termination proxy in front of ClamAV |
 | [options.preference] | <code>object</code> | <code>&#x27;clamdscan&#x27;</code> | If preferred binary is found and active, it will be used by default |
-| [cb] | <code>function</code> |  | Callback method. Prototype: `(err, <instance of NodeClam>)` |
+| [cb] | <code>function</code> | <code></code> | Callback method. Prototype: `(err, <instance of NodeClam>)` |
 
 **Example**  
 ```js
@@ -137,10 +138,10 @@ Allows one to create a new instances of clamscan with new options.
 **Returns**: <code>Promise.&lt;object&gt;</code> - A reset instance of NodeClam  
 **Access**: public  
 
-| Param | Type | Description |
-| --- | --- | --- |
-| [options] | <code>object</code> | Same options as the `init` method |
-| [cb] | <code>function</code> | What to do after reset (repsponds with reset instance of NodeClam) |
+| Param | Type | Default | Description |
+| --- | --- | --- | --- |
+| [options] | <code>object</code> | <code>{}</code> | Same options as the `init` method |
+| [cb] | <code>function</code> | <code></code> | What to do after reset (repsponds with reset instance of NodeClam) |
 
 <a name="NodeClam+getVersion"></a>
 
@@ -179,10 +180,10 @@ be the most common use-case for this module.
 **Returns**: <code>Promise.&lt;object&gt;</code> - Object like: `{ file: String, isInfected: Boolean, viruses: Array }`  
 **Access**: public  
 
-| Param | Type | Description |
-| --- | --- | --- |
-| file | <code>string</code> | Path to the file to check |
-| [cb] | <code>function</code> | What to do after the scan |
+| Param | Type | Default | Description |
+| --- | --- | --- | --- |
+| file | <code>string</code> |  | Path to the file to check |
+| [cb] | <code>function</code> | <code></code> | What to do after the scan |
 
 **Example**  
 ```js
