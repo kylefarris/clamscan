@@ -7,7 +7,7 @@ const fakeVirusUrl = 'https://www.eicar.org/download/eicar-com-2/?wpdmdl=8842&re
 const testUrl = fakeVirusUrl;
 
 // Initialize the clamscan module
-const NodeClam = require('../index.js'); // Offically: require('clamscan');
+const NodeClam = require('../index'); // Offically: require('clamscan');
 
 /**
  * Actually run the test.
@@ -19,18 +19,15 @@ async function test() {
             bypassTest: true,
             host: 'localhost',
             port: 3310,
-            //socket: '/var/run/clamd.scan/clamd.sock',
+            // socket: '/var/run/clamd.scan/clamd.sock',
         },
     });
 
     // Fetch fake Eicar virus file and pipe it through to our scan screeam
     const passthrough = new PassThrough();
-    axios.get(
-        testUrl, { responseType: 'stream' }
-    ).then((response) => {
+    axios.get(testUrl, { responseType: 'stream' }).then((response) => {
         response.data.pipe(passthrough);
     });
-
 
     try {
         const { isInfected, viruses } = await clamscan.scanStream(passthrough);

@@ -18,7 +18,7 @@ const config = {
 };
 
 // Initialize the clamscan module
-const NodeClam = require('../index.js'); // Offically: require('clamscan');
+const NodeClam = require('../index'); // Offically: require('clamscan');
 
 (async () => {
     const clamscan = await new NodeClam().init(config);

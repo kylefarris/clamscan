@@ -1,5 +1,5 @@
 // Initialize the clamscan module
-const NodeClam = require('../index.js'); // Offically: require('clamscan');
+const NodeClam = require('../index'); // Offically: require('clamscan');
 
 const ClamScan = new NodeClam().init({
     debugMode: false,

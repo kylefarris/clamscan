@@ -12,7 +12,7 @@ const { Readable } = require('stream');
 
 const goodScanDir = `${__dirname}/good_scan_dir`;
 const badScanDir = `${__dirname}/bad_scan_dir`;
-const mixedScanDir = `${__dirname}/mixed_scan_dir`
+const mixedScanDir = `${__dirname}/mixed_scan_dir`;
 const badScanFile = `${badScanDir}/bad_file_1.txt`;
 const spacedVirusFile = `${badScanDir}/bad  file  1.txt`;
 

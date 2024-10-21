@@ -1,4 +1,5 @@
 /* eslint-disable no-unused-vars */
+/* eslint-disable no-useless-catch */
 /* eslint-env mocha */
 const fs = require('fs');
 const path = require('path');
@@ -44,7 +45,7 @@ const fsCopyfile = promisify(fs.copyFile);
 
 chai.use(chaiAsPromised);
 
-const NodeClam = require('../index.js');
+const NodeClam = require('../index');
 
 const check = (done, f) => {
     try {
@@ -219,7 +220,10 @@ describe('Initialized NodeClam module', () => {
         expect(resetClam({ preference: 'clamscan' }), 'valid scanner').to.not.be.rejectedWith(Error);
         expect(resetClam({ preference: 'badscanner' }), 'invalid scanner').to.not.be.rejectedWith(Error);
         expect(
-            resetClam({ clamdscan: { localFallback: true, socket: false, port: false, host: false }, preference: 'badscanner' }),
+            resetClam({
+                clamdscan: { localFallback: true, socket: false, port: false, host: false },
+                preference: 'badscanner',
+            }),
             'invalid scanner - no socket or host for local fallback'
         ).to.be.rejectedWith(Error);
     });
@@ -314,10 +318,12 @@ describe('Initialized NodeClam module', () => {
     });
 
     it('should initialize with only a port (no host or socket provided)', async () => {
-        expect(resetClam({
-            preference: 'clamdscan',
-            clamdscan: { host: null, port: config.clamdscan.port },
-        })).to.not.be.rejectedWith(Error);
+        expect(
+            resetClam({
+                preference: 'clamdscan',
+                clamdscan: { host: null, port: config.clamdscan.port },
+            })
+        ).to.not.be.rejectedWith(Error);
     });
 });
 
@@ -787,7 +793,11 @@ describe('isInfected', () => {
 
         it('should be okay when scanning a file with consecutive (or any) spaces in it while doing a local scan', async () => {
             // Make sure we're forced to scan locally
-            clamscan = await resetClam({ clamdscan: { host: null, port: null, socket: null, localFallback: true }, debugMode: false, quarantineInfected: false });
+            clamscan = await resetClam({
+                clamdscan: { host: null, port: null, socket: null, localFallback: true },
+                debugMode: false,
+                quarantineInfected: false,
+            });
 
             // Write virus file with spaces in its name
             eicarGen.writeFileSpaced();
@@ -1177,23 +1187,32 @@ describe('scanFiles', () => {
                 expect(viruses).to.have.length(1);
                 expect(viruses[0]).to.match(eicarSignatureRgx);
             } catch (err) {
+                // This is mostly just here to allow for the `finally` block
                 throw err;
             } finally {
                 if (fs.existsSync(badScanFile)) fs.unlinkSync(badScanFile);
             }
         });
     });
-    
+
     describe('edge cases', () => {
         it('should be fine when one of the filenames has consecutive spaces in it when locally scanning', async () => {
             // Make sure we're forced to scan locally
-            clamscan = await resetClam({ clamdscan: { host: null, port: null, socket: null, localFallback: true }, debugMode: false, quarantineInfected: false });
+            clamscan = await resetClam({
+                clamdscan: { host: null, port: null, socket: null, localFallback: true },
+                debugMode: false,
+                quarantineInfected: false,
+            });
 
             eicarGen.writeFile();
             eicarGen.writeFileSpaced();
 
             try {
-                const { goodFiles, badFiles, errors, viruses } = await clamscan.scanFiles([badScanFile, goodScanFile, spacedVirusFile]);
+                const { goodFiles, badFiles, errors, viruses } = await clamscan.scanFiles([
+                    badScanFile,
+                    goodScanFile,
+                    spacedVirusFile,
+                ]);
                 expect(goodFiles).to.not.be.empty;
                 expect(goodFiles).to.be.an('array');
                 expect(goodFiles).to.have.length(1);
@@ -1206,6 +1225,7 @@ describe('scanFiles', () => {
                 expect(viruses).to.have.length(1);
                 expect(viruses[0]).to.match(eicarSignatureRgx);
             } catch (err) {
+                // This is mostly just here to allow for the `finally` block
                 throw err;
             } finally {
                 if (fs.existsSync(badScanFile)) fs.unlinkSync(badScanFile);
@@ -1354,12 +1374,8 @@ describe('scanDir', () => {
 
                 expect(badFiles, 'bad files should be array').to.be.an('array');
                 expect(badFiles, 'bad files should have 2 items').to.have.length(2);
-                expect(validBadFiles, 'bad files should include bad_file_1.txt').to.include(
-                    badFiles[0].file
-                );
-                expect(validBadFiles, 'bad files should include bad_file_2.txt').to.include(
-                    badFiles[1].file
-                );
+                expect(validBadFiles, 'bad files should include bad_file_1.txt').to.include(badFiles[0].file);
+                expect(validBadFiles, 'bad files should include bad_file_2.txt').to.include(badFiles[1].file);
 
                 expect(goodFiles, 'good files should be array').to.be.an('array');
                 expect(goodFiles, 'good files should be empty').to.have.length(0);
@@ -1381,11 +1397,15 @@ describe('scanDir', () => {
     describe('edge cases', () => {
         it('should work when falling back to local scan and there is a file with consecutive spaces in it', async () => {
             // Make sure we're forced to scan locally
-            clamscan = await resetClam({ clamdscan: { host: null, port: null, socket: null, localFallback: true }, debugMode: false, quarantineInfected: false });
+            clamscan = await resetClam({
+                clamdscan: { host: null, port: null, socket: null, localFallback: true },
+                debugMode: false,
+                quarantineInfected: false,
+            });
 
             eicarGen.writeFile();
             eicarGen.writeFileSpaced();
-    
+
             try {
                 const { goodFiles, badFiles, viruses } = await clamscan.scanDir(badScanDir);
 
@@ -1398,13 +1418,14 @@ describe('scanDir', () => {
                 expect(badFiles).to.be.an('array');
                 expect(badFiles).to.have.length(2);
             } catch (err) {
+                // This is mostly just here to allow for the `finally` block
                 throw err;
             } finally {
                 if (fs.existsSync(badScanFile)) fs.unlinkSync(badScanFile);
                 if (fs.existsSync(spacedVirusFile)) fs.unlinkSync(spacedVirusFile);
             }
         });
-    })
+    });
 });
 
 describe('scanStream', () => {
@@ -1738,9 +1759,14 @@ describe('passthrough', () => {
 
     // https://github.com/kylefarris/clamscan/issues/82
     it('should not throw multiple callback error', (done) => {
-        // To reliably reproduce the issue in the broken code, it's important that this is an async generator
-        // and it emits some chunks larger than the default highWaterMark of 16 KB.
-        // eslint-disable-next-line require-jsdoc
+        /**
+         * To reliably reproduce the issue in the broken code, it's important that this is an async generator
+         * and it emits some chunks larger than the default highWaterMark of 16 KB.
+         *
+         * @generator
+         * @param {number} [i = 10] - Starting index for generating buffers
+         * @yields {Buffer} 1KB Buffer fill with NULLs
+         */
         async function* gen(i = 10) {
             while (i < 25) {
                 i += 1;

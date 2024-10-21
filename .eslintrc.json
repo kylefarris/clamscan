@@ -1,30 +1,36 @@
 {
-    "parser": "babel-eslint",
     "env": {
         "browser": false,
         "node": true,
-        "es6": true
+        "es6": true,
+        "mocha": true
     },
-    "extends": ["airbnb-base", "plugin:prettier/recommended", "plugin:chai-friendly/recommended"],
+    "extends": [
+        "airbnb-base",
+        "plugin:prettier/recommended",
+        "plugin:chai-friendly/recommended",
+        "plugin:jsdoc/recommended"
+    ],
     "plugins": ["prettier", "chai-friendly", "jsdoc"],
     "globals": {
         "Atomics": "readonly",
         "SharedArrayBuffer": "readonly"
     },
     "parserOptions": {
-        "ecmaVersion": 2018,
+        "ecmaVersion": 2022,
         "sourceType": "module"
     },
     "rules": {
         "no-console": "off",
         "no-param-reassign": "off",
         "prettier/prettier": "error",
-        "no-underscore-dangle": "off",
         "class-methods-use-this": "off",
         "require-jsdoc": "error",
         "valid-jsdoc": "off",
         "global-require": "warn",
         "lines-between-class-members": "off",
+        "no-underscore-dangle": "off",
+        "no-promise-executor-return": "off",
         "jsdoc/check-alignment": 1, // Recommended
         "jsdoc/check-indentation": 1,
         "jsdoc/check-param-names": 1, // Recommended
@@ -32,19 +38,26 @@
         "jsdoc/check-tag-names": [
             "warn",
             {
-                "definedTags": ["typicalname", "route", "authentication", "bodyparam", "routeparam"]
+                "definedTags": [
+                    "typicalname",
+                    "route",
+                    "authentication",
+                    "bodyparam",
+                    "routeparam",
+                    "queryparam"
+                ]
             }
         ],
         "jsdoc/check-types": 1, // Recommended
         "jsdoc/implements-on-classes": 1, // Recommended
         "jsdoc/match-description": 1,
-        "jsdoc/newline-after-description": 1, // Recommended
-        "jsdoc/no-undefined-types": [
-            "warn",
+        "jsdoc/tag-lines": [
+            "error",
+            "never",
             {
-                "definedTypes": ["DELETE", "POST", "PATCH", "PUT", "GET"]
+                "startLines": 1
             }
-        ], // Recommended
+        ],
         "jsdoc/require-description": 1,
         "jsdoc/require-hyphen-before-param-description": 1,
         "jsdoc/require-jsdoc": 1, // Recommended
@@ -56,16 +69,19 @@
         "jsdoc/require-returns-check": 1, // Recommended
         "jsdoc/require-returns-description": 1, // Recommended
         "jsdoc/require-returns-type": 1, // Recommended
-        "jsdoc/valid-types": 1 // Recommended
-    },
-    "settings": {
-        "jsdoc": {
-            "plugins": ["jsdoc-route-plugin"],
-            "structuredTags": {
-                "route": {
-                    "type": ["DELETE", "POST", "PATCH", "PUT", "GET"]
-                }
-            }
-        }
+        "jsdoc/valid-types": 1, // Recommended
+        "jsdoc/no-defaults": 0, // Recommended
+        "jsdoc/check-access": 1, // Recommended
+        "jsdoc/check-property-names": 1, // Recommended
+        "jsdoc/check-values": 1, // Recommended
+        "jsdoc/empty-tags": 1, // Recommended
+        "jsdoc/multiline-blocks": 1, // Recommended
+        "jsdoc/no-multi-asterisks": 1, // Recommended
+        "jsdoc/require-property": 1, // Recommended
+        "jsdoc/require-property-description": 1, // Recommended
+        "jsdoc/require-property-name": 1, // Recommended
+        "jsdoc/require-property-type": 1, // Recommended
+        "jsdoc/require-yields": 1, // Recommended
+        "jsdoc/require-yields-check": 1 // Recommended
     }
 }

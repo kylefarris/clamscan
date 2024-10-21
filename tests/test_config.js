@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const p = require('node:path');
 
 const isMac = process.platform === 'darwin';
-const isGithub = process.env.CI ? true : false;
+const isGithub = !!process.env.CI;
 
 // Walk $PATH to find bin
 const which = (bin) => {

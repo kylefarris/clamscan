@@ -115,7 +115,7 @@ async function pipe2s3(req, res, opts = {}) {
             }
 
             // If the scan threw an error...
-            else if (scanResult instanceof Error) {
+            if (scanResult instanceof Error) {
                 if ('data' in scanResult && scanResult.data.is_infected) {
                     logError('Stream contained virus(es):', scanResult.data.viruses);
                 }

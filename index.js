@@ -16,12 +16,12 @@ const { promisify } = require('util');
 const { execFile } = require('child_process');
 const { PassThrough, Transform, Readable } = require('stream');
 const { Socket } = require('dgram');
+const fsPromises = require('fs').promises;
 const NodeClamError = require('./lib/NodeClamError');
 const NodeClamTransform = require('./lib/NodeClamTransform');
 const getFiles = require('./lib/getFiles');
 
 // Re-named `fs` promise methods to prevent conflicts while keeping short names
-const fsPromises = require('fs').promises;
 const fsAccess = fsPromises.access;
 const fsReadfile = fsPromises.readFile;
 const fsReaddir = fsPromises.readdir;
@@ -33,14 +33,14 @@ const cpExecFile = promisify(execFile);
 /**
  * NodeClam class definition.
  *
+ * @class
+ * @public
  * @typicalname NodeClam
  */
 class NodeClam {
     /**
      * This sets up all the defaults of the instance but does not
      * necessarily return an initialized instance. Use `.init` for that.
-     * 
-     * @constructor
      */
     constructor() {
         this.initialized = false;
@@ -111,7 +111,7 @@ class NodeClam {
      * @param {boolean} [options.clamdscan.bypassTest=false] - If true, check to see if socket is avaliable
      * @param {boolean} [options.clamdscan.tls=false] - If true, connect to a TLS-Termination proxy in front of ClamAV
      * @param {object} [options.preference='clamdscan'] - If preferred binary is found and active, it will be used by default
-     * @param {Function} [cb] - Callback method. Prototype: `(err, <instance of NodeClam>)`
+     * @param {Function} [cb = null] - Callback method. Prototype: `(err, <instance of NodeClam>)`
      * @returns {Promise<object>} An initated instance of NodeClam
      * @example
      * const NodeClam = require('clamscan');
@@ -144,7 +144,7 @@ class NodeClam {
      *     preference: 'clamdscan'
      });
      */
-    async init(options = {}, cb) {
+    async init(options = {}, cb = null) {
         let hasCb = false;
 
         // Verify second param, if supplied, is a function
@@ -357,11 +357,11 @@ class NodeClam {
      * Allows one to create a new instances of clamscan with new options.
      *
      * @public
-     * @param {object} [options] - Same options as the `init` method
-     * @param {Function} [cb] - What to do after reset (repsponds with reset instance of NodeClam)
+     * @param {object} [options = {}] - Same options as the `init` method
+     * @param {Function} [cb = null] - What to do after reset (repsponds with reset instance of NodeClam)
      * @returns {Promise<object>} A reset instance of NodeClam
      */
-    reset(options = {}, cb) {
+    reset(options = {}, cb = null) {
         let hasCb = false;
 
         // Verify second param, if supplied, is a function
@@ -686,11 +686,13 @@ class NodeClam {
 
     /**
      * Alias `ping()` for backwards-compatibility with older package versions.
-     * 
+     *
      * @private
      * @alias ping
+     * @param {Function} [cb] - Callback function
+     * @returns {Promise<object>} A copy of the Socket/TCP client
      */
-    _ping(cb) {
+    _ping(cb = null) {
         return this.ping(cb);
     }
 
@@ -737,11 +739,15 @@ class NodeClam {
             }
 
             // Parse out the name of the virus(es) found...
-            const viruses = Array.from(new Set(result
-                // eslint-disable-next-line no-control-regex
-                .split(/(\u0000|[\r\n])/)
-                .map((v) => (/:\s+(.+)FOUND$/gm.test(v) ? v.replace(/(.+:\s+)(.+)FOUND/gm, '$2').trim() : null))
-                .filter((v) => !!v)));
+            const viruses = Array.from(
+                new Set(
+                    result
+                        // eslint-disable-next-line no-control-regex
+                        .split(/(\u0000|[\r\n])/)
+                        .map((v) => (/:\s+(.+)FOUND$/gm.test(v) ? v.replace(/(.+:\s+)(.+)FOUND/gm, '$2').trim() : null))
+                        .filter((v) => !!v)
+                )
+            );
 
             return { isInfected: true, viruses, file, resultString: result, timeout };
         }
@@ -878,7 +884,7 @@ class NodeClam {
      *
      * @public
      * @param {string} file - Path to the file to check
-     * @param {Function} [cb] - What to do after the scan
+     * @param {Function} [cb = null] - What to do after the scan
      * @returns {Promise<object>} Object like: `{ file: String, isInfected: Boolean, viruses: Array }`
      * @example
      * // Callback Example
@@ -901,7 +907,7 @@ class NodeClam {
      * // Async/Await Example
      * const {file, isInfected, viruses} = await clamscan.isInfected('/a/picture/for_example.jpg');
      */
-    isInfected(file = '', cb) {
+    isInfected(file = '', cb = null) {
         const self = this;
         let hasCb = false;
 
@@ -1326,7 +1332,7 @@ class NodeClam {
                                         else if (
                                             typeof result === 'object' &&
                                             'isInfected' in result &&
-                                            result.isInfected === true
+                                            result.isInfected === false
                                         ) {
                                             this.emit('timeout');
                                             handleError(null, false, result);
@@ -1402,7 +1408,7 @@ class NodeClam {
         });
     }
 
-        /**
+    /**
      * Quick check to see if the remote/local socket is working. Callback/Resolve
      * response is an instance to a ClamAV socket client.
      *
@@ -1578,11 +1584,11 @@ class NodeClam {
                     .forEach((result) => {
                         if (/^[-]+$/.test(result)) return;
 
-                        let path = result.match(/^(.*): /);
-                        if (path && path.length > 0) {
-                            path = path[1];
-                        } else {
-                            path = '<Unknown File Path!>';
+                        let path = '<Unknown File Path!>';
+                        const pathMatch = result.match(/^(.*): /);
+                        if (pathMatch && pathMatch.length > 0) {
+                            // eslint-disable-next-line prefer-destructuring
+                            path = pathMatch[1];
                         }
 
                         // eslint-disable-next-line no-control-regex
@@ -2101,10 +2107,14 @@ class NodeClam {
                                 // If the path is infected, build out list of infected files
                                 let badFiles = [];
                                 if (isInfected) {
-                                    badFiles = Array.from(new Set(result.resultString.split(os.EOL).map(v => {
-                                        const [file, virus] = v.replace(/ FOUND$/, '').split(': ');
-                                        return { file, virus };
-                                    })));
+                                    badFiles = Array.from(
+                                        new Set(
+                                            result.resultString.split(os.EOL).map((v) => {
+                                                const [file, virus] = v.replace(/ FOUND$/, '').split(': ');
+                                                return { file, virus };
+                                            })
+                                        )
+                                    );
                                 }
 
                                 // Having a list of good files could use up all available memory if a big enough
@@ -2115,7 +2125,8 @@ class NodeClam {
                                 const numGoodFiles = (await getFiles(path)).length - badFiles.length;
 
                                 if (this.settings.debugMode) console.log(`${this.debugLabel}: Bad Files: `, badFiles);
-                                if (this.settings.debugMode) console.log(`${this.debugLabel}: # Good Files: `, numGoodFiles);
+                                if (this.settings.debugMode)
+                                    console.log(`${this.debugLabel}: # Good Files: `, numGoodFiles);
 
                                 return hasCb
                                     ? endCb(null, goodFiles, badFiles, viruses, numGoodFiles)
@@ -2265,14 +2276,14 @@ class NodeClam {
                 // stream.pipe(transform).pipe(socket);
                 transform
                     // Writing data into ClamAV socket
-                    .on('data', data => {
+                    .on('data', (data) => {
                         socket.write(data);
                     })
                     // The transform stream has dried up
                     .on('end', () => {
                         if (this.settings.debugMode) console.log(`${this.debugLabel}: The transform stream has ended.`);
                     })
-                    .on('error', err => {
+                    .on('error', (err) => {
                         console.error(`${this.debugLabel}: Error emitted from transform stream: `, err);
                         socket.end();
                         return hasCb ? cb(err, null) : reject(err);
@@ -2281,7 +2292,7 @@ class NodeClam {
                 // Setup the listeners for the stream
                 stream
                     // The stream is writting data into transform stream
-                    .on('data', data => {
+                    .on('data', (data) => {
                         transform.write(data);
                     })
                     // The stream has dried up
